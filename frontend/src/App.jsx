@@ -1,0 +1,202 @@
+import { useEffect, useState } from 'react'
+import { supabase } from './lib/supabase'
+import { usePermisos } from './hooks/usePermisos'
+import Login from './pages/Login'
+import Sidebar from './components/Sidebar'
+import MonitorStock from './pages/MonitorStock'
+import SeguimientoOC from './pages/SeguimientoOC'
+import Proveedores from './pages/Proveedores'
+import HistorialOC from './pages/HistorialOC'
+import UsuariosAccesos from './pages/UsuariosAccesos'
+import Alertas from './pages/Alertas'
+import OrdenesCompra from './pages/OrdenesCompra'
+import ConectorYiQi from './pages/ConectorYiQi'
+import PredictorDemanda from './pages/PredictorDemanda'
+import NuevaOC from './pages/NuevaOC'
+import ReglasAlertas from './pages/ReglasAlertas'
+import CatalogoCausas from './pages/CatalogoCausas'
+import Empresa from './pages/Empresa'
+import TemplatesMensajes from './pages/TemplatesMensajes'
+import CondicionesProveedor from './pages/CondicionesProveedor'
+
+// ------------------------------------------------------------
+// Páginas que YA tienen datos reales conectados para la demo.
+// El resto del sidebar es navegable (para mostrar la interfaz
+// completa a Aris) pero muestra un aviso de "en construcción".
+// ------------------------------------------------------------
+const PAGINAS_CON_DATOS_REALES = [
+  'stock',
+  'seguimiento',
+  'proveedores',
+  'historial',
+  'usuarios',
+  'alertas',
+  'ocs',
+  'yiqi',
+  'predictor',
+  'nueva-oc',
+  'reglas',
+  'causas',
+  'empresa',
+  'templates',
+  'condiciones',
+]
+
+function PaginaEnConstruccion({ nombre }) {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#f7f8fa]">
+      <div className="text-center max-w-sm">
+        <div className="text-4xl mb-3">🚧</div>
+        <div className="text-lg font-bold mb-1">{nombre}</div>
+        <div className="text-sm text-gray-500">
+          Esta sección está en desarrollo. El diseño completo ya está
+          validado en el prototipo — falta conectar la lógica real.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const TITULOS = {
+  alertas: 'Alertas',
+  ocs: 'Órdenes de compra',
+  historial: 'Historial de OC',
+  'nueva-oc': 'Nueva OC',
+  predictor: 'Predictor de demanda',
+  proveedores: 'Proveedores',
+  usuarios: 'Usuarios y accesos',
+  causas: 'Catálogo de causas',
+  empresa: 'Datos de la empresa',
+  condiciones: 'Condiciones comerciales',
+  reglas: 'Reglas y alertas',
+  templates: 'Templates de mensajes',
+  yiqi: 'Conector YiQi',
+}
+
+// ============================================================
+// Parte logueada de la app.
+//
+// Se separa en su propio componente para poder usar usePermisos()
+// SOLO cuando hay sesión. Si el hook viviera en App, correría también
+// en la pantalla de login y fallaría con "No hay sesión activa" cada
+// vez que alguien abre la app sin estar logueado.
+// ============================================================
+function AppLogueada({ session, onLogout }) {
+  const permisos = usePermisos()
+  const [currentPage, setCurrentPage] = useState('stock')
+  const [contadores, setContadores] = useState({})
+  const [ultimaSync, setUltimaSync] = useState(null)
+
+  // El nombre sale de usuarios_config, no de partir el mail: con las
+  // cuentas reales, el mail comprasdentalab@gmail.com mostraría
+  // "comprasdentalab" en el sidebar. Si por algún motivo no hay nombre
+  // cargado, cae al mail como respaldo.
+  const nombreUsuario =
+    permisos.nombreUsuario || session.user.email?.split('@')[0] || 'Usuario'
+
+  // Clave derivada de los permisos: misma técnica que en las pantallas.
+  // Evita recalcular los contadores en cada refresh de token de Supabase.
+  const claveFiltro =
+    permisos.cargando || permisos.error
+      ? null
+      : `${permisos.esAdmin}|${permisos.codigos.join(',')}|${permisos.nombres.join(',')}`
+
+  useEffect(() => {
+    if (claveFiltro === null) return
+    let vivo = true
+
+    async function cargarContadores() {
+      // contadores_sidebar() NO es SECURITY DEFINER a propósito: corre
+      // con los permisos del usuario logueado, así que el RLS filtra
+      // solo y cada uno ve sus propios números sin duplicar la lógica
+      // de permisos en el frontend.
+      const { data, error } = await supabase.rpc('contadores_sidebar')
+      if (!vivo) return
+      if (error) {
+        // Los badges no son crítica: si falla, simplemente no se dibujan.
+        console.error('[contadores_sidebar]', error)
+        return
+      }
+      setContadores(data ?? {})
+      setUltimaSync(data?.ultimaSync ?? null)
+    }
+
+    cargarContadores()
+    return () => {
+      vivo = false
+    }
+  }, [claveFiltro])
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar
+        currentPage={currentPage}
+        onNavigate={setCurrentPage}
+        contadores={contadores}
+        ultimaSync={ultimaSync}
+        nombreUsuario={nombreUsuario}
+        onLogout={onLogout}
+      />
+
+      {currentPage === 'stock' && <MonitorStock />}
+      {currentPage === 'seguimiento' && <SeguimientoOC />}
+      {currentPage === 'proveedores' && <Proveedores />}
+      {currentPage === 'historial' && <HistorialOC />}
+      {currentPage === 'usuarios' && <UsuariosAccesos />}
+      {currentPage === 'alertas' && <Alertas />}
+      {currentPage === 'ocs' && <OrdenesCompra />}
+      {currentPage === 'yiqi' && <ConectorYiQi />}
+      {currentPage === 'predictor' && <PredictorDemanda />}
+      {currentPage === 'nueva-oc' && <NuevaOC />}
+      {currentPage === 'reglas' && <ReglasAlertas />}
+      {currentPage === 'causas' && <CatalogoCausas />}
+      {currentPage === 'empresa' && <Empresa />}
+      {currentPage === 'templates' && <TemplatesMensajes />}
+      {currentPage === 'condiciones' && <CondicionesProveedor />}
+      {!PAGINAS_CON_DATOS_REALES.includes(currentPage) && (
+        <PaginaEnConstruccion nombre={TITULOS[currentPage] ?? currentPage} />
+      )}
+    </div>
+  )
+}
+
+export default function App() {
+  const [session, setSession] = useState(undefined) // undefined = todavía no sabemos, null = no logueado
+
+  useEffect(() => {
+    // Revisar si ya hay una sesión activa (por ejemplo, si recargaste la página)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    // Escuchar cambios de sesión (login / logout)
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  // Todavía verificando si hay sesión guardada — evita parpadeo de la pantalla de login
+  if (session === undefined) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#f7f8fa] text-sm text-gray-400">
+        Cargando…
+      </div>
+    )
+  }
+
+  // No hay sesión activa — mostrar login
+  if (!session) {
+    return <Login onLoginExitoso={() => {}} />
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+  }
+
+  // `key` fuerza a remontar todo si cambia el usuario: así los permisos,
+  // los contadores y el estado de las pantallas arrancan limpios y no
+  // quedan datos del usuario anterior en pantalla.
+  return <AppLogueada key={session.user.id} session={session} onLogout={handleLogout} />
+}

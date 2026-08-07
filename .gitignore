@@ -1,0 +1,20 @@
+.env
+.env.local
+node_modules/
+__pycache__/
+*.pyc
+dist/
+build/
+# artefactos de exploracion con datos reales de clientes
+script-Exploracion/
+yiqi-responses/
+
+# credenciales en texto plano (5/8/2026 - rotar igual: estuvieron expuestas)
+dentalabs_Sup_KW.txt
+*_Sup_KW.txt
+
+# copias de seguridad manuales: NO deben viajar al bundle de Deno
+*.bak
+*.bak[0-9]
+# scratch de la sesion, no versionar
+_to_delete*/

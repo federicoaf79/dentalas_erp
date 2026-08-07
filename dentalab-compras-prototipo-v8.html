@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dentalab Compras — v8</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --ind:#4338ca;--ind-d:#3730a3;--ind-bg:#eef2ff;--ind-lt:#e0e7ff;
+  --red:#9b1c1c;--red-bg:#fdf2f2;--red-bd:#fca5a5;
+  --yel:#FFC72C;--yel-bg:#fffbe6;--yel-bd:#FFC72C;
+  --blu:#1d4ed8;--blu-bg:#eff6ff;--blu-bd:#93c5fd;
+  --grn:#3d9970;--grn-d:#2d7a56;--grn-bg:#e8f5ee;--grn-bd:#a3d9bc;
+  --border:#e5e7eb;--text:#111827;--sub:#6b7280;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;color:var(--text);font-size:14px}
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:228px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.logo{padding:14px 14px 12px;border-bottom:1px solid var(--border)}
+.logo-name{font-size:15px;font-weight:700}
+.logo-sync{font-size:10px;color:var(--grn);display:flex;align-items:center;gap:4px;font-weight:600;margin-top:2px}
+.nav{padding:7px 6px;flex:1;overflow-y:auto}
+.nav-section{font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;padding:11px 9px 3px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:8px;cursor:pointer;color:#374151;font-size:13px;margin-bottom:1px;user-select:none;transition:background .12s}
+.nav-item:hover{background:var(--ind-bg)}
+.nav-item.active{background:var(--ind-bg);color:var(--ind);font-weight:700}
+.nav-item i{font-size:15px;flex-shrink:0}
+.nb-wrap{margin-left:auto;display:flex;gap:3px;align-items:center}
+.nb{color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:9px;min-width:18px;text-align:center;display:inline-block}
+.nb-red{background:var(--red)}.nb-yel{background:var(--yel);color:#1a1a1a}.nb-blu{background:var(--blu)}.nb-ind{background:var(--ind)}.nb-grn{background:var(--grn)}
+.user-area{padding:10px 12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:9px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--ind-bg);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--ind);flex-shrink:0}
+.user-name{font-size:13px;font-weight:600}.user-role{font-size:10px;color:var(--sub)}
+.main{flex:1;overflow-y:auto;background:#f7f8fa}
+.page{display:none}.page.active{display:block}
+.ph{padding:15px 24px 13px;border-bottom:1px solid var(--border);background:#fff;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ph-title{font-size:17px;font-weight:700}.ph-sub{font-size:12px;color:var(--sub);margin-top:2px}
+.ha{display:flex;gap:7px;flex-shrink:0;align-items:center}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 24px}
+.metric{background:#fff;border-radius:10px;padding:13px 15px;border:1px solid var(--border)}
+.ml{font-size:10px;color:var(--sub);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.mv{font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.ms{font-size:11px;color:#9ca3af;margin-top:4px}
+.mv-red{color:var(--red)}.mv-yel{color:#92400e}.mv-grn{color:var(--grn)}.mv-ind{color:var(--ind)}.mv-blu{color:var(--blu)}.mv-n{color:var(--text)}
+.pad{padding:0 24px 26px}
+.tw{background:#fff;border-radius:10px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px}
+table{width:100%;border-collapse:collapse}
+th{padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--sub);border-bottom:1px solid var(--border);background:#fafafa;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+td{padding:11px 12px;font-size:13px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#fafafa}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:14px;font-size:11px;font-weight:600;white-space:nowrap}
+.bgray{background:#f3f4f6;color:#374151}.bred{background:var(--red-bg);color:var(--red)}.byel{background:var(--yel-bg);color:#92400e}.bblu{background:var(--blu-bg);color:var(--blu)}.bgrn{background:var(--grn-bg);color:var(--grn)}.bind{background:var(--ind-bg);color:var(--ind)}
+.cc{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap;background:#f3f4f6;color:#374151}
+.cc-red{background:var(--red-bg);color:var(--red)}.cc-yel{background:var(--yel-bg);color:#92400e}.cc-blu{background:var(--blu-bg);color:var(--blu)}
+.stock-bar-wrap{display:flex;align-items:center;gap:6px}
+.stock-bar{width:68px;height:8px;background:#e5e7eb;border-radius:4px;position:relative;overflow:visible;flex-shrink:0}
+.stock-fill{height:100%;border-radius:4px}
+.stock-min-mark{position:absolute;top:-3px;height:14px;width:2px;background:#FFC72C;border-radius:1px}
+.stock-max-mark{position:absolute;top:-3px;height:14px;width:2px;background:#3d9970;border-radius:1px}
+.stock-val{font-size:12px;font-weight:700;min-width:26px}
+.sem{width:10px;height:10px;border-radius:50%;flex-shrink:0;display:inline-block}
+.sg{background:var(--grn);box-shadow:0 0 0 3px var(--grn-bg)}.sy{background:var(--yel);box-shadow:0 0 0 3px var(--yel-bg)}.sr{background:var(--red);box-shadow:0 0 0 3px var(--red-bg)}.sb2{background:var(--blu);box-shadow:0 0 0 3px var(--blu-bg)}
+.sem-legend{display:flex;align-items:center;gap:14px;padding:9px 13px;background:#fff;border:1px solid var(--border);border-radius:9px;margin:12px 24px 0;font-size:12px;flex-wrap:wrap}
+.sem-legend-item{display:flex;align-items:center;gap:6px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:#fff;color:#374151;transition:all .15s;white-space:nowrap;font-family:inherit}
+.btn:hover{background:#f3f4f6}
+.bp{background:var(--ind);color:#fff;border-color:var(--ind)}.bp:hover{background:var(--ind-d)}
+.bgrn2{background:var(--grn);color:#fff;border-color:var(--grn)}.bgrn2:hover{background:var(--grn-d)}
+.bblu2{background:var(--blu);color:#fff;border-color:var(--blu)}.bblu2:hover{background:#1e40af}
+.bred2{background:var(--red-bg);color:var(--red);border-color:var(--red-bd)}
+.byel2{background:var(--yel-bg);color:#92400e;border-color:var(--yel-bd)}
+.bsm{padding:5px 10px;font-size:12px}
+.bgh{border-color:transparent;background:transparent}.bgh:hover{background:#f3f4f6}
+.oc-card{background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:11px;overflow:hidden}
+.oc-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.oc-head{padding:13px 17px;display:flex;align-items:center;gap:11px;cursor:pointer;user-select:none}
+.oc-head:hover{background:#fafafa}
+.oc-prov{font-size:14px;font-weight:700}.oc-meta{font-size:12px;color:var(--sub);margin-top:2px}
+.oc-body{border-top:1px solid #f3f4f6;display:none}.oc-body.open{display:block}
+.oc-row{display:flex;align-items:center;gap:10px;padding:10px 17px;border-bottom:1px solid #f7f8fa;font-size:13px}
+.oc-row:last-child{border-bottom:none}
+.oc-name{flex:1;font-weight:500}.oc-qty{font-weight:700;color:var(--ind);min-width:80px;text-align:right}
+.oc-foot{padding:10px 17px;background:#fafafa;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.seg-card{background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:11px;overflow:hidden}
+.seg-head{padding:13px 17px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+.seg-head:hover{background:#fafafa}
+.seg-body{border-top:1px solid #f3f4f6;padding:18px 22px;display:none}.seg-body.open{display:block}
+.pipeline{display:flex;align-items:flex-start;padding:4px 0 12px}
+.pipe-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;position:relative}
+.pipe-step:not(:last-child)::after{content:'';position:absolute;top:17px;left:calc(50% + 18px);right:calc(-50% + 18px);height:2px;background:var(--border)}
+.pipe-step.done:not(:last-child)::after{background:var(--grn)}
+.pipe-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;z-index:1;position:relative}
+.pd-done{background:var(--grn-bg);color:var(--grn);border:2px solid var(--grn)}.pd-curr{background:var(--yel-bg);color:#92400e;border:2px solid var(--yel)}.pd-pend{background:#f3f4f6;color:#9ca3af;border:2px solid #e5e7eb}.pd-alert{background:var(--red-bg);color:var(--red);border:2px solid var(--red-bd)}
+.pipe-label{font-size:10px;color:var(--sub);text-align:center;line-height:1.4;max-width:64px}
+.pipe-label strong{display:block;font-size:11px;color:#374151;font-weight:700;margin-bottom:1px}
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.md{background:#fff;border-radius:13px;width:560px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.18)}
+.mdlg{width:720px}
+.mh{padding:15px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.mt2{font-size:15px;font-weight:700}
+.mb2{padding:17px 20px;overflow-y:auto;flex:1}
+.mf{padding:11px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:7px;flex-shrink:0}
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.fl{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.fi{padding:8px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#f9fafb;font-family:inherit;outline:none;width:100%}
+.fi:focus{border-color:var(--ind);background:#fff}
+.fsel{padding:8px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#f9fafb;font-family:inherit;outline:none;width:100%;cursor:pointer}
+.fta{padding:8px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#f9fafb;font-family:inherit;outline:none;width:100%;resize:vertical;min-height:88px}
+.canal-row{display:flex;gap:7px}
+.canal-opt{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-weight:600;color:#374151;transition:all .15s;flex:1}
+.canal-opt:hover{background:#f3f4f6}
+.co-email.sel{background:var(--ind-bg);border-color:var(--ind);color:var(--ind)}
+.co-wa.sel{background:var(--grn-bg);border-color:var(--grn);color:var(--grn)}
+.co-edit.sel{background:#f3f4f6;border-color:#374151}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--grn);color:#fff;padding:11px 17px;border-radius:10px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,.2);transform:translateY(80px);opacity:0;transition:all .3s;z-index:300}
+.toast.show{transform:translateY(0);opacity:1}
+.si{padding:6px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#f9fafb;font-family:inherit;outline:none}
+.si:focus{border-color:var(--ind)}
+input[type=number]{padding:6px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;font-weight:700;background:#f9fafb;width:76px;font-family:inherit;outline:none;text-align:center}
+.tg{width:38px;height:21px;border-radius:11px;background:#d1d5db;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.tg.on{background:var(--ind)}.tg::after{content:'';width:17px;height:17px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s}
+.tg.on::after{left:19px}
+.coll-trigger{cursor:pointer;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--sub);font-weight:600;padding:9px 0;user-select:none}
+.coll-trigger:hover{color:#374151}
+.coll-trigger i.ti-chevron-down{transition:transform .2s}
+.coll-trigger.open i.ti-chevron-down{transform:rotate(180deg)}
+.mono{font-family:'SF Mono','Fira Code',monospace;font-size:12px}
+.msgprev{background:var(--grn-bg);border:1px solid var(--grn-bd);border-radius:9px;padding:13px;font-size:13px;color:#1a4a2e;line-height:1.7;white-space:pre-wrap}
+.nueva-oc-layout{display:grid;grid-template-columns:1fr 320px;gap:13px;padding:14px 24px 26px}
+.nueva-oc-form{background:#fff;border:1px solid var(--border);border-radius:10px;padding:18px}
+.nueva-oc-panel{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 120px)}
+.panel-head{padding:11px 13px;border-bottom:1px solid var(--border);background:#fafafa;flex-shrink:0}
+.panel-title{font-size:12px;font-weight:700;margin-bottom:6px}
+.art-row{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid #f3f4f6;font-size:12px;cursor:pointer;transition:background .1s}
+.art-row:hover{background:#f0f4ff}
+.art-row:last-child{border-bottom:none}
+.art-urg{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.art-name{flex:1;font-weight:500;line-height:1.3}
+.art-stock{font-size:11px;text-align:right;min-width:50px;font-weight:700}
+.pred-card{background:#fff;border-radius:10px;padding:15px 17px;border:1px solid var(--border)}
+.pred-title{font-size:13px;font-weight:700;margin-bottom:11px;display:flex;align-items:center;gap:7px}
+.pred-title i{color:var(--ind);font-size:16px}
+.pred-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;padding:0 24px 24px}
+.rec-box{padding:10px 12px;border-radius:8px;margin-bottom:8px}
+.rec-box:last-child{margin-bottom:0}
+.ra{background:var(--yel-bg);border:1px solid var(--yel-bd)}.rg{background:var(--grn-bg);border:1px solid var(--grn-bd)}.rn{background:#f3f4f6;border:1px solid var(--border)}
+.rt{font-size:12px;font-weight:700;margin-bottom:3px}
+.ra .rt{color:#92400e}.rg .rt{color:var(--grn)}.rn .rt{color:#374151}
+.rd{font-size:12px;line-height:1.5;color:var(--sub)}
+.ep-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:13px}
+.ep-row:last-child{border-bottom:none}
+.ep-method{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;min-width:40px;text-align:center}
+.ep-get{background:var(--ind-bg);color:var(--ind)}.ep-post{background:var(--grn-bg);color:var(--grn)}
+.ep-path{font-family:monospace;font-size:12px;flex:1;color:var(--ind)}
+.ep-desc{font-size:12px;color:var(--sub);min-width:190px}
+.ep-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ep-ok{background:var(--grn)}.ep-warn{background:var(--yel)}
+</style>
+</head>
+<body>
+<div class="app">
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-name">🦷 Dentalab</div>
+    <div class="logo-sync"><i class="ti ti-circle-check" style="font-size:11px"></i> Última act.: hoy 14:26 hs</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Principal</div>
+    <div class="nav-item" data-page="stock"><i class="ti ti-package"></i>Monitor de stock<div class="nb-wrap"><span class="nb nb-yel">8</span></div></div>
+    <div class="nav-item" data-page="alertas"><i class="ti ti-bell"></i>Alertas<div class="nb-wrap"><span class="nb nb-red">2</span><span class="nb nb-yel">4</span><span class="nb nb-blu">2</span></div></div>
+    <div class="nav-section">Compras</div>
+    <div class="nav-item active" data-page="ocs"><i class="ti ti-clipboard-list"></i>Órdenes de compra<div class="nb-wrap"><span class="nb nb-ind">4</span></div></div>
+    <div class="nav-item" data-page="seguimiento"><i class="ti ti-route"></i>Seguimiento de OC<div class="nb-wrap"><span class="nb nb-yel">3</span></div></div>
+    <div class="nav-item" data-page="historial"><i class="ti ti-history"></i>Historial de OC</div>
+    <div class="nav-item" data-page="nueva-oc"><i class="ti ti-file-plus"></i>Nueva OC</div>
+    <div class="nav-section">Inteligencia</div>
+    <div class="nav-item" data-page="predictor"><i class="ti ti-chart-line"></i>Predictor de demanda</div>
+    <div class="nav-section">Configuración</div>
+    <div class="nav-item" data-page="proveedores"><i class="ti ti-building-store"></i>Proveedores</div>
+    <div class="nav-item" data-page="usuarios"><i class="ti ti-users"></i>Usuarios y accesos</div>
+    <div class="nav-item" data-page="causas"><i class="ti ti-tags"></i>Catálogo de causas</div>
+    <div class="nav-item" data-page="reglas"><i class="ti ti-adjustments"></i>Reglas y alertas</div>
+    <div class="nav-item" data-page="templates"><i class="ti ti-message"></i>Templates de mensajes</div>
+    <div class="nav-item" data-page="yiqi"><i class="ti ti-plug-connected"></i>Conector YiQi</div>
+  </nav>
+  <div class="user-area">
+    <div class="avatar">IV</div>
+    <div><div class="user-name">Ivana</div><div class="user-role">Operadora</div></div>
+  </div>
+</aside>
+<main class="main">
+<!-- MONITOR DE STOCK -->
+<div id="page-stock" class="page">
+  <div class="ph">
+    <div><div class="ph-title">Monitor de stock</div><div class="ph-sub">Última actualización: hoy 14:26 hs</div></div>
+    <div class="ha"><button class="btn bsm"><i class="ti ti-refresh"></i> Sincronizar</button><button class="btn bsm bp" onclick="goTo('nueva-oc')"><i class="ti ti-plus"></i> Nueva OC</button></div>
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="ml">Alertas activas</div><div class="mv" style="display:flex;align-items:center;gap:7px;font-size:18px"><span style="color:var(--red);font-weight:800">2</span><span style="color:#9ca3af;font-size:12px">crit</span><span style="color:#92400e;font-weight:800">4</span><span style="color:#9ca3af;font-size:12px">prev</span><span style="color:var(--blu);font-weight:800">2</span><span style="color:#9ca3af;font-size:12px">man</span></div><div class="ms">por proveedor activo</div></div>
+    <div class="metric"><div class="ml">Proveedores con alerta</div><div class="mv mv-yel">6</div><div class="ms">de 12 proveedores activos</div></div>
+    <div class="metric"><div class="ml">SKUs activos</div><div class="mv mv-n">9.487</div><div class="ms">sync con YiQi</div></div>
+    <div class="metric"><div class="ml">OC en curso</div><div class="mv mv-ind">4</div><div class="ms">activas en el sistema</div></div>
+  </div>
+  <div class="pad">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span style="font-size:13px;font-weight:700">Productos con alerta de bajo stock</span>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <input class="si" type="text" placeholder="Buscar producto o SKU…" style="width:180px">
+        <select class="si" style="cursor:pointer"><option>Todos los proveedores</option><option>Dental Depot SA</option><option>Biolab Distribuciones</option><option>Siladent SRL</option></select>
+        <select class="si" style="cursor:pointer"><option>Todas las familias</option><option>Acrílicos</option><option>Yesos</option><option>Instrumentos</option></select>
+      </div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>SKU</th><th>Producto</th><th>Familia</th><th>Proveedor</th><th>Stock</th><th>Alerta en</th><th>Causa</th><th>Estado</th><th>Sugerido</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><span class="mono">AC-1042</span></td><td style="font-weight:700">Acrílico rosa claro 1 kg</td><td><span class="badge bgray">Acrílicos</span></td><td style="font-size:12px;color:var(--sub)">Dental Depot SA</td>
+            <td><div class="stock-bar-wrap"><div class="stock-bar"><div class="stock-fill" style="width:54%;background:#FFC72C"></div><div class="stock-min-mark" style="left:38%"></div><div class="stock-max-mark" style="left:90%"></div></div><span class="stock-val" style="color:#92400e">68</span></div></td>
+            <td style="font-weight:600;color:#92400e;font-size:12px">65 u</td><td><span class="cc cc-yel">Venta 28 u / 48 hs</span></td><td><span class="badge byel">Preventiva</span></td><td style="font-weight:700;color:var(--ind)">100 u</td><td><button class="btn bsm" onclick="openModal('modal-nueva-oc')">+ OC</button></td></tr>
+          <tr><td><span class="mono">YE-0318</span></td><td style="font-weight:700">Yeso tipo IV extraduro 5 kg</td><td><span class="badge bgray">Yesos</span></td><td style="font-size:12px;color:var(--sub)">Biolab Distribuciones</td>
+            <td><div class="stock-bar-wrap"><div class="stock-bar"><div class="stock-fill" style="width:58%;background:#FFC72C"></div><div class="stock-min-mark" style="left:43%"></div><div class="stock-max-mark" style="left:90%"></div></div><span class="stock-val" style="color:#92400e">42</span></div></td>
+            <td style="font-weight:600;color:#92400e;font-size:12px">40 u</td><td><span class="cc">Consumo semanal</span></td><td><span class="badge byel">Preventiva</span></td><td style="font-weight:700;color:var(--ind)">60 u</td><td><button class="btn bsm" onclick="openModal('modal-nueva-oc')">+ OC</button></td></tr>
+          <tr style="background:#fdf2f2"><td><span class="mono">DI-0447</span></td><td style="font-weight:700">Disco de corte metal 22 mm × 10</td><td><span class="badge bgray">Instrumentos</span></td><td style="font-size:12px;color:var(--sub)">Dental Depot SA</td>
+            <td><div class="stock-bar-wrap"><div class="stock-bar"><div class="stock-fill" style="width:24%;background:var(--red)"></div><div class="stock-min-mark" style="left:32%"></div><div class="stock-max-mark" style="left:88%"></div></div><span class="stock-val" style="color:var(--red)">18</span></div></td>
+            <td style="font-weight:600;color:var(--red);font-size:12px">20 u</td><td><span class="cc cc-red"><i class="ti ti-alert-triangle" style="font-size:10px"></i>Problema importación</span></td><td><span class="badge bred">Crítica</span></td><td style="font-weight:700;color:var(--ind)">40 u</td><td><button class="btn bsm bp" onclick="openModal('modal-nueva-oc')">OC urgente</button></td></tr>
+          <tr style="background:#fdf2f2"><td><span class="mono">SI-2201</span></td><td style="font-weight:700">Silicona de adición pesada 300 ml</td><td><span class="badge bgray">Siliconas</span></td><td style="font-size:12px;color:var(--sub)">Siladent SRL</td>
+            <td><div class="stock-bar-wrap"><div class="stock-bar"><div class="stock-fill" style="width:55%;background:var(--red)"></div><div class="stock-min-mark" style="left:40%"></div><div class="stock-max-mark" style="left:90%"></div></div><span class="stock-val" style="color:var(--red)">55</span></div></td>
+            <td style="font-weight:600;color:var(--red);font-size:12px">50 u</td><td><span class="cc cc-red"><i class="ti ti-building-store" style="font-size:10px"></i>Proveedor sin stock</span></td><td><span class="badge bred">Crítica</span></td><td style="font-weight:700;color:var(--ind)">80 u</td><td><button class="btn bsm" onclick="openModal('modal-nueva-oc')">OC alt.</button></td></tr>
+          <tr><td><span class="mono">GU-0099</span></td><td style="font-weight:700">Guantes nitrilo talle M × 100</td><td><span class="badge bgray">Descartables</span></td><td style="font-size:12px;color:var(--sub)">Dental Depot SA</td>
+            <td><div class="stock-bar-wrap"><div class="stock-bar"><div class="stock-fill" style="width:64%;background:#FFC72C"></div><div class="stock-min-mark" style="left:45%"></div><div class="stock-max-mark" style="left:92%"></div></div><span class="stock-val" style="color:#92400e">32</span></div></td>
+            <td style="font-weight:600;color:#92400e;font-size:12px">30 u</td><td><span class="cc">Consumo regular</span></td><td><span class="badge byel">Preventiva</span></td><td style="font-weight:700;color:var(--ind)">50 u</td><td><button class="btn bsm" onclick="openModal('modal-nueva-oc')">+ OC</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+      <span style="font-size:12px;color:var(--sub)">Mostrando 5 de 8 — <span style="color:var(--ind);cursor:pointer;font-weight:600">ver todos</span></span>
+      <div style="display:flex;align-items:center;gap:12px;font-size:11px;color:var(--sub)">
+        <span style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:3px;background:var(--yel);border-radius:2px"></div>Mínimo</span>
+        <span style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:3px;background:var(--grn);border-radius:2px"></div>Máximo</span>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ALERTAS -->
+<div id="page-alertas" class="page">
+  <div class="ph">
+    <div><div class="ph-title">Alertas de stock</div><div class="ph-sub">Última actualización: hoy 14:26 hs</div></div>
+    <div class="ha"><button class="btn bsm"><i class="ti ti-checks"></i> Marcar leídas</button></div>
+  </div>
+  <div class="metrics">
+    <div class="metric" style="border-left:3px solid var(--red)"><div class="ml">Críticas</div><div class="mv mv-red">2</div><div class="ms">acción inmediata</div></div>
+    <div class="metric" style="border-left:3px solid var(--yel)"><div class="ml">Preventivas</div><div class="mv mv-yel">4</div><div class="ms">tiempo para actuar</div></div>
+    <div class="metric" style="border-left:3px solid var(--blu)"><div class="ml">Acción manual</div><div class="mv mv-blu">2</div><div class="ms">decisión requerida</div></div>
+    <div class="metric" style="border-left:3px solid var(--grn)"><div class="ml">Resueltas este mes</div><div class="mv mv-grn">14</div><div class="ms">alertas cerradas</div></div>
+  </div>
+  <div class="pad">
+    <!-- CRÍTICAS -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:var(--red);display:inline-block"></span><span style="font-size:13px;font-weight:700">Críticas — acción inmediata</span></div>
+      <span style="font-size:12px;color:var(--sub)">No se generó OC automática · intervención necesaria</span>
+    </div>
+    <div class="tw" style="margin-bottom:14px">
+      <table>
+        <thead><tr><th>SKU</th><th>Producto</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th>Causa</th><th>Situación y opciones</th><th>Días est.</th></tr></thead>
+        <tbody>
+          <tr style="background:#fdf2f2">
+            <td><span class="mono">DI-0447</span></td><td style="font-weight:700">Disco de corte metal 22 mm × 10</td><td style="font-weight:700;color:var(--red)">18 u</td><td style="color:#9ca3af">15 u</td><td style="font-size:12px">Dental Depot SA</td>
+            <td><span class="cc cc-red"><i class="ti ti-alert-triangle" style="font-size:10px"></i>Importación</span></td>
+            <td><div style="font-size:12px;color:#374151;margin-bottom:6px">Dental Depot SA sin stock por problema de importación. Alternativo disponible: <strong>Siladent SRL</strong></div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                <button class="btn bsm bblu2" onclick="openModal('modal-nueva-oc')"><i class="ti ti-building-store"></i> Comprar en Siladent SRL</button>
+                <button class="btn bsm byel2" onclick="openModal('modal-causa')"><i class="ti ti-clock"></i> Prorrogar 15 días</button>
+                <button class="btn bsm" onclick="openModal('modal-causa')"><i class="ti ti-tags"></i> Declarar causa</button>
+              </div>
+            </td>
+            <td style="font-weight:700;color:var(--red)">~31 días</td>
+          </tr>
+          <tr style="background:#fdf2f2">
+            <td><span class="mono">SI-2201</span></td><td style="font-weight:700">Silicona de adición pesada 300 ml</td><td style="font-weight:700;color:var(--red)">55 u</td><td style="color:#9ca3af">40 u</td><td style="font-size:12px">Siladent SRL</td>
+            <td><span class="cc cc-red"><i class="ti ti-building-store" style="font-size:10px"></i>Sin stock</span></td>
+            <td><div style="font-size:12px;color:#374151;margin-bottom:6px">Siladent SRL sin stock. Alternativo: <strong>Dental Depot SA</strong> (lo trabaja Aris). Siladent exige mín. 20 artículos distintos.</div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                <button class="btn bsm bblu2" onclick="showToast('Alerta derivada a Aris para comprar en Dental Depot SA')"><i class="ti ti-send"></i> Derivar a Aris</button>
+                <button class="btn bsm byel2" onclick="openModal('modal-causa')"><i class="ti ti-clock"></i> Prorrogar 15 días</button>
+                <button class="btn bsm" onclick="openModal('modal-nueva-oc')">Completar OC Siladent</button>
+              </div>
+            </td>
+            <td style="font-weight:700;color:var(--red)">~18 días</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- PREVENTIVAS -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:var(--yel);display:inline-block"></span><span style="font-size:13px;font-weight:700">Preventivas — hay tiempo para actuar</span></div>
+      <span style="font-size:12px;color:var(--sub)">OC ya generada para cada una</span>
+    </div>
+    <div class="tw" style="margin-bottom:14px">
+      <table>
+        <thead><tr><th>SKU</th><th>Producto</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th>Causa</th><th>Días est.</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><span class="mono">AC-1042</span></td><td style="font-weight:700">Acrílico rosa claro 1 kg</td><td style="font-weight:700;color:#92400e">68 u</td><td style="color:#9ca3af">50 u</td><td style="font-size:12px">Dental Depot SA</td><td><span class="cc cc-yel">Venta 28 u / 48 hs</span></td><td style="color:#92400e;font-weight:600">~11 días</td><td><button class="btn bsm" onclick="goTo('ocs')">Ver OC generada</button></td></tr>
+          <tr><td><span class="mono">CE-1130</span></td><td style="font-weight:700">Cera rosa modelar 500 g</td><td style="font-weight:700;color:#92400e">46 u</td><td style="color:#9ca3af">40 u</td><td style="font-size:12px">Dental Depot SA</td><td><span class="cc cc-yel">Pedido puntual cliente</span></td><td style="color:#92400e;font-weight:600">~15 días</td><td><button class="btn bsm" onclick="goTo('ocs')">Ver OC generada</button></td></tr>
+          <tr><td><span class="mono">GU-0099</span></td><td style="font-weight:700">Guantes nitrilo talle M × 100</td><td style="font-weight:700;color:#92400e">32 u</td><td style="color:#9ca3af">25 u</td><td style="font-size:12px">Dental Depot SA</td><td><span class="cc">Consumo regular</span></td><td style="color:#92400e;font-weight:600">~20 días</td><td><button class="btn bsm" onclick="goTo('ocs')">Ver OC generada</button></td></tr>
+          <tr><td><span class="mono">YE-0318</span></td><td style="font-weight:700">Yeso tipo IV extraduro 5 kg</td><td style="font-weight:700;color:#92400e">42 u</td><td style="color:#9ca3af">30 u</td><td style="font-size:12px">Biolab Distribuciones</td><td><span class="cc">Consumo semanal</span></td><td style="color:#92400e;font-weight:600">~18 días</td><td><button class="btn bsm" onclick="goTo('ocs')">Ver OC generada</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- ACCIÓN MANUAL -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:var(--blu);display:inline-block"></span><span style="font-size:13px;font-weight:700">Acción manual — decisión del operador</span></div>
+    </div>
+    <div class="tw" style="margin-bottom:14px">
+      <table>
+        <thead><tr><th>SKU</th><th>Producto</th><th>Stock</th><th>Proveedor</th><th>Situación</th><th>Opciones</th></tr></thead>
+        <tbody>
+          <tr style="background:var(--blu-bg)">
+            <td><span class="mono">AC-0881</span></td><td style="font-weight:700">Acrílico transparente 500 g</td><td style="color:#9ca3af">12 u</td><td style="font-size:12px">Rondanini & Cía</td>
+            <td style="font-size:12px">OC-2025-0039 enviada hace 3 días. Sin confirmación del proveedor.</td>
+            <td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn bsm" onclick="openModal('modal-causa')"><i class="ti ti-phone"></i> Registrar contacto</button><button class="btn bsm byel2" onclick="openModal('modal-causa')"><i class="ti ti-clock"></i> Recordar en 15 días</button></div></td>
+          </tr>
+          <tr style="background:var(--blu-bg)">
+            <td><span class="mono">RE-0214</span></td><td style="font-weight:700">Resina acrílica base 250 g</td><td style="color:#9ca3af">8 u</td><td style="font-size:12px">Rondanini & Cía</td>
+            <td style="font-size:12px">Proveedor solicitó prórroga de entrega. Pendiente resolución.</td>
+            <td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn bsm bblu2" onclick="openModal('modal-nueva-oc')">Comprar en alternativo</button><button class="btn bsm" onclick="openModal('modal-causa')"><i class="ti ti-tags"></i> Declarar causa</button></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="coll-trigger" id="coll-btn" onclick="toggleColl()">
+      <i class="ti ti-chevron-down"></i>
+      <span>Alertas en pausa (2) — OC enviada, esperando mercadería</span>
+    </div>
+    <div id="coll-body" style="display:none;margin-top:8px">
+      <div class="tw">
+        <table><thead><tr><th>SKU</th><th>Producto</th><th>Stock</th><th>OC enviada</th><th>Proveedor</th><th>Estado</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mono">YE-0320</span></td><td style="font-weight:700">Yeso tipo III normal 3 kg</td><td style="color:#9ca3af">22 u</td><td style="font-size:12px;color:var(--sub)">OC-2025-0040 · hace 5 días</td><td style="font-size:12px">Biolab Distribuciones</td><td><span class="badge bgray">Esperando entrega</span></td></tr>
+          <tr><td><span class="mono">AC-0881</span></td><td style="font-weight:700">Acrílico transparente 500 g</td><td style="color:#9ca3af">12 u</td><td style="font-size:12px;color:var(--sub)">OC-2025-0039 · hace 3 días</td><td style="font-size:12px">Dental Depot SA</td><td><span class="badge bgray">Recepción parcial</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ÓRDENES DE COMPRA -->
+<div id="page-ocs" class="page active">
+  <div class="ph">
+    <div><div class="ph-title">Órdenes de compra</div><div class="ph-sub">Agrupadas por proveedor · generadas por alertas de stock</div></div>
+    <div class="ha"><button class="btn bsm bp" onclick="openModal('modal-nueva-oc')"><i class="ti ti-plus"></i> Nueva OC manual</button></div>
+  </div>
+  <div class="sem-legend">
+    <span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Acción:</span>
+    <div class="sem-legend-item"><span class="sem sg"></span><span style="font-weight:600;color:var(--grn)">Enviar directo</span><span style="color:var(--sub)"> — dentro del límite</span></div>
+    <div class="sem-legend-item"><span class="sem sy"></span><span style="font-weight:600;color:#92400e">Completar OC</span><span style="color:var(--sub)"> — falta mínimo del proveedor</span></div>
+    <div class="sem-legend-item"><span class="sem sb2"></span><span style="font-weight:600;color:var(--blu)">Requiere aprobación</span><span style="color:var(--sub)"> — supera límite o condición especial</span></div>
+    <div class="sem-legend-item"><span class="sem sr"></span><span style="font-weight:600;color:var(--red)">Reevaluar OC</span><span style="color:var(--sub)"> — rechazada o requiere modificación</span></div>
+  </div>
+  <div style="padding:13px 24px 26px">
+    <!-- Verde -->
+    <div class="oc-card">
+      <div class="oc-head" onclick="togOC('oc1')">
+        <span class="sem sg"></span>
+        <div style="flex:1"><div class="oc-prov">Biolab Distribuciones</div><div class="oc-meta">2 productos · generada hoy · dentro del límite ($150.000)</div></div>
+        <span style="font-size:14px;font-weight:700;color:var(--grn);margin-right:9px">$118.400</span>
+        <i class="ti ti-chevron-down" style="color:var(--sub)"></i>
+      </div>
+      <div class="oc-body" id="oc1">
+        <div class="oc-row"><div class="oc-name">Yeso tipo IV extraduro 5 kg</div><span class="cc">Consumo semanal</span><div class="oc-qty">60 u / 3 bolsas</div></div>
+        <div class="oc-row"><div class="oc-name">Yeso tipo III normal 3 kg</div><span class="cc">Consumo semanal</span><div class="oc-qty">40 u / 2 bolsas</div></div>
+      </div>
+      <div class="oc-foot">
+        <div style="font-size:12px;color:#374151">Total estimado: <strong>$118.400</strong> · 2 productos</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn bsm" onclick="openModal('modal-detalle-oc')"><i class="ti ti-eye"></i> Ver detalle</button>
+          <button class="btn bsm" onclick="openModal('modal-editar-oc')"><i class="ti ti-edit"></i> Editar</button>
+          <button class="btn bsm" onclick="openModal('modal-enviar-oc')"><i class="ti ti-mail"></i> Mail</button>
+          <button class="btn bsm bgrn2" onclick="openModal('modal-enviar-oc')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>
+        </div>
+      </div>
+    </div>
+    <!-- Azul — requiere aprobación -->
+    <div class="oc-card" style="border-left:3px solid var(--blu)">
+      <div class="oc-head" onclick="togOC('oc2')">
+        <span class="sem sb2"></span>
+        <div style="flex:1"><div class="oc-prov">Dental Depot SA</div><div class="oc-meta">3 productos · generada hace 1 h · <strong style="color:var(--blu)">supera límite $200.000 → requiere aprobación de Aris</strong></div></div>
+        <span style="font-size:14px;font-weight:700;color:var(--blu);margin-right:9px">$436.000</span>
+        <i class="ti ti-chevron-down" style="color:var(--sub)"></i>
+      </div>
+      <div class="oc-body" id="oc2">
+        <div class="oc-row"><div class="oc-name">Acrílico rosa claro 1 kg</div><span class="cc cc-yel">Venta 28 u / 48 hs</span><div class="oc-qty">100 u / 5 cajas</div></div>
+        <div class="oc-row"><div class="oc-name">Cera rosa modelar 500 g</div><span class="cc cc-yel">Pedido puntual</span><div class="oc-qty">60 u / 3 cajas</div></div>
+        <div class="oc-row"><div class="oc-name">Guantes nitrilo talle M × 100</div><span class="cc">Consumo regular</span><div class="oc-qty">50 u</div></div>
+      </div>
+      <div class="oc-foot">
+        <div style="font-size:12px;color:#374151">Total estimado: <strong>$436.000</strong> · 3 productos</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn bsm" onclick="openModal('modal-detalle-oc')"><i class="ti ti-eye"></i> Ver detalle</button>
+          <button class="btn bsm" onclick="openModal('modal-editar-oc')"><i class="ti ti-edit"></i> Editar</button>
+          <button class="btn bsm bblu2" onclick="showToast('OC enviada a Aris para aprobación')"><i class="ti ti-send"></i> Enviar a Aris</button>
+        </div>
+      </div>
+    </div>
+    <!-- Amarillo — completar mínimo -->
+    <div class="oc-card">
+      <div class="oc-head" onclick="togOC('oc3')">
+        <span class="sem sy"></span>
+        <div style="flex:1"><div class="oc-prov">Siladent SRL</div><div class="oc-meta">1 producto · necesita completar mínimo del proveedor (20 artículos distintos)</div></div>
+        <span style="font-size:14px;font-weight:700;color:#92400e;margin-right:9px">$96.000</span>
+        <i class="ti ti-chevron-down" style="color:var(--sub)"></i>
+      </div>
+      <div class="oc-body" id="oc3">
+        <div class="oc-row"><div class="oc-name">Silicona de adición pesada 300 ml</div><span class="cc cc-red">Proveedor sin stock</span><div class="oc-qty">80 u / 4 cajas</div></div>
+        <div style="background:var(--yel-bg);padding:9px 17px;font-size:12px;color:#92400e;display:flex;align-items:center;gap:7px;border-top:1px solid #f3f4f6"><i class="ti ti-alert-circle"></i>Siladent SRL exige mínimo 20 artículos distintos. Agregá productos para completar la OC.</div>
+      </div>
+      <div class="oc-foot">
+        <div style="font-size:12px;color:#374151">Total parcial: <strong>$96.000</strong> · <span style="color:#92400e">falta completar mínimo</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn bsm" onclick="openModal('modal-detalle-oc')"><i class="ti ti-eye"></i> Ver detalle</button>
+          <button class="btn bsm" onclick="openModal('modal-editar-oc')"><i class="ti ti-edit"></i> Editar</button>
+          <button class="btn bsm bp"><i class="ti ti-plus"></i> Agregar productos</button>
+        </div>
+      </div>
+    </div>
+    <!-- Rojo — reevaluar -->
+    <div class="oc-card" style="border-left:3px solid var(--red)">
+      <div class="oc-head" onclick="togOC('oc4')">
+        <span class="sem sr"></span>
+        <div style="flex:1"><div class="oc-prov">Rondanini & Cía</div><div class="oc-meta">5 productos · <strong style="color:var(--red)">rechazada por Aris — requiere modificaciones</strong></div></div>
+        <span style="font-size:14px;font-weight:700;color:var(--red);margin-right:9px">$312.000</span>
+        <i class="ti ti-chevron-down" style="color:var(--sub)"></i>
+      </div>
+      <div class="oc-body" id="oc4">
+        <div style="background:var(--red-bg);padding:9px 17px;font-size:12px;color:var(--red);display:flex;align-items:center;gap:7px;border-bottom:1px solid #f3f4f6"><i class="ti ti-x"></i>Motivo de rechazo: "Bajar cantidad de guantes a 30 u y revisar precio de acrílicos."</div>
+        <div class="oc-row"><div class="oc-name">Acrílico transparente 500 g</div><span class="cc">Consumo regular</span><div class="oc-qty">80 u</div></div>
+        <div class="oc-row"><div class="oc-name">Resina acrílica base 250 g</div><span class="cc">Consumo regular</span><div class="oc-qty">60 u</div></div>
+      </div>
+      <div class="oc-foot">
+        <div style="font-size:12px;color:var(--red);font-weight:600">⚠ Reevaluar según indicaciones de Aris</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn bsm" onclick="openModal('modal-detalle-oc')"><i class="ti ti-eye"></i> Ver detalle</button>
+          <button class="btn bsm bp" onclick="openModal('modal-editar-oc')"><i class="ti ti-edit"></i> Modificar y reenviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SEGUIMIENTO -->
+<div id="page-seguimiento" class="page">
+  <div class="ph"><div><div class="ph-title">Seguimiento de OC</div><div class="ph-sub">Estado de todas las órdenes en curso · Última actualización: hoy 14:26 hs</div></div></div>
+  <div style="margin:13px 24px 0;background:var(--yel-bg);border:1px solid var(--yel-bd);border-radius:9px;padding:11px 15px;display:flex;align-items:flex-start;gap:10px">
+    <i class="ti ti-alert-triangle" style="color:#92400e;font-size:16px;flex-shrink:0;margin-top:1px"></i>
+    <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#92400e">Ingreso parcial — OC-2025-0039 · Dental Depot SA</div><div style="font-size:12px;color:#92400e;margin-top:2px">YiQi detectó ingreso de 40 de 100 u de Acrílico rosa claro. Quedan 60 u pendientes. Notificación enviada a Ivana y Aris.</div></div>
+    <button class="btn bsm" onclick="togSeg('seg1')">Ver detalle</button>
+  </div>
+  <div style="padding:13px 24px 26px">
+    <div class="seg-card" style="border-left:3px solid var(--yel)">
+      <div class="seg-head" onclick="togSeg('seg1')">
+        <div style="min-width:106px"><div style="font-size:13px;font-weight:700;color:var(--ind)">OC-2025-0039</div><div style="font-size:11px;color:var(--sub)">26/06/2025</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">Dental Depot SA</div><div style="font-size:12px;color:var(--sub)">3 art. · $436.000</div></div>
+        <div style="display:flex;align-items:center;gap:7px;margin-right:12px">
+          <span style="font-size:11px;font-weight:600;color:#92400e">⚠ Ingreso parcial</span>
+          <button class="btn bsm bred2" onclick="event.stopPropagation();openModal('modal-causa')"><i class="ti ti-building-store"></i> Declarar causa</button>
+          <button class="btn bsm byel2" onclick="event.stopPropagation();openModal('modal-causa')"><i class="ti ti-clock"></i> Prorrogar</button>
+        </div>
+        <i class="ti ti-chevron-down" style="color:var(--sub)"></i>
+      </div>
+      <div class="seg-body" id="seg1">
+        <div class="pipeline">
+          <div class="pipe-step done"><div class="pipe-dot pd-done"><i class="ti ti-send" style="font-size:13px"></i></div><div class="pipe-label"><strong>Enviada</strong>23/06</div></div>
+          <div class="pipe-step done"><div class="pipe-dot pd-done"><i class="ti ti-check" style="font-size:13px"></i></div><div class="pipe-label"><strong>Recepcionada</strong>proveedor</div></div>
+          <div class="pipe-step curr"><div class="pipe-dot pd-alert"><i class="ti ti-alert-triangle" style="font-size:13px"></i></div><div class="pipe-label"><strong>Parcial</strong>40 de 100 u</div></div>
+          <div class="pipe-step"><div class="pipe-dot pd-pend"><i class="ti ti-circle-check" style="font-size:13px"></i></div><div class="pipe-label"><strong>Completado</strong>pendiente</div></div>
+        </div>
+        <div style="background:#f9fafb;border-radius:8px;padding:11px 13px;margin-bottom:11px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Causa registrada</div>
+            <div style="font-size:13px;font-weight:600">Proveedor sin stock — chequeado 26/06/2025</div>
+            <div style="font-size:12px;color:var(--sub);margin-top:2px">Nota: Dental Depot confirmó recepción de mercadería en 2 semanas.</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn bsm" onclick="openModal('modal-causa')"><i class="ti ti-edit"></i> Editar causa</button>
+            <button class="btn bsm bblu2" onclick="showToast('Reclamo enviado a Dental Depot SA')"><i class="ti ti-send"></i> Reclamar</button>
+          </div>
+        </div>
+        <div class="tw" style="margin-bottom:0"><table><thead><tr><th>Producto</th><th>Pedido</th><th>Recibido</th><th>Pendiente</th></tr></thead>
+        <tbody>
+          <tr><td>Acrílico rosa claro 1 kg</td><td>100 u</td><td style="color:var(--grn);font-weight:700">40 u</td><td style="color:var(--red);font-weight:700">60 u</td></tr>
+          <tr><td>Cera rosa modelar 500 g</td><td>60 u</td><td style="color:var(--grn);font-weight:700">60 u</td><td style="color:#9ca3af">—</td></tr>
+          <tr><td>Guantes nitrilo M × 100</td><td>50 u</td><td style="color:var(--grn);font-weight:700">50 u</td><td style="color:#9ca3af">—</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+    <div class="seg-card">
+      <div class="seg-head" onclick="togSeg('seg2')">
+        <div style="min-width:106px"><div style="font-size:13px;font-weight:700;color:var(--ind)">OC-2025-0040</div><div style="font-size:11px;color:var(--sub)">21/06/2025</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">Biolab Distribuciones</div><div style="font-size:12px;color:var(--sub)">4 art. · $198.500</div></div>
+        <div style="margin-right:12px"><span class="badge bgray">Enviada al proveedor</span></div>
+        <i class="ti ti-chevron-down" style="color:var(--sub)"></i>
+      </div>
+      <div class="seg-body" id="seg2">
+        <div class="pipeline">
+          <div class="pipe-step done"><div class="pipe-dot pd-done"><i class="ti ti-send" style="font-size:13px"></i></div><div class="pipe-label"><strong>Enviada</strong>21/06</div></div>
+          <div class="pipe-step curr"><div class="pipe-dot pd-curr"><i class="ti ti-clock" style="font-size:13px"></i></div><div class="pipe-label"><strong>Esp. recepción</strong>proveedor</div></div>
+          <div class="pipe-step"><div class="pipe-dot pd-pend"><i class="ti ti-package" style="font-size:13px"></i></div><div class="pipe-label"><strong>Ingreso stock</strong></div></div>
+          <div class="pipe-step"><div class="pipe-dot pd-pend"><i class="ti ti-circle-check" style="font-size:13px"></i></div><div class="pipe-label"><strong>Completado</strong></div></div>
+        </div>
+        <div style="background:#f9fafb;border-radius:8px;padding:10px 13px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:12px;color:var(--sub)">Sin causa declarada</span>
+          <button class="btn bsm" onclick="openModal('modal-causa')"><i class="ti ti-tags"></i> Declarar causa</button>
+        </div>
+      </div>
+    </div>
+    <div class="seg-card" style="border-left:3px solid var(--blu)">
+      <div class="seg-head" onclick="togSeg('seg3')">
+        <div style="min-width:106px"><div style="font-size:13px;font-weight:700;color:var(--ind)">OC-2025-0044</div><div style="font-size:11px;color:var(--sub)">26/06/2025</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">Dental Depot SA</div><div style="font-size:12px;color:var(--sub)">3 art. · $436.000</div></div>
+        <div style="display:flex;align-items:center;gap:7px;margin-right:12px">
+          <span style="font-size:12px;font-weight:700;color:var(--blu)">⏳ Esperando aprobación de Aris</span>
+          <button class="btn bsm bblu2" onclick="event.stopPropagation();showToast('OC aprobada — Ivana puede enviarla')"><i class="ti ti-check"></i> Aprobar</button>
+        </div>
+        <i class="ti ti-chevron-down" style="color:var(--sub)"></i>
+      </div>
+      <div class="seg-body" id="seg3">
+        <div class="pipeline">
+          <div class="pipe-step done"><div class="pipe-dot pd-done"><i class="ti ti-check" style="font-size:13px"></i></div><div class="pipe-label"><strong>Generada</strong>26/06</div></div>
+          <div class="pipe-step curr"><div class="pipe-dot pd-curr"><i class="ti ti-clock" style="font-size:13px"></i></div><div class="pipe-label"><strong>Esp. aprobación</strong>Aris</div></div>
+          <div class="pipe-step"><div class="pipe-dot pd-pend"><i class="ti ti-send" style="font-size:13px"></i></div><div class="pipe-label"><strong>Envío</strong>proveedor</div></div>
+          <div class="pipe-step"><div class="pipe-dot pd-pend"><i class="ti ti-circle-check" style="font-size:13px"></i></div><div class="pipe-label"><strong>Completado</strong></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- HISTORIAL -->
+<div id="page-historial" class="page">
+  <div class="ph"><div><div class="ph-title">Historial de OC</div><div class="ph-sub">Registro de todas las órdenes ejecutadas</div></div><div class="ha"><button class="btn bsm"><i class="ti ti-download"></i> Exportar</button></div></div>
+  <div class="metrics">
+    <div class="metric"><div class="ml">Completadas este mes</div><div class="mv mv-grn">14</div></div>
+    <div class="metric"><div class="ml">Enviadas este mes</div><div class="mv mv-n">18</div></div>
+    <div class="metric"><div class="ml">Gasto del mes</div><div class="mv mv-n" style="font-size:19px">$4,2 M</div></div>
+    <div class="metric"><div class="ml">Ingresos parciales</div><div class="mv mv-yel">2</div></div>
+  </div>
+  <div class="pad"><div class="tw"><table>
+    <thead><tr><th>N° OC</th><th>Proveedor</th><th>Artículos</th><th>Total</th><th>Enviada</th><th>Ingresada</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+      <tr><td style="font-weight:700;color:var(--ind)">OC-2025-0038</td><td>Biolab Distribuciones</td><td style="color:var(--sub)">4 art.</td><td style="font-weight:700">$198.500</td><td style="font-size:12px;color:var(--sub)">18/06/2025</td><td style="font-size:12px;color:var(--sub)">23/06/2025</td><td><span class="badge bgrn">✓ Completada</span></td><td><button class="btn bsm">Ver</button></td></tr>
+      <tr><td style="font-weight:700;color:var(--ind)">OC-2025-0037</td><td>Siladent SRL</td><td style="color:var(--sub)">6 art.</td><td style="font-weight:700">$312.000</td><td style="font-size:12px;color:var(--sub)">15/06/2025</td><td style="font-size:12px;color:var(--sub)">22/06/2025</td><td><span class="badge bgrn">✓ Completada</span></td><td><button class="btn bsm">Ver</button></td></tr>
+      <tr style="background:var(--yel-bg)"><td style="font-weight:700;color:var(--ind)">OC-2025-0035</td><td>Biolab Distribuciones</td><td style="color:var(--sub)">5 art.</td><td style="font-weight:700">$241.600</td><td style="font-size:12px;color:var(--sub)">05/06/2025</td><td style="font-size:12px;color:var(--sub)">12/06/2025 (parcial)</td><td><span class="badge byel">⚠ Ingreso parcial</span></td><td><button class="btn bsm">Ver</button></td></tr>
+    </tbody>
+  </table></div></div>
+</div>
+<!-- NUEVA OC -->
+<div id="page-nueva-oc" class="page">
+  <div class="ph"><div><div class="ph-title">Nueva OC</div><div class="ph-sub">Creá una orden de compra libre o desde artículos con alerta</div></div></div>
+  <div class="nueva-oc-layout">
+    <div class="nueva-oc-form">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px">
+        <div class="fg"><div class="fl">Proveedor</div><select class="fsel"><option>Seleccioná un proveedor…</option><option selected>Biolab Distribuciones</option><option>Dental Depot SA</option><option>Siladent SRL</option><option>Rondanini & Cía</option></select></div>
+        <div class="fg"><div class="fl">Condición de pago</div><select class="fsel"><option>Contado</option><option>30 días</option><option>60 días</option></select></div>
+      </div>
+      <div class="fg" style="margin-bottom:13px">
+        <div class="fl" style="margin-bottom:6px">Productos a pedir</div>
+        <div class="tw" style="margin-bottom:0"><table>
+          <thead><tr><th>Producto / búsqueda</th><th>Presentación</th><th>Cantidad</th><th>Stock actual</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td><input class="fi" type="text" value="Yeso tipo IV extraduro 5 kg" style="width:100%"><div style="font-size:11px;color:var(--sub);margin-top:2px">Detectado automáticamente</div></td>
+              <td><div style="font-size:12px;font-weight:600">Bolsa 5 kg</div></td>
+              <td><input type="number" value="60"></td>
+              <td><span style="font-size:12px;color:#92400e;font-weight:700">42 u ⚠</span></td>
+              <td><button class="btn bsm bred2"><i class="ti ti-trash"></i></button></td>
+            </tr>
+            <tr>
+              <td><input class="fi" type="text" placeholder="Buscá producto o SKU…" style="width:100%"></td>
+              <td><div style="font-size:12px;color:#9ca3af">—</div></td>
+              <td><input type="number" value="1"></td>
+              <td><span style="font-size:12px;color:#9ca3af">—</span></td>
+              <td><button class="btn bsm bred2"><i class="ti ti-trash"></i></button></td>
+            </tr>
+          </tbody>
+        </table></div>
+        <button class="btn bsm" style="margin-top:7px"><i class="ti ti-plus"></i> Agregar producto</button>
+      </div>
+      <div class="fg"><div class="fl">Notas</div><textarea class="fta" placeholder="Observaciones, instrucciones especiales…"></textarea></div>
+      <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:13px">
+        <button class="btn">Cancelar</button>
+        <button class="btn bp" onclick="showToast('OC creada y agregada a Órdenes de compra')"><i class="ti ti-check"></i> Crear OC</button>
+      </div>
+    </div>
+    <div class="nueva-oc-panel">
+      <div class="panel-head">
+        <div class="panel-title">Artículos de Biolab Distribuciones</div>
+        <select class="si" style="font-size:11px;padding:4px 7px;width:100%"><option>Ordenar: más urgente primero</option><option>Por stock</option><option>Por familia</option></select>
+      </div>
+      <div style="overflow-y:auto;flex:1">
+        <div class="art-row" onclick="showToast('Yeso tipo IV agregado a la OC')">
+          <div class="art-urg" style="background:var(--red)"></div>
+          <div class="art-name">Yeso tipo IV extraduro 5 kg<div style="font-size:10px;color:var(--sub)">BL-YE-220</div></div>
+          <div class="art-stock" style="color:var(--red)">42 u<div style="font-size:10px">CRÍTICO</div></div>
+        </div>
+        <div class="art-row" onclick="showToast('Yeso tipo III agregado a la OC')">
+          <div class="art-urg" style="background:var(--yel)"></div>
+          <div class="art-name">Yeso tipo III normal 3 kg<div style="font-size:10px;color:var(--sub)">BL-YE-318</div></div>
+          <div class="art-stock" style="color:#92400e">22 u<div style="font-size:10px">ALERTA</div></div>
+        </div>
+        <div class="art-row" onclick="showToast('Artículo agregado a la OC')">
+          <div class="art-urg" style="background:var(--yel)"></div>
+          <div class="art-name">Polvo de yeso especial 1 kg<div style="font-size:10px;color:var(--sub)">BL-YE-405</div></div>
+          <div class="art-stock" style="color:#92400e">18 u<div style="font-size:10px">ALERTA</div></div>
+        </div>
+        <div class="art-row" onclick="showToast('Artículo agregado a la OC')">
+          <div class="art-urg" style="background:var(--grn)"></div>
+          <div class="art-name">Piedra de yeso tipo II<div style="font-size:10px;color:var(--sub)">BL-YE-120</div></div>
+          <div class="art-stock" style="color:var(--grn)">78 u<div style="font-size:10px">OK</div></div>
+        </div>
+        <div class="art-row" onclick="showToast('Artículo agregado a la OC')">
+          <div class="art-urg" style="background:var(--grn)"></div>
+          <div class="art-name">Yeso extraduro blanco 5 kg<div style="font-size:10px;color:var(--sub)">BL-YE-225</div></div>
+          <div class="art-stock" style="color:var(--grn)">92 u<div style="font-size:10px">OK</div></div>
+        </div>
+        <div class="art-row"><div class="art-urg" style="background:var(--grn)"></div><div class="art-name">Base de yeso crema 500 g<div style="font-size:10px;color:var(--sub)">BL-YE-501</div></div><div class="art-stock" style="color:var(--grn)">110 u</div></div>
+      </div>
+      <div style="padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--sub);text-align:center">Click para agregar a la OC</div>
+    </div>
+  </div>
+</div>
+<!-- PREDICTOR -->
+<div id="page-predictor" class="page">
+  <div class="ph"><div><div class="ph-title">Predictor de demanda</div><div class="ph-sub">Proyecciones basadas en historial de movimientos YiQi · en desarrollo</div></div></div>
+  <div class="metrics">
+    <div class="metric"><div class="ml">Demanda estimada próx. 30 días</div><div class="mv mv-yel">+18 %</div><div class="ms">vs. mismo período año anterior</div></div>
+    <div class="metric"><div class="ml">Mes de mayor compra histórico</div><div class="mv mv-n" style="font-size:19px">Jul–Ago</div><div class="ms">últimos 5 años seguidos</div></div>
+    <div class="metric"><div class="ml">Ahorro potencial comprando hoy</div><div class="mv mv-grn">$84.000</div><div class="ms">vs. comprar en agosto a precio pico</div></div>
+    <div class="metric"><div class="ml">Precisión del modelo</div><div class="mv mv-grn">91 %</div><div class="ms">validado contra historial real</div></div>
+  </div>
+  <div style="padding:0 24px 13px"><div class="pred-card">
+    <div class="pred-title"><i class="ti ti-chart-bar"></i> Consumo mensual proyectado — familia Acrílicos</div>
+    <svg width="100%" height="120" viewBox="0 0 580 120">
+      <rect x="8" y="76" width="28" height="38" rx="3" fill="#e5e7eb"/><rect x="48" y="64" width="28" height="50" rx="3" fill="#e5e7eb"/><rect x="88" y="56" width="28" height="58" rx="3" fill="#e5e7eb"/><rect x="128" y="70" width="28" height="44" rx="3" fill="#e5e7eb"/><rect x="168" y="60" width="28" height="54" rx="3" fill="#e5e7eb"/><rect x="208" y="50" width="28" height="64" rx="3" fill="#e5e7eb"/>
+      <rect x="248" y="42" width="28" height="72" rx="3" fill="var(--ind)"/>
+      <rect x="288" y="30" width="28" height="84" rx="3" fill="#6366f1" opacity=".7"/><rect x="328" y="18" width="28" height="96" rx="3" fill="#6366f1" opacity=".6"/><rect x="368" y="26" width="28" height="88" rx="3" fill="#6366f1" opacity=".5"/><rect x="408" y="40" width="28" height="74" rx="3" fill="#6366f1" opacity=".4"/><rect x="448" y="56" width="28" height="58" rx="3" fill="#6366f1" opacity=".3"/>
+      <text x="22" y="116" font-size="9" fill="#9ca3af" text-anchor="middle">Ene</text><text x="62" y="116" font-size="9" fill="#9ca3af" text-anchor="middle">Feb</text><text x="102" y="116" font-size="9" fill="#9ca3af" text-anchor="middle">Mar</text><text x="142" y="116" font-size="9" fill="#9ca3af" text-anchor="middle">Abr</text><text x="182" y="116" font-size="9" fill="#9ca3af" text-anchor="middle">May</text><text x="222" y="116" font-size="9" fill="#9ca3af" text-anchor="middle">Jun</text>
+      <text x="262" y="116" font-size="9" fill="var(--ind)" font-weight="bold" text-anchor="middle">Jul ◄</text>
+      <text x="302" y="116" font-size="9" fill="#6366f1" text-anchor="middle">Ago</text><text x="342" y="116" font-size="9" fill="#6366f1" text-anchor="middle">Sep</text><text x="382" y="116" font-size="9" fill="#6366f1" text-anchor="middle">Oct</text><text x="422" y="116" font-size="9" fill="#6366f1" text-anchor="middle">Nov</text><text x="462" y="116" font-size="9" fill="#6366f1" text-anchor="middle">Dic</text>
+      <line x1="328" y1="4" x2="328" y2="108" stroke="#FFC72C" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="333" y="13" font-size="9" fill="#92400e" font-weight="bold">▲ Pico histórico de compras</text>
+    </svg>
+  </div></div>
+  <div class="pred-grid">
+    <div class="pred-card">
+      <div class="pred-title"><i class="ti ti-building-store"></i> OC estimadas por proveedor — próximos 30 días</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr><th style="text-align:left;font-size:10px;color:var(--sub);padding:0 0 5px;text-transform:uppercase">Proveedor</th><th style="text-align:right;font-size:10px;color:var(--sub);padding:0 0 5px;text-transform:uppercase">OC est.</th><th style="text-align:right;font-size:10px;color:var(--sub);padding:0 0 5px;text-transform:uppercase">Prom. art./OC</th></tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #f3f4f6"><td style="padding:7px 0">Dental Depot SA</td><td style="text-align:right;font-weight:700;color:var(--ind)">3 OC</td><td style="text-align:right;color:var(--sub)">8 art.</td></tr>
+          <tr style="border-bottom:1px solid #f3f4f6"><td style="padding:7px 0">Biolab Distribuciones</td><td style="text-align:right;font-weight:700;color:var(--ind)">2 OC</td><td style="text-align:right;color:var(--sub)">5 art.</td></tr>
+          <tr style="border-bottom:1px solid #f3f4f6"><td style="padding:7px 0">Siladent SRL</td><td style="text-align:right;font-weight:700;color:var(--ind)">1 OC</td><td style="text-align:right;color:var(--sub)">22 art.</td></tr>
+          <tr><td style="padding:7px 0">Rondanini & Cía</td><td style="text-align:right;font-weight:700;color:var(--ind)">2 OC</td><td style="text-align:right;color:var(--sub)">6 art.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pred-card">
+      <div class="pred-title"><i class="ti ti-bulb"></i> Sugerencias de compra proactivas</div>
+      <div class="rec-box ra"><div class="rt">Comprar acrílicos antes del 15 de julio</div><div class="rd">Históricamente el precio sube un 22 % en agosto. Comprando ahora el ahorro estimado es de $84.000.</div><button class="btn bsm bp" style="margin-top:8px" onclick="goTo('nueva-oc')">Crear OC preventiva</button></div>
+      <div class="rec-box rg"><div class="rt">Guantes: el punto de reposición puede bajar</div><div class="rd">El consumo cayó 18 % vs. el año pasado. El mínimo de 25 u podría bajar a 15 u, liberando capital de trabajo.</div></div>
+      <div class="rec-box rn"><div class="rt">Programar OC de siliconas para septiembre</div><div class="rd">El consumo sube todos los años en octubre. Conviene hacer el pedido en la segunda semana de septiembre.</div></div>
+    </div>
+  </div>
+</div>
+<!-- PROVEEDORES -->
+<div id="page-proveedores" class="page">
+  <div class="ph"><div><div class="ph-title">Proveedores</div><div class="ph-sub">104 proveedores activos</div></div><div class="ha"><button class="btn bsm bp"><i class="ti ti-plus"></i> Nuevo</button></div></div>
+  <div style="padding:13px 24px 26px"><div style="margin-bottom:11px"><input class="si" type="text" placeholder="Buscar proveedor…" style="width:230px"></div>
+  <div class="tw"><table>
+    <thead><tr><th>Proveedor</th><th>Contacto</th><th>Canal</th><th>Condiciones del proveedor</th><th>Entrega</th><th>Productos</th><th>Límite auto</th><th>Operador</th><th></th></tr></thead>
+    <tbody>
+      <tr><td style="font-weight:700">Dental Depot SA</td><td><div style="font-size:12px">Marcos Gutiérrez</div><div style="font-size:11px;color:var(--sub)">pedidos@dentaldepot.com.ar</div></td><td><span class="badge bgrn">WhatsApp</span></td><td style="font-size:12px;max-width:200px;line-height:1.5">Mín. $200.000 · 30d+3%/Ef−5%<br>Cemento: cajas de 10 u · Guantes: mín. 20 packs</td><td>3 días</td><td style="font-weight:700">234</td><td style="font-weight:700;color:var(--ind)">$200.000</td><td><span class="badge bind">Ivana</span></td><td><button class="btn bsm"><i class="ti ti-edit"></i></button></td></tr>
+      <tr><td style="font-weight:700">Biolab Distribuciones</td><td><div style="font-size:12px">Lucía Fernández</div><div style="font-size:11px;color:var(--sub)">recepcion@biolabdistrib.com.ar</div></td><td><span class="badge bind">Email</span></td><td style="font-size:12px;max-width:200px;line-height:1.5">Mín. 10 artículos distintos<br>Contado / 30d+3%</td><td>5 días</td><td style="font-weight:700">89</td><td style="font-weight:700;color:var(--ind)">$150.000</td><td><span class="badge bind">Ivana</span></td><td><button class="btn bsm"><i class="ti ti-edit"></i></button></td></tr>
+      <tr><td style="font-weight:700">Siladent SRL</td><td><div style="font-size:12px">Roberto Paz</div><div style="font-size:11px;color:var(--sub)">ventas@siladent.com.ar</div></td><td><span class="badge bgray">Email y WA</span></td><td style="font-size:12px;max-width:200px;line-height:1.5">Mín. 20 artículos distintos<br>60d / Ef−3%</td><td>7 días</td><td style="font-weight:700">156</td><td style="font-weight:700;color:var(--ind)">$100.000</td><td><span class="badge" style="background:#f3e8ff;color:#7c3aed">Aris</span></td><td><button class="btn bsm"><i class="ti ti-edit"></i></button></td></tr>
+    </tbody>
+  </table></div></div>
+</div>
+<!-- USUARIOS Y ACCESOS -->
+<div id="page-usuarios" class="page">
+  <div class="ph"><div><div class="ph-title">Usuarios y accesos</div><div class="ph-sub">Definí qué proveedores trabaja cada operador</div></div><div class="ha"><button class="btn bsm bp"><i class="ti ti-plus"></i> Nuevo usuario</button></div></div>
+  <div style="padding:13px 24px 26px;display:grid;grid-template-columns:1fr 1fr;gap:13px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="padding:13px 15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;background:var(--ind-bg)">
+        <div class="avatar">IV</div><div><div style="font-size:14px;font-weight:700">Ivana</div><div style="font-size:11px;color:var(--sub)">Operadora · ivana@dentalab.com.ar</div></div><span class="badge bind" style="margin-left:auto">Activa</span>
+      </div>
+      <div style="padding:11px 15px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin-bottom:7px">Proveedores asignados</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#f9fafb;border-radius:7px;border:1px solid var(--border);font-size:13px"><span style="font-weight:600">Dental Depot SA</span><button class="btn bsm bred2" style="padding:2px 7px;font-size:11px">Quitar</button></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#f9fafb;border-radius:7px;border:1px solid var(--border);font-size:13px"><span style="font-weight:600">Biolab Distribuciones</span><button class="btn bsm bred2" style="padding:2px 7px;font-size:11px">Quitar</button></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#f9fafb;border-radius:7px;border:1px solid var(--border);font-size:13px"><span style="font-weight:600">Rondanini & Cía</span><button class="btn bsm bred2" style="padding:2px 7px;font-size:11px">Quitar</button></div>
+          <button class="btn bsm" style="width:100%;justify-content:center;margin-top:3px"><i class="ti ti-plus"></i> Agregar proveedor</button>
+        </div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="padding:13px 15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;background:#f3e8ff">
+        <div class="avatar" style="background:#f3e8ff;color:#7c3aed">AR</div><div><div style="font-size:14px;font-weight:700">Aris</div><div style="font-size:11px;color:var(--sub)">Dueño · aprobador · aris@dentalab.com.ar</div></div><span class="badge" style="background:#f3e8ff;color:#7c3aed;margin-left:auto">Activo</span>
+      </div>
+      <div style="padding:11px 15px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin-bottom:7px">Proveedores asignados</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#f9fafb;border-radius:7px;border:1px solid var(--border);font-size:13px"><span style="font-weight:600">Siladent SRL</span><button class="btn bsm bred2" style="padding:2px 7px;font-size:11px">Quitar</button></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#f3e8ff;border-radius:7px;border:1px solid #ddd6fe;font-size:13px"><span style="font-weight:600;color:#7c3aed">Acceso completo (aprobador)</span><span style="font-size:11px;color:#7c3aed">Todos los proveedores</span></div>
+          <button class="btn bsm" style="width:100%;justify-content:center;margin-top:3px"><i class="ti ti-plus"></i> Agregar proveedor</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- CATÁLOGO DE CAUSAS -->
+<div id="page-causas" class="page">
+  <div class="ph"><div><div class="ph-title">Catálogo de causas</div><div class="ph-sub">Causas predefinidas por el cliente para asignar a alertas y órdenes</div></div><div class="ha"><button class="btn bsm bp"><i class="ti ti-plus"></i> Nueva causa</button></div></div>
+  <div style="padding:13px 24px 26px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--red);margin-bottom:9px;display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>Causas críticas</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="padding:7px 10px;background:var(--red-bg);border-radius:7px;border:1px solid var(--red-bd);font-size:12px;font-weight:600;color:var(--red);display:flex;justify-content:space-between;align-items:center">Proveedor sin stock<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+        <div style="padding:7px 10px;background:var(--red-bg);border-radius:7px;border:1px solid var(--red-bd);font-size:12px;font-weight:600;color:var(--red);display:flex;justify-content:space-between;align-items:center">Problema de importación<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+        <div style="padding:7px 10px;background:var(--red-bg);border-radius:7px;border:1px solid var(--red-bd);font-size:12px;font-weight:600;color:var(--red);display:flex;justify-content:space-between;align-items:center">Falta de producción<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#92400e;margin-bottom:9px;display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--yel);display:inline-block"></span>Causas preventivas</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="padding:7px 10px;background:var(--yel-bg);border-radius:7px;border:1px solid var(--yel-bd);font-size:12px;font-weight:600;color:#92400e;display:flex;justify-content:space-between;align-items:center">Consumo regular<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+        <div style="padding:7px 10px;background:var(--yel-bg);border-radius:7px;border:1px solid var(--yel-bd);font-size:12px;font-weight:600;color:#92400e;display:flex;justify-content:space-between;align-items:center">Consumo semanal alto<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+        <div style="padding:7px 10px;background:var(--yel-bg);border-radius:7px;border:1px solid var(--yel-bd);font-size:12px;font-weight:600;color:#92400e;display:flex;justify-content:space-between;align-items:center">Venta puntual cliente<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+        <div style="padding:7px 10px;background:var(--yel-bg);border-radius:7px;border:1px solid var(--yel-bd);font-size:12px;font-weight:600;color:#92400e;display:flex;justify-content:space-between;align-items:center">Pedido puntual cliente<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--blu);margin-bottom:9px;display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--blu);display:inline-block"></span>Acción manual</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="padding:7px 10px;background:var(--blu-bg);border-radius:7px;border:1px solid var(--blu-bd);font-size:12px;font-weight:600;color:var(--blu);display:flex;justify-content:space-between;align-items:center">Proveedor demorado<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+        <div style="padding:7px 10px;background:var(--blu-bg);border-radius:7px;border:1px solid var(--blu-bd);font-size:12px;font-weight:600;color:var(--blu);display:flex;justify-content:space-between;align-items:center">OC pendiente confirmar<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+        <div style="padding:7px 10px;background:var(--blu-bg);border-radius:7px;border:1px solid var(--blu-bd);font-size:12px;font-weight:600;color:var(--blu);display:flex;justify-content:space-between;align-items:center">Decisión del dueño<button class="btn bsm bgh" style="font-size:11px"><i class="ti ti-edit"></i></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- REGLAS -->
+<div id="page-reglas" class="page">
+  <div class="ph"><div><div class="ph-title">Reglas y alertas</div><div class="ph-sub">Configuración de alertas preventivas y límites de aprobación</div></div><div class="ha"><button class="btn bsm bp"><i class="ti ti-device-floppy"></i> Guardar</button></div></div>
+  <div style="padding:13px 24px 26px;display:flex;flex-direction:column;gap:11px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:17px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px"><div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px"><i class="ti ti-bell" style="color:var(--ind)"></i> Alertas preventivas</div><div style="display:flex;align-items:center;gap:7px"><div class="tg on" onclick="this.classList.toggle('on')"></div><span style="font-size:12px;color:var(--sub)">Activas</span></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div><div class="fl" style="margin-bottom:7px">Activar alerta cuando el stock llegue al</div><div style="display:flex;align-items:center;gap:7px"><input type="number" value="20" style="width:64px"><span style="font-size:12px;color:var(--sub)">% sobre el mínimo</span></div><div style="font-size:11px;color:#9ca3af;margin-top:4px">Ej: mínimo 50 u → alerta en 60 u</div></div>
+        <div><div class="fl" style="margin-bottom:7px">Generar OC agrupada por proveedor</div><div style="display:flex;align-items:center;gap:7px"><div class="tg on" onclick="this.classList.toggle('on')"></div><span style="font-size:12px;color:var(--sub)">Sí — una OC por proveedor para revisión del operador</span></div></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:17px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:7px"><i class="ti ti-shield-check" style="color:var(--ind)"></i> Límites de aprobación por proveedor</div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:11px">OC que superen este monto requieren aprobación del dueño (semáforo azul).</div>
+      <div class="tw"><table><thead><tr><th>Proveedor</th><th>Límite OC automática</th><th>Si supera</th></tr></thead><tbody>
+        <tr><td style="font-weight:700">Dental Depot SA</td><td><input type="number" value="200000" style="width:116px"></td><td style="font-size:12px;color:var(--sub)"><span class="sem sb2" style="display:inline-block;margin-right:5px"></span>Semáforo azul → requiere aprobación de Aris</td></tr>
+        <tr><td style="font-weight:700">Biolab Distribuciones</td><td><input type="number" value="150000" style="width:116px"></td><td style="font-size:12px;color:var(--sub)"><span class="sem sb2" style="display:inline-block;margin-right:5px"></span>Semáforo azul → requiere aprobación de Aris</td></tr>
+        <tr><td style="font-weight:700">Siladent SRL</td><td><input type="number" value="100000" style="width:116px"></td><td style="font-size:12px;color:var(--sub)"><span class="sem sb2" style="display:inline-block;margin-right:5px"></span>Semáforo azul → requiere aprobación de Aris</td></tr>
+      </tbody></table></div>
+    </div>
+  </div>
+</div>
+<!-- TEMPLATES -->
+<div id="page-templates" class="page">
+  <div class="ph"><div><div class="ph-title">Templates de mensajes</div><div class="ph-sub">Mensaje enviado al proveedor con cada OC</div></div><div class="ha"><button class="btn bsm bp"><i class="ti ti-device-floppy"></i> Guardar</button></div></div>
+  <div style="padding:13px 24px 26px;display:grid;grid-template-columns:1fr 1fr;gap:13px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:17px"><div style="font-size:13px;font-weight:700;margin-bottom:11px;display:flex;align-items:center;gap:7px"><i class="ti ti-mail" style="color:var(--ind)"></i> Template de email</div><div class="fg"><div class="fl">Asunto</div><input class="fi" type="text" value="Orden de compra {{numero_oc}} — Dentalab"></div><div class="fg"><div class="fl">Cuerpo</div><textarea class="fta">Estimado/a {{nombre_contacto}},
+
+Adjuntamos la OC {{numero_oc}} con fecha {{fecha}}.
+
+Detalle:
+{{tabla_productos}}
+
+Entrega en: Dentalab — Av. Corrientes 1234, CABA
+
+Saludos,
+Equipo de Compras — Dentalab</textarea></div></div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:17px"><div style="font-size:13px;font-weight:700;margin-bottom:11px;display:flex;align-items:center;gap:7px"><i class="ti ti-brand-whatsapp" style="color:var(--grn)"></i> Template de WhatsApp</div><div class="fg"><div class="fl">Mensaje</div><textarea class="fta">Hola {{nombre_contacto}} 👋
+
+OC *{{numero_oc}}* de Dentalab — {{fecha}}.
+
+*Detalle:*
+{{lista_productos_wa}}
+
+Por favor confirmá recepción. ¡Gracias! 🦷</textarea></div><div style="font-size:11px;color:var(--sub);margin-top:5px">Variables: <span class="badge bind" style="margin:2px">{{numero_oc}}</span><span class="badge bind" style="margin:2px">{{nombre_contacto}}</span><span class="badge bind" style="margin:2px">{{fecha}}</span><span class="badge bind" style="margin:2px">{{tabla_productos}}</span></div></div>
+    <div style="grid-column:span 2;background:#fff;border:1px solid var(--border);border-radius:10px;padding:17px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px"><i class="ti ti-file-description" style="color:var(--ind)"></i> Vista previa del PDF — OC-2025-0043 · Biolab Distribuciones</div>
+      <div class="msgprev">OC N° OC-2025-0043
+Fecha: 26/06/2025
+
+Proveedor: Biolab Distribuciones — Lucía Fernández
+
+ARTÍCULOS:
+  BL-YE-220  Yeso tipo IV extraduro 5 kg ...... 60 unidades (3 bolsas)
+  BL-YE-318  Yeso tipo III normal 3 kg ........ 40 unidades (2 bolsas)
+
+Entrega en: Dentalab — Av. Corrientes 1234, CABA
+
+Firma autorizada: ___________________</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:6px">El PDF incluye SKU del proveedor, cantidad y presentación · No incluye precios ni condiciones de pago</div>
+    </div>
+  </div>
+</div>
+<!-- CONECTOR YIQI -->
+<div id="page-yiqi" class="page">
+  <div class="ph"><div><div class="ph-title">Conector YiQi</div><div class="ph-sub">Estado e integración con el ERP · apidoc.yiqi.com.ar</div></div><div class="ha"><button class="btn bsm" onclick="showToast('Probando conexión…')"><i class="ti ti-plug"></i> Probar</button><button class="btn bsm bp"><i class="ti ti-device-floppy"></i> Guardar</button></div></div>
+  <div style="padding:13px 24px 26px;display:flex;flex-direction:column;gap:11px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:17px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:11px">Estado de la conexión</div>
+      <div style="display:flex;align-items:center;gap:7px;padding:10px 13px;border-radius:8px;margin-bottom:13px;background:var(--grn-bg);border:1px solid var(--grn-bd);font-size:13px;font-weight:600;color:var(--grn)"><i class="ti ti-circle-check"></i> Conectado · Última sync exitosa: hoy 14:26 hs</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px">
+        <div class="fg"><div class="fl">URL base de la API</div><input class="fi" type="text" value="https://apidoc.yiqi.com.ar"></div>
+        <div class="fg"><div class="fl">Bearer token</div><input class="fi" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."></div>
+        <div class="fg"><div class="fl">Frecuencia de sync</div><select class="fsel"><option>Cada 10 minutos</option><option>Cada 30 minutos</option><option>Cada hora</option></select></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:17px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:13px">Endpoints activos</div>
+      <div class="ep-row"><span class="ep-method ep-get">GET</span><span class="ep-path">/LISTA_DE_PRECIO_COMP</span><span class="ep-desc">Listas de precios por proveedor</span><span class="ep-dot ep-ok"></span><span style="font-size:11px;color:var(--grn);font-weight:600">OK · 142 ms</span></div>
+      <div class="ep-row"><span class="ep-method ep-get">GET</span><span class="ep-path">/PRECIO_ARTICULO_COMP</span><span class="ep-desc">Precio por artículo/proveedor</span><span class="ep-dot ep-ok"></span><span style="font-size:11px;color:var(--grn);font-weight:600">OK · 98 ms</span></div>
+      <div class="ep-row"><span class="ep-method ep-get">GET</span><span class="ep-path">/REPORTE_PENDIENTES_D</span><span class="ep-desc">OCs pendientes en YiQi</span><span class="ep-dot ep-ok"></span><span style="font-size:11px;color:var(--grn);font-weight:600">OK · 210 ms</span></div>
+      <div class="ep-row"><span class="ep-method ep-get">GET</span><span class="ep-path">/REPORTE_DE_PROVEEDOR</span><span class="ep-desc">Datos de proveedores</span><span class="ep-dot ep-ok"></span><span style="font-size:11px;color:var(--grn);font-weight:600">OK · 187 ms</span></div>
+      <div class="ep-row"><span class="ep-method ep-post">POST</span><span class="ep-path">/ORDEN_DE_COMPRA</span><span class="ep-desc">Crear OC en YiQi</span><span class="ep-dot ep-ok"></span><span style="font-size:11px;color:var(--grn);font-weight:600">OK · hace 2 h</span></div>
+      <div class="ep-row"><span class="ep-method ep-post">POST</span><span class="ep-path">/GENERADOR_OC</span><span class="ep-desc">Generador nativo de OC</span><span class="ep-dot ep-ok"></span><span style="font-size:11px;color:var(--grn);font-weight:600">OK · hace 2 h</span></div>
+      <div class="ep-row"><span class="ep-method ep-post">POST</span><span class="ep-path">/SOLICITUD_DE_COMPRA</span><span class="ep-desc">Crear solicitud de compra</span><span class="ep-dot ep-warn"></span><span style="font-size:11px;color:#92400e;font-weight:600">Sin uso reciente</span></div>
+    </div>
+  </div>
+</div>
+</main>
+</div>
+<!-- MODALES -->
+<div class="mo" id="modal-nueva-oc" onclick="cob(event,'modal-nueva-oc')">
+  <div class="md mdlg">
+    <div class="mh"><div class="mt2">Agregar artículo a OC</div><button class="btn bsm bgh" onclick="cm('modal-nueva-oc')"><i class="ti ti-x"></i></button></div>
+    <div class="mb2">
+      <div style="background:var(--ind-bg);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--ind);margin-bottom:13px"><i class="ti ti-info-circle"></i> El artículo se agrega a la OC del proveedor correspondiente. Podés sumar más productos de otras alertas o compras estratégicas del dueño.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px">
+        <div class="fg"><div class="fl">Producto</div><input class="fi" type="text" value="Disco de corte metal 22 mm × 10" readonly style="background:#f3f4f6"></div>
+        <div class="fg"><div class="fl">Proveedor</div><select class="fsel"><option>Seleccioná un proveedor…</option><option>Siladent SRL (alternativo)</option><option>Dental Depot SA</option></select></div>
+        <div class="fg"><div class="fl">Presentación</div><input class="fi" type="text" placeholder="Ej: 3 cajas de 20 unidades"></div>
+        <div class="fg"><div class="fl">Cantidad sugerida</div><input type="number" value="40"></div>
+      </div>
+      <div class="fg"><div class="fl" style="margin-bottom:6px">Agregar más productos a esta OC</div>
+        <div class="tw" style="margin-bottom:6px"><table><thead><tr><th>Producto / búsqueda</th><th>Presentación</th><th>Cantidad</th><th></th></tr></thead>
+        <tbody><tr><td><input class="fi" type="text" placeholder="Buscá producto o SKU…"></td><td><input class="fi" type="text" placeholder="Ej: caja de 10"></td><td><input type="number" value="1" style="width:60px"></td><td><button class="btn bsm bred2"><i class="ti ti-trash"></i></button></td></tr></tbody></table></div>
+        <button class="btn bsm"><i class="ti ti-plus"></i> Agregar producto</button>
+      </div>
+      <div class="fg" style="margin-top:9px"><div class="fl">Nota</div><input class="fi" type="text" placeholder="Observación opcional…"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="cm('modal-nueva-oc')">Cancelar</button><button class="btn bp" onclick="cm('modal-nueva-oc');showToast('Artículo agregado a la OC del proveedor')"><i class="ti ti-check"></i> Agregar a OC</button></div>
+  </div>
+</div>
+<div class="mo" id="modal-detalle-oc" onclick="cob(event,'modal-detalle-oc')">
+  <div class="md mdlg">
+    <div class="mh"><div class="mt2">OC-2025-0043 — Biolab Distribuciones</div><button class="btn bsm bgh" onclick="cm('modal-detalle-oc')"><i class="ti ti-x"></i></button></div>
+    <div class="mb2">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px">
+        <div class="fg"><div class="fl">Proveedor</div><div style="font-size:14px;font-weight:700">Biolab Distribuciones</div></div>
+        <div class="fg"><div class="fl">Estado</div><div style="display:flex;align-items:center;gap:7px;margin-top:3px"><span class="sem sg"></span><span style="font-size:13px;font-weight:600;color:var(--grn)">Lista para enviar</span></div></div>
+        <div class="fg"><div class="fl">Contacto</div><div style="font-size:13px;font-weight:600">Lucía Fernández</div><div style="font-size:12px;color:var(--sub)">recepcion@biolabdistrib.com.ar</div></div>
+        <div class="fg"><div class="fl">Operador</div><div style="font-size:13px;font-weight:600">Ivana</div></div>
+      </div>
+      <div class="tw" style="margin-bottom:9px"><table><thead><tr><th>Producto</th><th>Presentación</th><th style="text-align:right">Cantidad</th></tr></thead>
+      <tbody>
+        <tr><td>Yeso tipo IV extraduro 5 kg</td><td style="font-size:12px;color:var(--sub)">Bolsa 5 kg</td><td style="text-align:right;font-weight:700;color:var(--ind)">60 u / 3 bolsas</td></tr>
+        <tr><td>Yeso tipo III normal 3 kg</td><td style="font-size:12px;color:var(--sub)">Bolsa 3 kg</td><td style="text-align:right;font-weight:700;color:var(--ind)">40 u / 2 bolsas</td></tr>
+      </tbody></table></div>
+      <div style="font-size:11px;color:var(--sub);background:#f9fafb;border-radius:7px;padding:8px 11px">El PDF incluye SKU del proveedor y presentación · No incluye precios ni condiciones de pago</div>
+    </div>
+    <div class="mf"><button class="btn" onclick="cm('modal-detalle-oc')">Cerrar</button><button class="btn bsm"><i class="ti ti-file-download"></i> PDF</button><button class="btn bsm" onclick="cm('modal-detalle-oc');openModal('modal-enviar-oc')"><i class="ti ti-mail"></i> Mail</button><button class="btn bsm bgrn2" onclick="cm('modal-detalle-oc');openModal('modal-enviar-oc')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button></div>
+  </div>
+</div>
+<div class="mo" id="modal-editar-oc" onclick="cob(event,'modal-editar-oc')">
+  <div class="md mdlg">
+    <div class="mh"><div class="mt2">Editar OC — Biolab Distribuciones</div><button class="btn bsm bgh" onclick="cm('modal-editar-oc')"><i class="ti ti-x"></i></button></div>
+    <div class="mb2">
+      <div class="tw" style="margin-bottom:9px"><table><thead><tr><th>Producto</th><th>Presentación</th><th>Cantidad</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Yeso tipo IV extraduro 5 kg</td><td style="font-size:12px;color:var(--sub)">Bolsa 5 kg</td><td><input type="number" value="60" style="width:64px"></td><td><button class="btn bsm bred2"><i class="ti ti-trash"></i></button></td></tr>
+        <tr><td>Yeso tipo III normal 3 kg</td><td style="font-size:12px;color:var(--sub)">Bolsa 3 kg</td><td><input type="number" value="40" style="width:64px"></td><td><button class="btn bsm bred2"><i class="ti ti-trash"></i></button></td></tr>
+      </tbody></table></div>
+      <button class="btn bsm"><i class="ti ti-plus"></i> Agregar producto</button>
+      <div class="fg" style="margin-top:11px"><div class="fl">Nota</div><input class="fi" type="text" placeholder="Observación…"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="cm('modal-editar-oc')">Cancelar</button><button class="btn bp" onclick="cm('modal-editar-oc');showToast('OC actualizada')"><i class="ti ti-check"></i> Guardar cambios</button></div>
+  </div>
+</div>
+<div class="mo" id="modal-enviar-oc" onclick="cob(event,'modal-enviar-oc')">
+  <div class="md">
+    <div class="mh"><div class="mt2">Enviar OC — Biolab Distribuciones</div><button class="btn bsm bgh" onclick="cm('modal-enviar-oc')"><i class="ti ti-x"></i></button></div>
+    <div class="mb2">
+      <div style="margin-bottom:13px"><div class="fl" style="margin-bottom:5px">Destinatario</div><div style="font-size:14px;font-weight:700">Lucía Fernández</div><div style="font-size:12px;color:var(--sub);margin-top:2px">recepcion@biolabdistrib.com.ar · +54 11 4822-0033</div></div>
+      <div class="fl" style="margin-bottom:8px">Canal de envío</div>
+      <div class="canal-row">
+        <div class="canal-opt co-email sel" id="ce1" onclick="selCanal('e')"><i class="ti ti-mail"></i> Email</div>
+        <div class="canal-opt co-wa" id="cw1" onclick="selCanal('w')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</div>
+        <div class="canal-opt co-edit" id="ced" onclick="selCanal('d')"><i class="ti ti-edit"></i> Editar antes</div>
+      </div>
+      <div style="margin-top:11px;background:#f9fafb;border-radius:8px;padding:10px 12px">
+        <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Vista previa editable</div>
+        <textarea class="fta" style="min-height:110px">Estimada Lucía Fernández,
+
+Adjuntamos la OC OC-2025-0043 con fecha 26/06/2025.
+
+  BL-YE-220  Yeso tipo IV extraduro 5 kg — 60 u (3 bolsas)
+  BL-YE-318  Yeso tipo III normal 3 kg — 40 u (2 bolsas)
+
+Entrega en: Dentalab — Av. Corrientes 1234, CABA
+
+Saludos, Dentalab</textarea>
+      </div>
+    </div>
+    <div class="mf"><button class="btn" onclick="cm('modal-enviar-oc')">Cancelar</button><button class="btn bgrn2" onclick="cm('modal-enviar-oc');showToast('OC enviada a Biolab Distribuciones')"><i class="ti ti-send"></i> Enviar ahora</button></div>
+  </div>
+</div>
+<div class="mo" id="modal-causa" onclick="cob(event,'modal-causa')">
+  <div class="md">
+    <div class="mh"><div class="mt2">Declarar causa</div><button class="btn bsm bgh" onclick="cm('modal-causa')"><i class="ti ti-x"></i></button></div>
+    <div class="mb2">
+      <div class="fg"><div class="fl">Causa</div>
+        <select class="fsel"><option>Seleccioná una causa…</option><optgroup label="Críticas"><option>Proveedor sin stock</option><option>Problema de importación</option><option>Falta de producción</option></optgroup><optgroup label="Preventivas"><option>Consumo regular</option><option>Consumo semanal alto</option><option>Venta puntual cliente</option></optgroup><optgroup label="Acción manual"><option>Proveedor demorado</option><option>OC pendiente de confirmar</option><option>Decisión del dueño</option></optgroup></select>
+      </div>
+      <div class="fg"><div class="fl">Nota adicional (opcional)</div><textarea class="fta" placeholder="Ampliá la información si es necesario…"></textarea></div>
+      <div class="fg"><div class="fl">Acción</div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-top:3px">
+          <label style="display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer"><input type="radio" name="accion" checked> Registrar y mantener alerta activa</label>
+          <label style="display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer"><input type="radio" name="accion"> Recordar en 15 días (prorrogar)</label>
+          <label style="display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer"><input type="radio" name="accion"> Quitar alerta (se resolvió)</label>
+        </div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn" onclick="cm('modal-causa')">Cancelar</button><button class="btn bp" onclick="cm('modal-causa');showToast('Causa registrada')"><i class="ti ti-check"></i> Guardar</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"><i class="ti ti-circle-check"></i><span id="toast-msg">Acción completada</span></div>
+<script>
+function goTo(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
+  const nav=document.querySelector('[data-page="'+p+'"]');if(nav)nav.classList.add('active');
+  document.querySelector('.main').scrollTo(0,0);
+}
+document.querySelectorAll('.nav-item[data-page]').forEach(el=>el.addEventListener('click',()=>goTo(el.dataset.page)));
+function om(id){document.getElementById(id).classList.add('open')}
+function cm(id){document.getElementById(id).classList.remove('open')}
+function cob(e,id){if(e.target.id===id)cm(id)}
+function openModal(id){om(id)}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  document.getElementById('toast-msg').textContent=msg;
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);
+}
+function togOC(id){const b=document.getElementById(id);if(b)b.classList.toggle('open')}
+function togSeg(id){const b=document.getElementById(id);if(b)b.classList.toggle('open')}
+function toggleColl(){
+  const btn=document.getElementById('coll-btn');
+  const body=document.getElementById('coll-body');
+  btn.classList.toggle('open');
+  body.style.display=body.style.display==='block'?'none':'block';
+}
+function selCanal(c){
+  ['ce1','cw1','ced'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('sel');}});
+  const map={e:'ce1',w:'cw1',d:'ced'};
+  const t=document.getElementById(map[c]);if(t)t.classList.add('sel');
+}
+</script>
+</body>
+</html>
