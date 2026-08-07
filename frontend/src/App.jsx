@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './lib/supabase'
 import { usePermisos } from './hooks/usePermisos'
 import Login from './pages/Login'
@@ -101,31 +101,39 @@ function AppLogueada({ session, onLogout }) {
       ? null
       : `${permisos.esAdmin}|${permisos.codigos.join(',')}|${permisos.nombres.join(',')}`
 
+  // Extraída con useCallback (y no declarada adentro del useEffect) para
+  // poder pasarla como onCambioOrdenes a OrdenesCompra y NuevaOC: así el
+  // badge del sidebar se refresca apenas se crea/aprueba/rechaza una OC,
+  // sin esperar a un F5. `vivo` sigue el mismo patrón que usePermisos.js
+  // (evita el setState después de desmontar).
+  const vivoRef = useRef(true)
   useEffect(() => {
-    if (claveFiltro === null) return
-    let vivo = true
-
-    async function cargarContadores() {
-      // contadores_sidebar() NO es SECURITY DEFINER a propósito: corre
-      // con los permisos del usuario logueado, así que el RLS filtra
-      // solo y cada uno ve sus propios números sin duplicar la lógica
-      // de permisos en el frontend.
-      const { data, error } = await supabase.rpc('contadores_sidebar')
-      if (!vivo) return
-      if (error) {
-        // Los badges no son crítica: si falla, simplemente no se dibujan.
-        console.error('[contadores_sidebar]', error)
-        return
-      }
-      setContadores(data ?? {})
-      setUltimaSync(data?.ultimaSync ?? null)
-    }
-
-    cargarContadores()
+    vivoRef.current = true
     return () => {
-      vivo = false
+      vivoRef.current = false
     }
+  }, [])
+
+  const cargarContadores = useCallback(async () => {
+    if (claveFiltro === null) return
+    // contadores_sidebar() NO es SECURITY DEFINER a propósito: corre
+    // con los permisos del usuario logueado, así que el RLS filtra
+    // solo y cada uno ve sus propios números sin duplicar la lógica
+    // de permisos en el frontend.
+    const { data, error } = await supabase.rpc('contadores_sidebar')
+    if (!vivoRef.current) return
+    if (error) {
+      // Los badges no son crítica: si falla, simplemente no se dibujan.
+      console.error('[contadores_sidebar]', error)
+      return
+    }
+    setContadores(data ?? {})
+    setUltimaSync(data?.ultimaSync ?? null)
   }, [claveFiltro])
+
+  useEffect(() => {
+    cargarContadores()
+  }, [cargarContadores])
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -144,10 +152,10 @@ function AppLogueada({ session, onLogout }) {
       {currentPage === 'historial' && <HistorialOC />}
       {currentPage === 'usuarios' && <UsuariosAccesos />}
       {currentPage === 'alertas' && <Alertas />}
-      {currentPage === 'ocs' && <OrdenesCompra />}
+      {currentPage === 'ocs' && <OrdenesCompra onCambioOrdenes={cargarContadores} />}
       {currentPage === 'yiqi' && <ConectorYiQi />}
       {currentPage === 'predictor' && <PredictorDemanda />}
-      {currentPage === 'nueva-oc' && <NuevaOC />}
+      {currentPage === 'nueva-oc' && <NuevaOC onCambioOrdenes={cargarContadores} />}
       {currentPage === 'reglas' && <ReglasAlertas />}
       {currentPage === 'causas' && <CatalogoCausas />}
       {currentPage === 'empresa' && <Empresa />}
