@@ -35,12 +35,15 @@
 // ============================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { verificarLlamador, respuestaAuthError } from '../_shared/auth.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') ?? 'https://dentalab-compras.vercel.app';
+
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
@@ -420,6 +423,15 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // pg_cron llama con la service_role key (camino de confianza en
+    // verificarLlamador) -- no hace falta tocar el cron job. Si un
+    // usuario la dispara a mano, tiene que ser admin. Antes del
+    // 7/8/2026 corría sin ningún chequeo: cualquiera con la anon key
+    // podía forzar un resync contra YiQi a demanda.
+    const chequeo = await verificarLlamador(req, supabaseAdmin, { soloAdmin: true });
+    if (!chequeo.ok) return respuestaAuthError(chequeo, CORS_HEADERS);
+
     const url = new URL(req.url);
     const entidadParam = url.searchParams.get('entidad');
 

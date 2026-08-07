@@ -48,6 +48,7 @@
 // ============================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { verificarLlamador, respuestaAuthError } from '../_shared/auth.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -71,8 +72,10 @@ const ENTIDADES_PERMITIDAS = [
 // una invocacion tarda como maximo ~80s, dejando margen de sobra.
 const MAX_PAGINAS_POR_INVOCACION = 40;
 
+const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') ?? 'https://dentalab-compras.vercel.app';
+
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*', // TODO: restringir al dominio real antes de produccion
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
@@ -232,6 +235,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Cualquier usuario activo (admin u operador) puede usar el
+    // conector -- no es admin-only, Ivana tambien lo necesita.
+    // Antes del 7/8/2026 corría sin ningún chequeo de sesión.
+    const chequeo = await verificarLlamador(req, supabaseAdmin);
+    if (!chequeo.ok) return respuestaAuthError(chequeo, CORS_HEADERS);
 
     const url = new URL(req.url);
     const accion = url.searchParams.get('accion');
