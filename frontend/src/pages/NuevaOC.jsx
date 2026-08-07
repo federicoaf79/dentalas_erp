@@ -306,7 +306,7 @@ function formatoMoneda(n) {
   }).format(num)
 }
 
-function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones }) {
+function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones, esAdmin }) {
   const [seleccion, setSeleccion] = useState(() => new Set())
   const [cantidades, setCantidades] = useState({})
   const [notas, setNotas] = useState('')
@@ -481,18 +481,27 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   // esta marcado para pasar SIEMPRE por Aris, va a aprobacion. El caso
   // sin costo es a proposito: no se puede afirmar que una orden esta
   // dentro del limite si parte del total no se pudo calcular.
+  //
+  // Excepcion: si quien arma la orden es Aris (esAdmin), no hay control
+  // que aplicarle — es el dueño, la orden se confirma directo sin pasar
+  // por "pendiente" (ni siquiera por su propia aprobación). El límite y
+  // el "siempre aprueba" son controles pensados para Ivana.
   const requiereAprobacion =
-    items.length > 0 && (superaLimite || valorizacion.sinCosto > 0 || siempreAprueba)
+    !esAdmin && items.length > 0 && (superaLimite || valorizacion.sinCosto > 0 || siempreAprueba)
 
   const semaforo = items.length === 0
     ? null
-    : siempreAprueba
-      ? { clase: 'bg-blue-50 text-[#1d4ed8] border-blue-200', label: 'Este proveedor siempre requiere aprobación de Aris' }
-      : valorizacion.sinCosto > 0
-        ? { clase: 'bg-[var(--yel-bg)] text-[#92400e] border-amber-200', label: 'Falta costo de algunos artículos' }
-        : superaLimite
-          ? { clase: 'bg-blue-50 text-[#1d4ed8] border-blue-200', label: 'Requiere aprobación de Aris' }
-          : { clase: 'bg-[var(--grn-bg,#dcfce7)] text-[var(--grn)] border-green-200', label: 'Dentro del límite' }
+    : esAdmin
+      ? (valorizacion.sinCosto > 0
+          ? { clase: 'bg-[var(--yel-bg)] text-[#92400e] border-amber-200', label: 'Orden directa — faltan costos en algunos artículos' }
+          : { clase: 'bg-[var(--grn-bg,#dcfce7)] text-[var(--grn)] border-green-200', label: 'Orden directa (sin controles de aprobación)' })
+      : siempreAprueba
+        ? { clase: 'bg-blue-50 text-[#1d4ed8] border-blue-200', label: 'Este proveedor siempre requiere aprobación de Aris' }
+        : valorizacion.sinCosto > 0
+          ? { clase: 'bg-[var(--yel-bg)] text-[#92400e] border-amber-200', label: 'Falta costo de algunos artículos' }
+          : superaLimite
+            ? { clase: 'bg-blue-50 text-[#1d4ed8] border-blue-200', label: 'Requiere aprobación de Aris' }
+            : { clase: 'bg-[var(--grn-bg,#dcfce7)] text-[var(--grn)] border-green-200', label: 'Dentro del límite' }
 
   return (
     <div className="p-4">
@@ -521,7 +530,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
               )}
             </div>
           )}
-          {limite != null && (
+          {limite != null && !esAdmin && (
             <div className="text-[11px] text-gray-400 mt-1">
               Límite de aprobación automática: {formatoMoneda(limite)}
               {condiciones?.limite_es_propio && (
@@ -762,7 +771,6 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
 // ------------------------------------------------------------
 function DetalleOrden({ orden, items, esAdmin, onVolver, onDecidir, onEnviar, ocupado }) {
   const est = ESTADOS[orden.estado] ?? ESTADOS.borrador
-  const esMia = !esAdmin
 
   return (
     <div className="p-4">
@@ -854,13 +862,13 @@ function DetalleOrden({ orden, items, esAdmin, onVolver, onDecidir, onEnviar, oc
       </div>
 
       <div className="flex items-center justify-end gap-2">
-        {esMia && orden.estado === 'borrador' && (
+        {orden.estado === 'borrador' && (
           <button
             disabled={ocupado}
             onClick={() => onEnviar(orden)}
             className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
           >
-            Enviar a aprobación
+            {esAdmin ? 'Confirmar orden' : 'Enviar a aprobación'}
           </button>
         )}
         {esAdmin && orden.estado === 'pendiente' && (
@@ -999,7 +1007,14 @@ export default function NuevaOC({ onCambioOrdenes }) {
           // cambian, y la decision se tomo con estos numeros.
           total_estimado: valorizacion?.total ?? null,
           items_sin_costo: valorizacion?.sinCosto ?? 0,
-          limite_al_crear: reglas?.limite_aprobacion ?? null,
+          // Antes guardaba siempre reglas?.limite_aprobacion (el limite
+          // GENERAL), aunque el proveedor tuviera uno propio distinto:
+          // el numero que quedaba en el historial no coincidia con el
+          // que realmente se uso para decidir (ver condiciones_proveedor
+          // arriba). Si arma Aris, no hay limite que haya aplicado.
+          limite_al_crear: permisos.esAdmin
+            ? null
+            : (condicionesProveedor?.limite ?? reglas?.limite_aprobacion ?? null),
         })
         .select()
         .single()
@@ -1015,11 +1030,14 @@ export default function NuevaOC({ onCambioOrdenes }) {
       if (estado !== 'borrador') {
         const parche = { estado, enviada_en: new Date().toISOString() }
         // Dentro del limite: no necesita aprobacion de nadie, queda
-        // confirmada directamente por quien la armo.
+        // confirmada directamente por quien la armo. Si la arma Aris,
+        // es directa siempre (es el dueño, no tiene límite que aplique).
         if (estado === 'aprobada') {
           parche.decidida_por = user.id
           parche.decidida_en = new Date().toISOString()
-          parche.comentario_decision = 'Dentro del límite de aprobación automática'
+          parche.comentario_decision = permisos.esAdmin
+            ? 'Orden directa de Aris (dueño, sin control de aprobación)'
+            : 'Dentro del límite de aprobación automática'
         }
         const { error: errEstado } = await supabase
           .from('ordenes_propias')
@@ -1032,7 +1050,9 @@ export default function NuevaOC({ onCambioOrdenes }) {
         estado === 'pendiente'
           ? `Orden #${cab.id} enviada a aprobación de Aris.`
           : estado === 'aprobada'
-            ? `Orden #${cab.id} confirmada: está dentro del límite de aprobación automática.`
+            ? permisos.esAdmin
+              ? `Orden #${cab.id} confirmada directo (la armó Aris).`
+              : `Orden #${cab.id} confirmada: está dentro del límite de aprobación automática.`
             : `Borrador #${cab.id} guardado.`
       )
       setVista('lista')
@@ -1072,12 +1092,31 @@ export default function NuevaOC({ onCambioOrdenes }) {
   async function enviarAAprobacion(orden) {
     setOcupado(true)
     try {
+      // Un borrador de Ivana va a "pendiente" (a que Aris lo revise). Un
+      // borrador de Aris se confirma directo: es el dueño, no tiene
+      // control de aprobación que le aplique (mismo criterio que al
+      // guardar la orden por primera vez, ver guardarOrden).
+      const { data: { user } } = await supabase.auth.getUser()
+      const parche = permisos.esAdmin
+        ? {
+            estado: 'aprobada',
+            enviada_en: new Date().toISOString(),
+            decidida_por: user?.id ?? null,
+            decidida_en: new Date().toISOString(),
+            comentario_decision: 'Orden directa de Aris (dueño, sin control de aprobación)',
+          }
+        : { estado: 'pendiente', enviada_en: new Date().toISOString() }
+
       const { error } = await supabase
         .from('ordenes_propias')
-        .update({ estado: 'pendiente', enviada_en: new Date().toISOString() })
+        .update(parche)
         .eq('id', orden.id)
       if (error) throw new Error(error.message)
-      setAviso(`Orden #${orden.id} enviada a aprobación.`)
+      setAviso(
+        permisos.esAdmin
+          ? `Orden #${orden.id} confirmada directo (la armó Aris).`
+          : `Orden #${orden.id} enviada a aprobación.`
+      )
       setVista('lista')
       await cargarOrdenes()
       if (typeof onCambioOrdenes === 'function') onCambioOrdenes()
@@ -1184,6 +1223,7 @@ export default function NuevaOC({ onCambioOrdenes }) {
           onCancelar={() => setVista('lista')}
           ocupado={ocupado}
           condiciones={condicionesProveedor}
+          esAdmin={permisos.esAdmin}
         />
       ) : ordenAbierta ? (
         <DetalleOrden
