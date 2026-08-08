@@ -61,6 +61,22 @@ export default function OrdenesPropias({ onCambio }) {
   const [abierta, setAbierta] = useState(null)
   const [items, setItems] = useState([])
   const [empresa, setEmpresa] = useState(null)
+  // Modal propio para aprobar/rechazar/eliminar, en reemplazo de
+  // window.prompt/window.confirm: esos diálogos nativos no se pueden
+  // estilar y además bloquean la automatización de pruebas.
+  //   { tipo: 'aprobar' | 'rechazar' | 'borrar', orden, nuevoEstado? }
+  const [modal, setModal] = useState(null)
+  const [comentarioModal, setComentarioModal] = useState('')
+
+  useEffect(() => {
+    if (!modal) return
+    function onKeyDown(e) {
+      if (e.key === 'Escape') cerrarModal()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modal])
 
   // Notifica al padre sin romper el flujo si onCambio no vino (por
   // ejemplo si este componente se usa en otro lugar sin conectar el
@@ -135,13 +151,19 @@ export default function OrdenesPropias({ onCambio }) {
       .maybeSingle()
     generarPdfOrden({ orden, items: lista, empresa, proveedor: prov ?? null })
   }
-  async function decidir(orden, nuevoEstado) {
-    const comentario = window.prompt(
-      nuevoEstado === 'aprobada'
-        ? 'Comentario de aprobación (opcional):'
-        : 'Motivo del rechazo (opcional):'
-    )
-    if (comentario === null) return
+  // Abre el modal de aprobar/rechazar (reemplaza al viejo window.prompt).
+  function pedirDecision(orden, nuevoEstado) {
+    setModal({ tipo: nuevoEstado === 'aprobada' ? 'aprobar' : 'rechazar', orden, nuevoEstado })
+    setComentarioModal('')
+  }
+  function cerrarModal() {
+    if (ocupado) return
+    setModal(null)
+    setComentarioModal('')
+  }
+  async function confirmarDecision() {
+    if (!modal) return
+    const { orden, nuevoEstado } = modal
     setOcupado(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -151,12 +173,14 @@ export default function OrdenesPropias({ onCambio }) {
           estado: nuevoEstado,
           decidida_por: user?.id ?? null,
           decidida_en: new Date().toISOString(),
-          comentario_decision: comentario || null,
+          comentario_decision: comentarioModal.trim() || null,
         })
         .eq('id', orden.id)
       if (error) throw new Error(error.message)
       setAviso(`Orden #${orden.id} ${nuevoEstado === 'aprobada' ? 'aprobada' : 'rechazada'}.`)
       setAbierta(null)
+      setModal(null)
+      setComentarioModal('')
       await cargar()
       avisarCambio()
     } catch (e) {
@@ -183,12 +207,18 @@ export default function OrdenesPropias({ onCambio }) {
       setOcupado(false)
     }
   }
-  async function borrar(orden) {
-    if (!window.confirm(`¿Eliminar el borrador #${orden.id}?`)) return
+  // Abre el modal de confirmación de borrado (reemplaza a window.confirm).
+  function pedirBorrar(orden) {
+    setModal({ tipo: 'borrar', orden })
+  }
+  async function confirmarBorrar() {
+    if (!modal) return
+    const { orden } = modal
     setOcupado(true)
     try {
       const { error } = await supabase.from('ordenes_propias').delete().eq('id', orden.id)
       if (error) throw new Error(error.message)
+      setModal(null)
       await cargar()
       avisarCambio()
     } catch (e) {
@@ -295,14 +325,14 @@ export default function OrdenesPropias({ onCambio }) {
                         <>
                           <button
                             disabled={ocupado}
-                            onClick={() => decidir(o, 'aprobada')}
+                            onClick={() => pedirDecision(o, 'aprobada')}
                             className="text-sm font-semibold text-[var(--grn)] hover:underline mr-3 disabled:opacity-40"
                           >
                             Aprobar
                           </button>
                           <button
                             disabled={ocupado}
-                            onClick={() => decidir(o, 'rechazada')}
+                            onClick={() => pedirDecision(o, 'rechazada')}
                             className="text-sm text-[var(--red)] hover:underline mr-3 disabled:opacity-40"
                           >
                             Rechazar
@@ -320,7 +350,7 @@ export default function OrdenesPropias({ onCambio }) {
                           </button>
                           <button
                             disabled={ocupado}
-                            onClick={() => borrar(o)}
+                            onClick={() => pedirBorrar(o)}
                             className="text-sm text-gray-400 hover:text-[var(--red)] disabled:opacity-40"
                           >
                             Eliminar
@@ -412,20 +442,107 @@ export default function OrdenesPropias({ onCambio }) {
             <div className="flex items-center justify-end gap-2">
               <button
                 disabled={ocupado}
-                onClick={() => decidir(abierta, 'rechazada')}
+                onClick={() => pedirDecision(abierta, 'rechazada')}
                 className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] text-[var(--red)] bg-white hover:bg-red-50 disabled:opacity-40"
               >
                 Rechazar
               </button>
               <button
                 disabled={ocupado}
-                onClick={() => decidir(abierta, 'aprobada')}
+                onClick={() => pedirDecision(abierta, 'aprobada')}
                 className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--grn,#3d9970)] text-white hover:opacity-90 disabled:opacity-40"
               >
                 Aprobar orden
               </button>
             </div>
           )}
+        </div>
+      )}
+      {/* Modal de aprobar / rechazar / eliminar — reemplaza a
+          window.prompt() y window.confirm(). Se estila con los mismos
+          tokens que el resto de la app. */}
+      {modal && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
+          onClick={cerrarModal}
+        >
+          <div
+            className="bg-white rounded-xl border border-[var(--border)] shadow-xl w-full max-w-md p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {modal.tipo === 'borrar' ? (
+              <>
+                <div className="text-[15px] font-bold mb-1.5">Eliminar borrador</div>
+                <div className="text-[13px] text-[var(--sub)] mb-4">
+                  ¿Eliminar el borrador #{modal.orden.id}
+                  {modal.orden.proveedor_nombre ? ` (${modal.orden.proveedor_nombre})` : ''}?
+                  Esta acción no se puede deshacer.
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    disabled={ocupado}
+                    onClick={cerrarModal}
+                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    disabled={ocupado}
+                    onClick={confirmarBorrar}
+                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--red)] text-white hover:opacity-90 disabled:opacity-40"
+                  >
+                    {ocupado ? 'Eliminando…' : 'Eliminar'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[15px] font-bold mb-1.5">
+                  {modal.tipo === 'aprobar'
+                    ? `Aprobar orden #${modal.orden.id}`
+                    : `Rechazar orden #${modal.orden.id}`}
+                </div>
+                <div className="text-[13px] text-[var(--sub)] mb-3">
+                  {modal.orden.proveedor_nombre}
+                  {modal.orden.total_estimado != null && ` · ${formatoMoneda(modal.orden.total_estimado)}`}
+                </div>
+                <label className="block text-[11px] uppercase text-gray-400 font-semibold mb-1">
+                  {modal.tipo === 'aprobar' ? 'Comentario de aprobación (opcional)' : 'Motivo del rechazo (opcional)'}
+                </label>
+                <textarea
+                  autoFocus
+                  value={comentarioModal}
+                  onChange={(e) => setComentarioModal(e.target.value)}
+                  rows={3}
+                  disabled={ocupado}
+                  className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-[13px] mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--ind,#4338ca)]/30 focus:border-[var(--ind,#4338ca)] disabled:opacity-60"
+                  placeholder="Escribí un comentario si querés dejarlo registrado…"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    disabled={ocupado}
+                    onClick={cerrarModal}
+                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    disabled={ocupado}
+                    onClick={confirmarDecision}
+                    className={`px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40 ${
+                      modal.tipo === 'aprobar' ? 'bg-[var(--grn,#3d9970)]' : 'bg-[var(--red)]'
+                    }`}
+                  >
+                    {ocupado
+                      ? 'Guardando…'
+                      : modal.tipo === 'aprobar'
+                        ? 'Aprobar orden'
+                        : 'Rechazar orden'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

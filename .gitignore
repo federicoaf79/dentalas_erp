@@ -18,3 +18,5 @@ dentalabs_Sup_KW.txt
 *.bak[0-9]
 # scratch de la sesion, no versionar
 _to_delete*/
+
+.vercel
