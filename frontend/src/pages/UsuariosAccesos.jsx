@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { usePermisos } from '../hooks/usePermisos'
 
 // ============================================================
 // UsuariosAccesos.jsx — v2, la lista de proveedores reales ahora
@@ -170,6 +171,9 @@ function PanelAsignacion({ usuario, proveedores, onCambioOptimista }) {
 }
 
 export default function UsuariosAccesos() {
+  const permisos = usePermisos()
+  const esAdmin = permisos.esAdmin
+
   const [usuarios, setUsuarios] = useState([])
   const [proveedores, setProveedores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -191,8 +195,20 @@ export default function UsuariosAccesos() {
   }
 
   useEffect(() => {
+    // Esta pantalla lista PII de Auth (emails de todos los usuarios) y
+    // reasigna qué proveedores ve cada uno — es admin-only tanto acá
+    // como en el server (admin-usuarios ya exige soloAdmin desde el
+    // 7/8/2026). Sin este gate, un operador la abre igual y la carga
+    // falla recién al pegarle a la Edge Function, con un error crudo.
+    // Con el gate, ni siquiera se intenta la llamada.
+    if (permisos.cargando) return
+    if (!esAdmin) {
+      setLoading(false)
+      return
+    }
     cargarTodo()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permisos.cargando, esAdmin])
 
   async function refrescarSoloUsuarios() {
     try {
@@ -229,11 +245,14 @@ export default function UsuariosAccesos() {
         <div>
           <div className="text-[17px] font-bold">Usuarios y accesos</div>
           <div className="text-[12px] text-[var(--sub)] mt-0.5">
-            {loading
-              ? 'Cargando usuarios y proveedores…'
+            {permisos.cargando || loading
+              ? 'Cargando…'
+              : !esAdmin
+              ? 'Solo el administrador puede ver esta sección'
               : `${usuarios.length} usuarios · ${proveedores.length} proveedores disponibles para asignar`}
           </div>
         </div>
+        {esAdmin && (
         <button
           onClick={cargarTodo}
           disabled={loading}
@@ -241,10 +260,22 @@ export default function UsuariosAccesos() {
         >
           {loading ? 'Actualizando…' : '↻ Actualizar'}
         </button>
+        )}
       </div>
 
+      {/* Sin permiso — pantalla admin-only, igual que el server (admin-usuarios exige soloAdmin) */}
+      {!permisos.cargando && !esAdmin && (
+        <div className="mx-6 mt-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4">
+          <p className="font-semibold">No tenés permiso para ver esta sección</p>
+          <p className="text-sm mt-1">
+            Usuarios y accesos define qué proveedores ve cada usuario — solo el administrador puede consultarla y
+            editarla.
+          </p>
+        </div>
+      )}
+
       {/* Error */}
-      {error && (
+      {esAdmin && error && (
         <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
           <p className="font-semibold">No se pudo cargar Usuarios y accesos</p>
           <p className="text-sm mt-1">{error}</p>
@@ -255,13 +286,15 @@ export default function UsuariosAccesos() {
       )}
 
       {/* Nota de alcance */}
-      <div className="mx-4 mt-4 bg-blue-50 border border-blue-100 text-[#1d4ed8] rounded-lg px-4 py-2.5 text-[12px]">
-        Acá se define qué proveedores puede ver cada usuario. Esta asignación todavía no se aplica como filtro
-        real en Monitor de Stock, Seguimiento de OC ni Proveedores — es el primer paso antes de activar esa
-        restricción.
-      </div>
+      {esAdmin && (
+        <div className="mx-4 mt-4 bg-blue-50 border border-blue-100 text-[#1d4ed8] rounded-lg px-4 py-2.5 text-[12px]">
+          Acá se define qué proveedores puede ver cada usuario. La asignación se aplica como filtro real en
+          Monitor de Stock, Seguimiento de OC y Proveedores.
+        </div>
+      )}
 
       {/* Lista de usuarios */}
+      {esAdmin && (
       <div className="mx-4 mt-4 mb-6 bg-white rounded-xl border border-[var(--border)] overflow-hidden">
         {loading && usuarios.length === 0 ? (
           <div className="p-8 text-center text-[var(--sub)] text-sm">Cargando usuarios…</div>
@@ -315,6 +348,7 @@ export default function UsuariosAccesos() {
           </table>
         )}
       </div>
+      )}
     </div>
   )
 }
