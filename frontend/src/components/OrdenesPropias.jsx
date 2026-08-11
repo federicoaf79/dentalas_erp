@@ -57,7 +57,10 @@ export default function OrdenesPropias({ onCambio }) {
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [ocupado, setOcupado] = useState(false)
-  const [filtro, setFiltro] = useState('pendientes')
+  // 'activas' = todas las que no estan en la papelera (orden: pendientes
+  // de aprobar primero, despues por fecha de creacion). 'papelera' = las
+  // que Aris archivo, hasta que las restaure o las elimine del todo.
+  const [filtro, setFiltro] = useState('activas')
   const [abierta, setAbierta] = useState(null)
   const [items, setItems] = useState([])
   const [empresa, setEmpresa] = useState(null)
@@ -99,9 +102,36 @@ export default function OrdenesPropias({ onCambio }) {
       const { data, error } = resOrdenes
       if (error) throw new Error(error.message)
       setEmpresa(resEmpresa.data ?? null)
-      setOrdenes((data ?? []).map((o) => ({
+
+      const filas = (data ?? []).map((o) => ({
         ...o,
         cant_items: o.ordenes_propias_items?.[0]?.count ?? 0,
+      }))
+
+      // Nombre de quien creo cada orden, para la columna "Creada por".
+      // usuarios_config tiene RLS propia (cada usuario lee solo su fila
+      // — ver usePermisos.js), asi que un join directo desde aca no
+      // mostraria el nombre de nadie mas que uno mismo. Se resuelve con
+      // nombres_usuarios(), la funcion SECURITY DEFINER de la migration
+      // 20260810150000 que expone solo el nombre, nada sensible.
+      const idsCreadores = [...new Set(filas.map((o) => o.creada_por).filter(Boolean))]
+      let nombresPorId = {}
+      if (idsCreadores.length > 0) {
+        const { data: nombresData, error: errNombres } = await supabase.rpc('nombres_usuarios', {
+          p_ids: idsCreadores,
+        })
+        if (errNombres) {
+          // No es critico para el resto de la pantalla: si falla, la
+          // columna "Creada por" queda en blanco nomas.
+          console.error('[nombres_usuarios]', errNombres)
+        } else {
+          nombresPorId = Object.fromEntries((nombresData ?? []).map((n) => [n.user_id, n.nombre]))
+        }
+      }
+
+      setOrdenes(filas.map((o) => ({
+        ...o,
+        creador_nombre: o.creada_por ? (nombresPorId[o.creada_por] ?? null) : null,
       })))
     } catch (e) {
       setError(e.message)
@@ -116,11 +146,25 @@ export default function OrdenesPropias({ onCambio }) {
     cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave])
+  const activas = useMemo(() => ordenes.filter((o) => !o.archivada_en), [ordenes])
+  const archivadas = useMemo(() => ordenes.filter((o) => o.archivada_en), [ordenes])
   const pendientes = useMemo(
-    () => ordenes.filter((o) => o.estado === 'pendiente'),
-    [ordenes]
+    () => activas.filter((o) => o.estado === 'pendiente'),
+    [activas]
   )
-  const visibles = filtro === 'pendientes' ? pendientes : ordenes
+  // Las que esperan aprobacion van siempre arriba, sin importar la
+  // fecha: son las que Aris tiene que accionar. El resto, mas nuevas
+  // primero (la query ya viene ordenada por id desc, pero se reordena
+  // aca por si el sort de pendientes lo alteró).
+  const activasOrdenadas = useMemo(() => {
+    return [...activas].sort((a, b) => {
+      const pa = a.estado === 'pendiente' ? 0 : 1
+      const pb = b.estado === 'pendiente' ? 0 : 1
+      if (pa !== pb) return pa - pb
+      return b.id - a.id
+    })
+  }, [activas])
+  const visibles = filtro === 'papelera' ? archivadas : activasOrdenadas
   async function abrir(orden) {
     setAbierta(orden)
     setItems([])
@@ -227,6 +271,68 @@ export default function OrdenesPropias({ onCambio }) {
       setOcupado(false)
     }
   }
+  // Archivar: la saca de la vista principal y la manda a la papelera.
+  // Reversible — no es un delete. Disponible para admin en cualquier
+  // estado (a diferencia del "Eliminar" de mas abajo, que solo existe
+  // para borradores propios y SI borra en el momento).
+  async function archivar(orden) {
+    setOcupado(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error } = await supabase
+        .from('ordenes_propias')
+        .update({ archivada_en: new Date().toISOString(), archivada_por: user?.id ?? null })
+        .eq('id', orden.id)
+      if (error) throw new Error(error.message)
+      setAviso(`Orden #${orden.id} archivada. Podés recuperarla desde "🗑 Papelera".`)
+      if (abierta?.id === orden.id) setAbierta(null)
+      await cargar()
+      avisarCambio()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+  async function restaurar(orden) {
+    setOcupado(true)
+    try {
+      const { error } = await supabase
+        .from('ordenes_propias')
+        .update({ archivada_en: null, archivada_por: null })
+        .eq('id', orden.id)
+      if (error) throw new Error(error.message)
+      setAviso(`Orden #${orden.id} restaurada.`)
+      await cargar()
+      avisarCambio()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+  // Borrado definitivo — solo desde adentro de la papelera. A
+  // diferencia de archivar, esto no tiene vuelta atras.
+  function pedirEliminarDefinitivo(orden) {
+    setModal({ tipo: 'eliminar_papelera', orden })
+  }
+  async function confirmarEliminarDefinitivo() {
+    if (!modal) return
+    const { orden } = modal
+    setOcupado(true)
+    try {
+      const { error } = await supabase.from('ordenes_propias').delete().eq('id', orden.id)
+      if (error) throw new Error(error.message)
+      setModal(null)
+      await cargar()
+      avisarCambio()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
   if (!cargando && ordenes.length === 0) return null
   return (
     <div className="mx-4 mt-4">
@@ -257,8 +363,10 @@ export default function OrdenesPropias({ onCambio }) {
         </div>
         <div className="flex gap-2">
           {[
-            { key: 'pendientes', label: `Esperando aprobación (${pendientes.length})` },
-            { key: 'todas',      label: `Todas (${ordenes.length})` },
+            { key: 'activas', label: `Órdenes (${activas.length})` },
+            // La papelera es cosa de Aris: quien la mando ahi es quien
+            // decide si se restaura o se borra para siempre.
+            ...(permisos.esAdmin ? [{ key: 'papelera', label: `🗑 Papelera (${archivadas.length})` }] : []),
           ].map((f) => (
             <button
               key={f.key}
@@ -279,13 +387,13 @@ export default function OrdenesPropias({ onCambio }) {
           <div className="p-6 text-center text-[var(--sub)] text-sm">Cargando…</div>
         ) : visibles.length === 0 ? (
           <div className="p-6 text-center text-[var(--sub)] text-sm">
-            No hay órdenes esperando aprobación.
+            {filtro === 'papelera' ? 'La papelera está vacía.' : 'No hay órdenes.'}
           </div>
         ) : (
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['#', 'Proveedor', 'Estado', 'Total', 'Creada', 'Ítems', ''].map((h) => (
+                {['#', 'Proveedor', 'Creada por', 'Estado', 'Total', 'Creada', 'Ítems', ''].map((h) => (
                   <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                     {h}
                   </th>
@@ -299,6 +407,9 @@ export default function OrdenesPropias({ onCambio }) {
                   <tr key={o.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                     <td className="px-3.5 py-2.5 font-mono text-xs">#{o.id}</td>
                     <td className="px-3.5 py-2.5 font-semibold">{o.proveedor_nombre}</td>
+                    <td className="px-3.5 py-2.5 text-[13px] text-[var(--sub)]">
+                      {o.creador_nombre ?? '—'}
+                    </td>
                     <td className="px-3.5 py-2.5">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${est.clase}`}>
                         {est.label}
@@ -321,7 +432,7 @@ export default function OrdenesPropias({ onCambio }) {
                       <button onClick={() => imprimir(o)} className="text-sm text-gray-500 hover:text-[var(--ind,#4338ca)] hover:underline mr-3">
                         PDF
                       </button>
-                      {permisos.esAdmin && o.estado === 'pendiente' && (
+                      {filtro === 'activas' && permisos.esAdmin && o.estado === 'pendiente' && (
                         <>
                           <button
                             disabled={ocupado}
@@ -339,7 +450,7 @@ export default function OrdenesPropias({ onCambio }) {
                           </button>
                         </>
                       )}
-                      {!permisos.esAdmin && o.estado === 'borrador' && (
+                      {filtro === 'activas' && !permisos.esAdmin && o.estado === 'borrador' && (
                         <>
                           <button
                             disabled={ocupado}
@@ -354,6 +465,34 @@ export default function OrdenesPropias({ onCambio }) {
                             className="text-sm text-gray-400 hover:text-[var(--red)] disabled:opacity-40"
                           >
                             Eliminar
+                          </button>
+                        </>
+                      )}
+                      {filtro === 'activas' && permisos.esAdmin && (
+                        <button
+                          disabled={ocupado}
+                          onClick={() => archivar(o)}
+                          title="Archivar (mover a la papelera)"
+                          className="text-sm text-gray-400 hover:text-[var(--red)] disabled:opacity-40"
+                        >
+                          🗑
+                        </button>
+                      )}
+                      {filtro === 'papelera' && (
+                        <>
+                          <button
+                            disabled={ocupado}
+                            onClick={() => restaurar(o)}
+                            className="text-sm font-semibold text-[var(--ind,#4338ca)] hover:underline mr-3 disabled:opacity-40"
+                          >
+                            Restaurar
+                          </button>
+                          <button
+                            disabled={ocupado}
+                            onClick={() => pedirEliminarDefinitivo(o)}
+                            className="text-sm text-[var(--red)] hover:underline disabled:opacity-40"
+                          >
+                            Eliminar definitivamente
                           </button>
                         </>
                       )}
@@ -438,7 +577,7 @@ export default function OrdenesPropias({ onCambio }) {
               </tbody>
             </table>
           </div>
-          {permisos.esAdmin && abierta.estado === 'pendiente' && (
+          {permisos.esAdmin && abierta.estado === 'pendiente' && !abierta.archivada_en && (
             <div className="flex items-center justify-end gap-2">
               <button
                 disabled={ocupado}
@@ -492,6 +631,31 @@ export default function OrdenesPropias({ onCambio }) {
                     className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--red)] text-white hover:opacity-90 disabled:opacity-40"
                   >
                     {ocupado ? 'Eliminando…' : 'Eliminar'}
+                  </button>
+                </div>
+              </>
+            ) : modal.tipo === 'eliminar_papelera' ? (
+              <>
+                <div className="text-[15px] font-bold mb-1.5">Eliminar definitivamente</div>
+                <div className="text-[13px] text-[var(--sub)] mb-4">
+                  ¿Eliminar para siempre la orden #{modal.orden.id}
+                  {modal.orden.proveedor_nombre ? ` (${modal.orden.proveedor_nombre})` : ''}?
+                  A diferencia de archivar, esto no tiene vuelta atrás.
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    disabled={ocupado}
+                    onClick={cerrarModal}
+                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    disabled={ocupado}
+                    onClick={confirmarEliminarDefinitivo}
+                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--red)] text-white hover:opacity-90 disabled:opacity-40"
+                  >
+                    {ocupado ? 'Eliminando…' : 'Eliminar definitivamente'}
                   </button>
                 </div>
               </>
