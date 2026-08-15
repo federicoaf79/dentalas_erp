@@ -18,6 +18,16 @@ import { renderTemplate } from './TemplatesMensajes'
 // IMPORTANTE: al aprobar NO se escribe todavia en YiQi. La orden queda
 // aprobada en nuestra base y lista para enviarse. Eso se avisa en
 // pantalla para no dar a entender que ya llego al ERP.
+//
+// LIMPIEZA 14 agosto 2026 (N-13, 10/8/2026): se saco un circuito
+// completo de codigo muerto — ListaOrdenes, DetalleOrden, abrirOrden,
+// enviarAAprobacion, decidir, borrarOrden, y los estados ordenAbierta/
+// itemsAbiertos/ordenes que solo alimentaban a ese bloque. Nada de eso
+// se renderizaba nunca: la vista real de lista es SelectorProveedor,
+// y el circuito de aprobar/rechazar/archivar en produccion vive en
+// OrdenesPropias.jsx (pantalla "Ordenes de compra"), no aca. Se
+// confirmo que era inalcanzable siguiendo cada referencia antes de
+// borrar (grep de cada funcion y de cada estado que solo la alimentaba).
 // ============================================================
 
 const ESTADOS = {
@@ -46,99 +56,6 @@ function formatoFecha(f) {
   } catch {
     return '—'
   }
-}
-
-// ------------------------------------------------------------
-// Vista 1 — lista de ordenes existentes
-// ------------------------------------------------------------
-function ListaOrdenes({ ordenes, esAdmin, onAbrir, onDecidir, onBorrar, ocupado }) {
-  return (
-    <>
-      <div className="px-4 pt-4">
-        <div className="text-[15px] font-bold">Órdenes generadas</div>
-        <div className="text-[12px] text-[var(--sub)]">
-          {ordenes.length} {ordenes.length === 1 ? 'orden' : 'órdenes'} en el sistema
-        </div>
-      </div>
-
-      <div className="mx-4 mt-3 mb-2 bg-white rounded-xl border border-[var(--border)] overflow-hidden">
-        {(
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['#', 'Proveedor', 'Estado', 'Total', 'Creada', 'Ítems', ''].map((h) => (
-                  <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {ordenes.map((o) => {
-                const est = ESTADOS[o.estado] ?? ESTADOS.borrador
-                return (
-                  <tr key={o.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td className="px-3.5 py-2.5 font-mono text-xs">#{o.id}</td>
-                    <td className="px-3.5 py-2.5 font-semibold">{o.proveedor_nombre}</td>
-                    <td className="px-3.5 py-2.5">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${est.clase}`}>
-                        {est.label}
-                      </span>
-                    </td>
-                    <td className="px-3.5 py-2.5 font-semibold tabular-nums text-[13px]">
-                      {o.total_estimado != null ? formatoMoneda(o.total_estimado) : '—'}
-                      {o.items_sin_costo > 0 && (
-                        <span className="block text-[10px] text-[#92400e] font-normal">
-                          {o.items_sin_costo} sin costo
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{formatoFecha(o.creada_en)}</td>
-                    <td className="px-3.5 py-2.5 text-xs">{o.cant_items ?? 0}</td>
-                    <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => onAbrir(o)}
-                        className="text-sm text-[var(--ind,#4338ca)] hover:underline mr-3"
-                      >
-                        Ver detalle
-                      </button>
-                      {esAdmin && o.estado === 'pendiente' && (
-                        <>
-                          <button
-                            disabled={ocupado}
-                            onClick={() => onDecidir(o, 'aprobada')}
-                            className="text-sm font-semibold text-[var(--grn)] hover:underline mr-3 disabled:opacity-40"
-                          >
-                            Aprobar
-                          </button>
-                          <button
-                            disabled={ocupado}
-                            onClick={() => onDecidir(o, 'rechazada')}
-                            className="text-sm text-[var(--red)] hover:underline mr-3 disabled:opacity-40"
-                          >
-                            Rechazar
-                          </button>
-                        </>
-                      )}
-                      {o.estado === 'borrador' && (
-                        <button
-                          disabled={ocupado}
-                          onClick={() => onBorrar(o)}
-                          className="text-sm text-gray-400 hover:text-[var(--red)] disabled:opacity-40"
-                        >
-                          Eliminar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </>
-  )
 }
 
 // ------------------------------------------------------------
@@ -766,149 +683,18 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   )
 }
 
-// ------------------------------------------------------------
-// Vista 4 — detalle de una orden ya creada
-// ------------------------------------------------------------
-function DetalleOrden({ orden, items, esAdmin, onVolver, onDecidir, onEnviar, ocupado }) {
-  const est = ESTADOS[orden.estado] ?? ESTADOS.borrador
-
-  return (
-    <div className="p-4">
-      <div className="flex items-start justify-between mb-3 gap-3">
-        <div>
-          <div className="text-[15px] font-bold">
-            Orden #{orden.id} — {orden.proveedor_nombre}
-          </div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5 flex items-center gap-2">
-            <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${est.clase}`}>
-              {est.label}
-            </span>
-            <span>Creada {formatoFecha(orden.creada_en)}</span>
-          </div>
-        </div>
-        <button onClick={onVolver} className="text-sm text-gray-500 hover:underline whitespace-nowrap">
-          ← Volver
-        </button>
-      </div>
-
-      {orden.estado === 'aprobada' && (
-        <Aviso tipo="filtro" className="mb-3">
-          Orden aprobada. El envío automático al ERP y al proveedor es la etapa siguiente del desarrollo:
-          por ahora la orden queda registrada y aprobada en el sistema.
-        </Aviso>
-      )}
-
-      {orden.total_estimado != null && (
-        <div className="bg-white border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3 flex items-center justify-between">
-          <span>
-            <span className="text-[10px] uppercase text-gray-400 block mb-0.5">Total estimado</span>
-            <span className="text-[16px] font-bold">{formatoMoneda(orden.total_estimado)}</span>
-            {orden.items_sin_costo > 0 && (
-              <span className="text-[11px] text-[#92400e] ml-2">
-                ({orden.items_sin_costo} artículos sin costo cargado, no suman al total)
-              </span>
-            )}
-          </span>
-          {orden.limite_al_crear != null && (
-            <span className="text-[11px] text-gray-400 text-right">
-              Límite vigente al crearla<br />{formatoMoneda(orden.limite_al_crear)}
-            </span>
-          )}
-        </div>
-      )}
-
-      {orden.notas && (
-        <div className="bg-white border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
-          <span className="text-[10px] uppercase text-gray-400 block mb-0.5">Notas</span>
-          {orden.notas}
-        </div>
-      )}
-
-      {orden.comentario_decision && (
-        <div className="bg-white border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
-          <span className="text-[10px] uppercase text-gray-400 block mb-0.5">
-            Comentario de {orden.estado === 'rechazada' ? 'rechazo' : 'aprobación'}
-          </span>
-          {orden.comentario_decision}
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden mb-3">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-[var(--border)]">
-              {['SKU', 'Producto', 'Cantidad', 'Costo unit.', 'Stock al armar', 'Prom./mes'].map((h) => (
-                <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((i) => (
-              <tr key={i.id} className="border-b border-gray-100 last:border-0">
-                <td className="px-3.5 py-2.5 font-mono text-xs">{i.mate_codigo}</td>
-                <td className="px-3.5 py-2.5 text-[13px] font-medium">{i.mate_nombre ?? '—'}</td>
-                <td className="px-3.5 py-2.5 font-bold">{formatoNumero(i.cantidad)}</td>
-                <td className="px-3.5 py-2.5 text-sm tabular-nums">
-                  {i.costo_unitario ? formatoMoneda(i.costo_unitario) : '—'}
-                </td>
-                <td className="px-3.5 py-2.5 text-gray-400 text-sm">{formatoNumero(i.stock_al_momento)}</td>
-                <td className="px-3.5 py-2.5 text-gray-400 text-sm">{formatoNumero(i.promedio_mensual)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex items-center justify-end gap-2">
-        {orden.estado === 'borrador' && (
-          <button
-            disabled={ocupado}
-            onClick={() => onEnviar(orden)}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
-          >
-            {esAdmin ? 'Confirmar orden' : 'Enviar a aprobación'}
-          </button>
-        )}
-        {esAdmin && orden.estado === 'pendiente' && (
-          <>
-            <button
-              disabled={ocupado}
-              onClick={() => onDecidir(orden, 'rechazada')}
-              className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] text-[var(--red)] bg-white hover:bg-red-50 disabled:opacity-40"
-            >
-              Rechazar
-            </button>
-            <button
-              disabled={ocupado}
-              onClick={() => onDecidir(orden, 'aprobada')}
-              className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--grn,#3d9970)] text-white hover:opacity-90 disabled:opacity-40"
-            >
-              Aprobar orden
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ============================================================
 // Componente principal
 // ============================================================
 export default function NuevaOC({ onCambioOrdenes }) {
   const permisos = usePermisos()
 
-  const [vista, setVista] = useState('lista') // lista | proveedor | armar | detalle
-  const [ordenes, setOrdenes] = useState([])
+  const [vista, setVista] = useState('lista') // lista | armar
   const [proveedores, setProveedores] = useState([])
   const [reglas, setReglas] = useState(null)
   const [sugerencias, setSugerencias] = useState([])
   const [condicionesProveedor, setCondicionesProveedor] = useState(null)
   const [proveedorElegido, setProveedorElegido] = useState(null)
-  const [ordenAbierta, setOrdenAbierta] = useState(null)
-  const [itemsAbiertos, setItemsAbiertos] = useState([])
 
   const [cargando, setCargando] = useState(true)
   const [cargandoSub, setCargandoSub] = useState(false)
@@ -925,30 +711,14 @@ export default function NuevaOC({ onCambioOrdenes }) {
     setCargando(true)
     setError(null)
     try {
-      // Las dos cosas en paralelo: la pantalla de inicio muestra el
-      // panorama de quiebres SIEMPRE, y las ordenes ya generadas solo
-      // si existen. Antes el inicio era una lista vacia que no informaba
-      // nada y obligaba a un clic de mas para llegar a lo util.
-      const [resOrdenes, resProv, resReglas] = await Promise.all([
-        supabase
-          .from('ordenes_propias')
-          .select('*, ordenes_propias_items(count)')
-          .order('id', { ascending: false }),
+      const [resProv, resReglas] = await Promise.all([
         supabase.rpc('proveedores_con_alertas'),
         supabase.from('reglas_compra').select('*').eq('id', 1).maybeSingle(),
       ])
 
-      if (resOrdenes.error) throw new Error(resOrdenes.error.message)
       if (resProv.error) throw new Error(resProv.error.message)
       if (resReglas.error) throw new Error(resReglas.error.message)
       setReglas(resReglas.data ?? null)
-
-      setOrdenes(
-        (resOrdenes.data ?? []).map((o) => ({
-          ...o,
-          cant_items: o.ordenes_propias_items?.[0]?.count ?? 0,
-        }))
-      )
       setProveedores(resProv.data ?? [])
     } catch (e) {
       setError(e.message)
@@ -1070,110 +840,6 @@ export default function NuevaOC({ onCambioOrdenes }) {
     }
   }
 
-  async function abrirOrden(orden) {
-    setOrdenAbierta(orden)
-    setVista('detalle')
-    setCargandoSub(true)
-    try {
-      const { data, error } = await supabase
-        .from('ordenes_propias_items')
-        .select('*')
-        .eq('orden_id', orden.id)
-        .order('id')
-      if (error) throw new Error(error.message)
-      setItemsAbiertos(data ?? [])
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setCargandoSub(false)
-    }
-  }
-
-  async function enviarAAprobacion(orden) {
-    setOcupado(true)
-    try {
-      // Un borrador de Ivana va a "pendiente" (a que Aris lo revise). Un
-      // borrador de Aris se confirma directo: es el dueño, no tiene
-      // control de aprobación que le aplique (mismo criterio que al
-      // guardar la orden por primera vez, ver guardarOrden).
-      const { data: { user } } = await supabase.auth.getUser()
-      const parche = permisos.esAdmin
-        ? {
-            estado: 'aprobada',
-            enviada_en: new Date().toISOString(),
-            decidida_por: user?.id ?? null,
-            decidida_en: new Date().toISOString(),
-            comentario_decision: 'Orden directa de Aris (dueño, sin control de aprobación)',
-          }
-        : { estado: 'pendiente', enviada_en: new Date().toISOString() }
-
-      const { error } = await supabase
-        .from('ordenes_propias')
-        .update(parche)
-        .eq('id', orden.id)
-      if (error) throw new Error(error.message)
-      setAviso(
-        permisos.esAdmin
-          ? `Orden #${orden.id} confirmada directo (la armó Aris).`
-          : `Orden #${orden.id} enviada a aprobación.`
-      )
-      setVista('lista')
-      await cargarOrdenes()
-      if (typeof onCambioOrdenes === 'function') onCambioOrdenes()
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setOcupado(false)
-    }
-  }
-
-  async function decidir(orden, nuevoEstado) {
-    const comentario = window.prompt(
-      nuevoEstado === 'aprobada'
-        ? 'Comentario de aprobación (opcional):'
-        : 'Motivo del rechazo (opcional):'
-    )
-    if (comentario === null) return // cancelo
-
-    setOcupado(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase
-        .from('ordenes_propias')
-        .update({
-          estado: nuevoEstado,
-          decidida_por: user?.id ?? null,
-          decidida_en: new Date().toISOString(),
-          comentario_decision: comentario || null,
-        })
-        .eq('id', orden.id)
-      if (error) throw new Error(error.message)
-      setAviso(`Orden #${orden.id} ${nuevoEstado === 'aprobada' ? 'aprobada' : 'rechazada'}.`)
-      setVista('lista')
-      await cargarOrdenes()
-      if (typeof onCambioOrdenes === 'function') onCambioOrdenes()
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setOcupado(false)
-    }
-  }
-
-  async function borrarOrden(orden) {
-    if (!window.confirm(`¿Eliminar el borrador #${orden.id}?`)) return
-    setOcupado(true)
-    try {
-      const { error } = await supabase.from('ordenes_propias').delete().eq('id', orden.id)
-      if (error) throw new Error(error.message)
-      await cargarOrdenes()
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setOcupado(false)
-    }
-  }
-
-
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
       <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
@@ -1224,16 +890,6 @@ export default function NuevaOC({ onCambioOrdenes }) {
           ocupado={ocupado}
           condiciones={condicionesProveedor}
           esAdmin={permisos.esAdmin}
-        />
-      ) : ordenAbierta ? (
-        <DetalleOrden
-          orden={ordenAbierta}
-          items={itemsAbiertos}
-          esAdmin={permisos.esAdmin}
-          onVolver={() => setVista('lista')}
-          onDecidir={decidir}
-          onEnviar={enviarAAprobacion}
-          ocupado={ocupado}
         />
       ) : null}
     </div>

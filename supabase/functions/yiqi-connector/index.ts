@@ -12,6 +12,15 @@
 //     smartie API_OC_Recientes, distinta de ORDEN_DE_COMPRA).
 //   - /search y /{id} quedan EXACTAMENTE IGUAL que antes, sin tocar.
 //
+// CORRECCION 14 agosto 2026:
+//   - CONSULTA_DE_STOCK y CONSUL_MOV_DE_STOCK eran nombres de entidad
+//     supuestos desde julio, nunca confirmados contra la API real.
+//     Probados en vivo directo contra YiQi (bypaseando este conector):
+//     los nombres reales son STOCK y MOVIMIENTO_STOCK. Corregido en la
+//     whitelist de abajo. Usados por las smarties nuevas
+//     Z.API_Stock_Por_Deposito_NO_BORRAR (2360) y
+//     Z.API_Movimientos_Stock_NO_BORRAR (2359).
+//
 // FLUJO REAL VALIDADO (12-13 julio 2026):
 //   1. POST https://api.yiqi.com.ar/token
 //      Body x-www-form-urlencoded: username, password, grant_type=password
@@ -38,7 +47,7 @@
 //
 // ENTIDADES WHITELISTED:
 //   MATERIAL, ORDEN_DE_COMPRA, FACTURA_COMPRA, DET_FACT_COMPRA, CLIENTE,
-//   CONSULTA_DE_STOCK, CONSUL_MOV_DE_STOCK, LISTA_DE_PRECIO_COMP,
+//   STOCK, MOVIMIENTO_STOCK, LISTA_DE_PRECIO_COMP,
 //   PRECIO_ARTICULO_COMP, REPORTE_DE_OC
 //
 // SMARTIES CORE DEL PROYECTO (13 julio 2026):
@@ -59,8 +68,8 @@ const ENTIDADES_PERMITIDAS = [
   'FACTURA_COMPRA',
   'DET_FACT_COMPRA',
   'CLIENTE',
-  'CONSULTA_DE_STOCK',
-  'CONSUL_MOV_DE_STOCK',
+  'STOCK',
+  'MOVIMIENTO_STOCK',
   'LISTA_DE_PRECIO_COMP',
   'PRECIO_ARTICULO_COMP',
   'REPORTE_DE_OC',
