@@ -228,6 +228,64 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   const [cantidades, setCantidades] = useState({})
   const [notas, setNotas] = useState('')
 
+  // Articulos agregados a mano (no venian en las sugerencias por
+  // alerta). Viven aparte de `sugerencias` — que es prop del padre
+  // y se recarga sola al cambiar de proveedor — para no pisarse con
+  // ese ciclo. `filas` mas abajo las une para todo lo demas (tabla,
+  // busqueda, paginado, calculo de items a guardar).
+  const [agregados, setAgregados] = useState([])
+  const [buscarTexto, setBuscarTexto] = useState('')
+  const [buscarResultados, setBuscarResultados] = useState([])
+  const [buscarCargando, setBuscarCargando] = useState(false)
+  const [buscarAbierto, setBuscarAbierto] = useState(false)
+
+  // Buscar en el catalogo completo del proveedor (no solo lo que
+  // esta en alerta) con un poco de debounce: no tiene sentido pegarle
+  // a la funcion en cada tecla. Minimo 2 caracteres para no traer de
+  // una el catalogo entero de proveedores con miles de articulos.
+  useEffect(() => {
+    const texto = buscarTexto.trim()
+    if (texto.length < 2) {
+      setBuscarResultados([])
+      setBuscarCargando(false)
+      return
+    }
+    setBuscarCargando(true)
+    const id = setTimeout(() => {
+      supabase
+        .rpc('buscar_articulos_proveedor', { p_proveedor: proveedor, p_busqueda: texto, p_limite: 20 })
+        .then(({ data, error }) => {
+          if (!error) setBuscarResultados(data ?? [])
+          setBuscarCargando(false)
+        })
+    }, 350)
+    return () => clearTimeout(id)
+  }, [buscarTexto, proveedor])
+
+  const codigosSugeridos = useMemo(() => new Set(sugerencias.map((s) => s.mate_codigo)), [sugerencias])
+  const codigosAgregados = useMemo(() => new Set(agregados.map((a) => a.mate_codigo)), [agregados])
+
+  // Agregar un articulo encontrado en el buscador: si ya estaba entre
+  // las sugerencias por alerta, no se duplica — solo se tilda (puede
+  // que ya estuviera ahi sin seleccionar). Si es nuevo, se suma a
+  // `agregados` y se tilda con cantidad 1 de arranque: a diferencia de
+  // las sugerencias (que arrancan sin tildar, ver mas abajo), agregar
+  // algo a mano ES la decision de incluirlo.
+  function agregarArticulo(fila) {
+    setSeleccion((prev) => new Set(prev).add(fila.mate_codigo))
+    setCantidades((prev) => {
+      const actual = prev[fila.mate_codigo]
+      if (actual !== undefined && actual !== '' && actual !== null) return prev
+      return { ...prev, [fila.mate_codigo]: 1 }
+    })
+    if (!codigosSugeridos.has(fila.mate_codigo) && !codigosAgregados.has(fila.mate_codigo)) {
+      setAgregados((prev) => [...prev, { ...fila, cantidad_sugerida: null, topeada: false }])
+    }
+    setBuscarTexto('')
+    setBuscarResultados([])
+    setBuscarAbierto(false)
+  }
+
   // Plantilla de WhatsApp: se carga una vez al entrar a armar la orden.
   // No se resuelve con permisos porque templates_mensaje es de lectura
   // publica para cualquier usuario logueado.
@@ -249,8 +307,13 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   const [paginaActual, setPaginaActual] = useState(1)
   const [filasPorPagina, setFilasPorPagina] = useState(50)
 
+  // Union de lo sugerido por alerta y lo agregado a mano: de aca para
+  // abajo (tabla, busqueda del listado, paginado, calculo de items a
+  // guardar) todo trabaja sobre `filas`, sin distinguir el origen.
+  const filas = useMemo(() => [...sugerencias, ...agregados], [sugerencias, agregados])
+
   const filtradas = useMemo(() => {
-    let out = sugerencias
+    let out = filas
     if (ocultarSinHistorial) out = out.filter((s) => s.cantidad_sugerida != null)
     if (busqueda) {
       const t = busqueda.toLowerCase()
@@ -261,7 +324,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
       )
     }
     return out
-  }, [sugerencias, busqueda, ocultarSinHistorial])
+  }, [filas, busqueda, ocultarSinHistorial])
 
   useEffect(() => {
     setPaginaActual(1)
@@ -274,8 +337,8 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   const paginadas = filtradas.slice(inicio, inicio + filasPorPagina)
 
   const sinHistorialTotal = useMemo(
-    () => sugerencias.filter((s) => s.cantidad_sugerida == null).length,
-    [sugerencias]
+    () => filas.filter((s) => s.cantidad_sugerida == null).length,
+    [filas]
   )
 
   // NADA viene tildado por defecto. El sistema sugiere, la persona
@@ -319,7 +382,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
 
   const items = useMemo(
     () =>
-      sugerencias
+      filas
         .filter((s) => seleccion.has(s.mate_codigo))
         .map((s) => ({
           mate_codigo: s.mate_codigo,
@@ -331,7 +394,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
           costo_unitario: s.costo_unitario ?? null,
         }))
         .filter((i) => i.cantidad > 0),
-    [sugerencias, seleccion, cantidades]
+    [filas, seleccion, cantidades]
   )
 
   // Valorizacion con CRM Neto (costo sin impuestos). Los articulos sin
@@ -500,6 +563,65 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
         libremente las cantidades.
       </Aviso>
 
+      {/* Agregar a mano: busca en TODO el catálogo comprable del
+          proveedor, no solo lo que está en alerta. Al elegir un
+          resultado se suma a la tabla de abajo, tildado, cantidad 1
+          para editar. Si el artículo ya estaba en la tabla (por alerta
+          o por un agregado previo), no se duplica: solo se tilda. */}
+      <div className="relative mb-3">
+        <label className="block text-[12px] font-semibold text-[var(--sub)] mb-1">
+          Agregar otro artículo del proveedor
+        </label>
+        <input
+          type="text"
+          value={buscarTexto}
+          onChange={(e) => {
+            setBuscarTexto(e.target.value)
+            setBuscarAbierto(true)
+          }}
+          onFocus={() => setBuscarAbierto(true)}
+          onBlur={() => setTimeout(() => setBuscarAbierto(false), 150)}
+          placeholder="Buscar por SKU o nombre en todo el catálogo de este proveedor…"
+          className="w-full max-w-md border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+        />
+        {buscarAbierto && buscarTexto.trim().length >= 2 && (
+          <div className="absolute z-10 mt-1 w-full max-w-md bg-white border border-[var(--border)] rounded-lg shadow-lg max-h-72 overflow-y-auto">
+            {buscarCargando ? (
+              <div className="px-3 py-2.5 text-sm text-[var(--sub)]">Buscando…</div>
+            ) : buscarResultados.length === 0 ? (
+              <div className="px-3 py-2.5 text-sm text-[var(--sub)]">
+                Sin resultados en el catálogo de {proveedor}.
+              </div>
+            ) : (
+              buscarResultados.map((r) => {
+                const yaIncluido = seleccion.has(r.mate_codigo)
+                return (
+                  <button
+                    type="button"
+                    key={r.mate_codigo}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => agregarArticulo(r)}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0 flex items-center justify-between gap-2"
+                  >
+                    <span className="min-w-0 flex items-baseline gap-2">
+                      <span className="font-mono text-xs text-gray-400 whitespace-nowrap">{r.mate_codigo}</span>
+                      <span className="text-[13px] font-medium truncate">{r.mate_nombre ?? '—'}</span>
+                    </span>
+                    <span className="text-[11px] font-semibold whitespace-nowrap">
+                      {yaIncluido ? (
+                        <span className="text-[var(--grn,#3d9970)]">Agregado ✓</span>
+                      ) : (
+                        <span className="text-[var(--ind,#4338ca)]">+ Agregar</span>
+                      )}
+                    </span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
         <div className="flex items-center gap-3 flex-wrap">
           <input
@@ -539,8 +661,8 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
           <div className="p-8 text-center text-[var(--sub)] text-sm">Calculando sugerencias…</div>
         ) : paginadas.length === 0 ? (
           <div className="p-8 text-center text-[var(--sub)] text-sm">
-            {sugerencias.length === 0
-              ? 'Este proveedor no tiene artículos por debajo del punto de pedido.'
+            {filas.length === 0
+              ? 'Este proveedor no tiene artículos por debajo del punto de pedido. Podés buscar y agregar artículos a mano más arriba.'
               : 'Ningún artículo coincide con el filtro.'}
           </div>
         ) : (
@@ -882,6 +1004,11 @@ export default function NuevaOC({ onCambioOrdenes }) {
         />
       ) : vista === 'armar' ? (
         <ArmarOrden
+          // key por proveedor: fuerza un montaje limpio al cambiar de
+          // proveedor, para que los artículos agregados a mano (estado
+          // local del componente, no viene por props) no sobrevivan al
+          // salto de un proveedor a otro.
+          key={proveedorElegido}
           proveedor={proveedorElegido}
           sugerencias={sugerencias}
           cargando={cargandoSub}
