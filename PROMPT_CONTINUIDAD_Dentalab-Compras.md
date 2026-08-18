@@ -1,11 +1,31 @@
 # PROMPT DE CONTINUIDAD — Dentalab-Compras
-**Actualizado: 31 de julio de 2026 · Reconciliado contra repo el 5 de agosto de 2026**
+**Actualizado: 31 de julio de 2026 · Reconciliado contra repo el 5 de agosto de 2026 · Validación en vivo (Chrome) el 7, 10 y 11 de agosto de 2026 · Deploy + validación de limpieza de alertas Etapa 1: 11 de agosto de 2026**
 *Pegar este documento completo al inicio de una nueva conversación con Claude.*
 
 > **Estado de la reconciliación del 5/8/2026.** Se verificó el repo local `C:\dentalab-compras` archivo por archivo.
 > **Producción NO se pudo verificar**: el entorno de la sesión bloquea la salida a `supabase.co`, `api.yiqi.com.ar` y `vercel.app`.
 > Todo lo que depende de prod quedó marcado `[sin verificar]` y hay un script para cerrarlo en `scripts/verificar-prod.ps1`.
 > El registro completo está en la sección **RECONCILIACIÓN 5/8/2026** al final.
+>
+> **Actualización 7/8/2026:** desde entonces se creó el repo remoto, se cerró el hueco de autorización en las 3 Edge Functions, se corrigió el badge del sidebar, y se validó todo en vivo contra producción con Claude in Chrome. Detalle en **VALIDACIÓN EN VIVO 7/8/2026**, al final del todo.
+>
+> **Actualización 10/8/2026:** se reemplazaron los diálogos nativos del navegador por un modal propio en Órdenes de compra, se creó y pobló la tabla `composicion_articulos` (fraccionados y combos de ML) y se integró al cálculo real de `sugerencias_compra()` e `historial_ventas()` — validado en vivo con precisión matemática, no solo "corrió sin error". Se cerró además un bug de la CLI de Supabase que impedía capturar el baseline. Detalle completo en **SESIÓN 10/8/2026**, al final del todo.
+>
+> **Más tarde el mismo 10/8:** se cerraron el resto de los pendientes técnicos de la sesión — gate de admin en `UsuariosAccesos.jsx`, limpieza de los 21 `.bak`, y una papelera reversible (archivar/restaurar/eliminar) para Órdenes de compra, con nombre del creador visible y las pendientes de aprobar siempre arriba. Se archivaron las 2 OC de prueba confirmadas (#3, #4); las OC #2/#5/#6/#7 se investigaron a fondo antes de tocar nada y resultaron ser órdenes reales de Ivana y Aris — no se tocaron. Ver sección **7. Papelera reversible...** al final.
+>
+> **Actualización 11/8/2026:** se identificó en vivo el candidato correcto para el código de la masa del kit Speedex — `21083` ("Silicona Speedex Putty Masa COLTENE 1.48kg"). **Confirmado por Aris** (no para `21087`, el kit chico ya discontinuado, sino como componente del combo grande `21081` que sí se vende: "21081 = 21083+21084+21085") y **cargado en `composicion_articulos`** — validado en vivo con un `SELECT`, 3 filas correctas. Gap de "Composición de combos y fraccionados" cerrado por completo. Ver **SESIÓN 11/8/2026** al final.
+>
+> **Más tarde el mismo 11/8:** se construyó la **Etapa 1 de la limpieza de alertas** que pidió Federico (el Monitor llegó a mostrar >3000 alertas sin ningún filtro): exclusión permanente por SKU (admin) + pausa de 15 días por SKU (cualquier usuario) con aviso activo en el sidebar al vencer. Dos migraciones aplicadas y validadas en vivo contra `contadores_sidebar()`; `Alertas.jsx` y `Sidebar.jsx` reescritos y entregados.
+>
+> **✅ Cerrada 11/8/2026 — deployada y validada en vivo.** Federico resolvió dos rondas de locks de git stale (`index.lock`, luego `HEAD.lock` + `objects/maintenance.lock`) y pusheó commit `9146741` a `main`; `vercel --prod` confirmó la URL de producción activa (`https://dentalab-compras.vercel.app`). Validación en vivo con Chrome, logueado como Aris: baseline confirmado en 2603 críticas / 450 preventivas / 3053 total (igual a las capturas previas); ciclo de pausa (SKU 1107: pausar → baja a 2602/450/3052, aparece en pestaña Pausadas con nombre/fecha correctos → reactivar → vuelve a 2603/450/3053) y ciclo de exclusión (mismo SKU: excluir → baja, aparece en pestaña Excluidos → restaurar → vuelve a subir) probados de punta a punta, sin dejar datos de prueba colgando. **Etapa 1 completa y en producción.** Ver sección **8. Limpieza de alertas — Etapa 1** dentro de SESIÓN 11/8/2026.
+>
+> **Todavía el mismo 11/8:** se armó una guía de testeo en Word para Aris e Ivana (qué está construido, qué probar esta ronda, qué no hace todavía, qué datos cargar). En el camino se auditó `NuevaOC.jsx` contra `git log` y se encontró que el límite de aprobación de Aris ya estaba resuelto desde el 7/8 (commit `41febe8`) sin haber quedado documentado — corregido acá y en el Word. También se descartó una sospecha de bug en el mapeo de `siempre_aprueba` (confirmado con `pg_get_functiondef`, funciona bien). **Federico ya envió la guía a Aris e Ivana — quedamos esperando su feedback.** Ver sección **9. Preparando el envío a testeo** dentro de SESIÓN 11/8/2026.
+>
+> **Actualización 14/8/2026:** se crearon dos smarties nuevas en YiQi (`Z.API_Stock_Por_Deposito_NO_BORRAR`, id 2360; `Z.API_Movimientos_Stock_NO_BORRAR`, id 2359). Al probarlas se descubrió que **el sync automático de stock llevaba 10 días roto** (última actualización real: 4/8) — el cron parecía sano porque `net.http_post` encola el pedido y "succeeded" no refleja la respuesta real. Causa doble: (1) los 3 cron jobs seguían usando la service_role key legacy, mientras el proyecto de Supabase ya había migrado al sistema de keys nuevo (`sb_secret_...`) — **arreglado**, los 3 jobs actualizados con la key correcta; (2) el token de integración con YiQi en sí también estaba vencido/inválido — **arreglado también**: Federico regeneró el token (`POST /token`, 265 caracteres) y lo cargó en `yiqi_config`. **✅ Sync 100% restablecido y confirmado en vivo**: llamada de prueba trajo 7185 filas de MATERIAL, y el Monitor de Stock mostró "Sincronizado 14/8, 11:37 a.m." Queda como pregunta abierta, sin urgencia, **por qué se venció el token sin que cambiara la contraseña de la cuenta de YiQi** — a investigar más adelante con Aris/soporte YiQi. Detalle completo en **SESIÓN 14/8/2026**, al final del documento.
+>
+> **Actualización 15/8/2026:** el sync se cortó de nuevo al día siguiente — dos causas distintas encontradas (un `cron.alter_job` que había cargado la key nueva sin el prefijo `Bearer `, corregido; y el token de YiQi que volvió a morir en menos de 24hs, sin regenerar todavía porque hay una hipótesis fuerte y sin confirmar de que la cuenta de integración se comparte con un login web de uso diario — **esperando respuesta de Aris**). Aparte, **✅ pedido nuevo de Aris — "Nueva OC" ahora permite agregar cualquier artículo del proveedor a mano**, no solo los que trae la alerta automática: migration `buscar_articulos_proveedor()` + buscador en `ArmarOrden`, deployado (commit `f1e416f`) y validado en vivo con Chrome sobre dos proveedores reales, sin dejar datos de prueba. Detalle completo en **SESIÓN 15/8/2026**, al final del documento.
+>
+> **Actualización 17/8/2026 — causa raíz real del vencimiento del token de YiQi, encontrada y resuelta.** Aris confirmó que nadie de Dentalab usó la cuenta compartida recientemente, y Federico confirmó que tampoco inició sesión en la web de YiQi — **la hipótesis del 15/8 (login web comparte y mata el token) queda descartada.** Investigando la documentación oficial de YiQi (`apidoc.yiqi.com.ar`) se confirmó la causa real: el `access_token` es de **vida corta por diseño** (~24hs, confirmado empíricamente: `expires_in = 86399`), no ~4 años como asumía un comentario viejo del código nunca verificado — y el sistema **nunca implementó** la renovación (`grant_type=refresh_token`) que YiQi exige. **✅ Construido, deployado y validado en vivo**: módulo compartido `_shared/yiqiConfig.ts` que renueva el token solo, 2hs antes de vencer, usado ahora por `sync-yiqi` y `yiqi-connector`. Confirmado en base de datos (`token_expira_en` con fecha real), en logs reales (`net._http_response`, sin errores tras el fix) y en vivo en el Monitor de Stock (7186 artículos, "✓ Sincronizado"). Riesgo residual (colisión de renovación entre los 3 cron jobs a las 6:00 UTC) documentado y aceptado a propósito, sin locking — de baja probabilidad y auto-recuperable. Detalle completo en **SESIÓN 17/8/2026**, al final del documento.
 
 ---
 
@@ -26,7 +46,8 @@ Soy Federico, de Tulkas LLC. Estoy desarrollando **Dentalab-Compras**, un sistem
   $anon = (Get-Content .env.local | Where-Object { $_ -match '^VITE_SUPABASE_ANON_KEY=' }) -replace '^VITE_SUPABASE_ANON_KEY=',''
   $anon = $anon.Trim().Trim('"').Trim("'")
   ```
-- Para invocar Edge Functions desde PowerShell hacen falta **los dos headers**: `Authorization: Bearer` + `apikey`.
+- Para invocar Edge Functions desde PowerShell con la **anon key legacy** hacen falta **los dos headers**: `Authorization: Bearer` + `apikey`. `[14/8/2026]` Con la **`sb_secret_...` nueva** (sistema de keys nuevo), mandar **solo** `Authorization` — combinarla con un `apikey` legacy (`eyJ...`) da `401 Conflicting API keys` desde el gateway de Supabase, no es un error de nuestro código.
+- **Desde el 5-7/8/2026 trabajamos todo en la sesión de la nube (Claude Code / Cowork)**, no solo en PowerShell local: el repo tiene remoto (`github.com/federicoaf79/dentalas_erp`), y Claude puede leer/editar el repo vía `device_bash`/`device_stage_files`, y validar en vivo contra producción con Claude in Chrome. Metodología fija a partir de ahora: **revisar siempre lo hecho antes de cambiar algo, no romper nada, validar cada construcción (en vivo cuando aplica), y priorizar gaps de seguridad**.
 
 ## QUIÉN ES QUIÉN
 
@@ -34,10 +55,12 @@ Soy Federico, de Tulkas LLC. Estoy desarrollando **Dentalab-Compras**, un sistem
 - **Alex Samandjian** = hermano de Aris, también usuario de YiQi.
 - Mails reales: Ivana `comprasdentalab@gmail.com`, Aris `aris@dentalab.com.ar`
 - Usuario YiQi del sistema: `ventas@dentalab.com.ar` (con "Integrador" habilitado)
+- `[chrome-live 2026-08-07]` Confirmado en vivo: ambas cuentas reales (Ivana y Aris) ya existen en Supabase Auth con su fila resuelta en `usuarios_config`. Pendiente: Aris nunca inició sesión con su cuenta real, sigue usando la demo.
 
 ## INFRAESTRUCTURA
 
 - Local: `C:\dentalab-compras\` — `frontend\`, `supabase\functions\`
+- **Remoto:** `github.com/federicoaf79/dentalas_erp`, rama `main` — ✅ **creado y sincronizado 6/8/2026** (ver PENDIENTE INMEDIATO #1)
 - Supabase: `hsfudsnmooaesrzdwecg` (org UrbanTales), plan Pro
 - Deploy: `vercel --prod` desde `frontend\` → **https://dentalab-compras.vercel.app**
 - Bearer token de YiQi: tabla `yiqi_config`
@@ -70,17 +93,16 @@ Soy Federico, de Tulkas LLC. Estoy desarrollando **Dentalab-Compras**, un sistem
 
 ## Lo que falta y NO se destraba con respuestas del cliente
 
-1. **Envío de la OC al proveedor** (Resend / WhatsApp). Los templates y el PDF están; falta la integración de envío.
+1. **Envío de la OC al proveedor** (Resend / WhatsApp). Los templates y el PDF están; falta la integración de envío. `[chrome-live 2026-08-07]` Confirmado en vivo: el propio banner de "Órdenes de compra" dice *"Todavía no se envían al ERP ni al proveedor — esa etapa es la siguiente del desarrollo"*. Ninguna OC nueva (creada vía Nueva OC) llega hoy a estado `Enviada`, solo `Aprobada`. Las 51 OC en estado `Enviada` que se ven en el listado son históricas/pre-existentes.
 2. **Escritura en YiQi** (`POST /ORDEN_DE_COMPRA`). Marcado como el mayor riesgo técnico desde el roadmap original. Nunca se probó el formato.
 3. **Comparación de precios entre proveedores** (`LISTA_DE_PRECIO_COMP` / `PRECIO_ARTICULO_COMP`, identificadas pero no exploradas).
 
 ## Lo que falta y SÍ depende de respuestas
 
-4. **Condiciones comerciales por proveedor** (mínimo de compra, descuentos por volumen, plazo de pago). La tabla `proveedores` existe pero está vacía: YiQi no tiene esos datos (`INFO_PROVEEDOR` da 404 siempre). Sin el mínimo de compra **no se puede evaluar una de las dos causales de OC provisoria definidas en v8**.
-   - `[repo 2026-08-05]` Ninguna pantalla consulta la tabla: `grep "from('proveedores')"` en `frontend/src` no devuelve nada. `Proveedores.jsx` lee `material_yiqi`, no `proveedores`.
-   - `[sin verificar]` Que la tabla exista en prod sale del propio MD (31/7), no se pudo confirmar contra la base. Tulkas registra el riesgo contradictorio "sin tabla ni UI" — ver contradicción C-2.
-5. **Composición de combos y conversión de fraccionados.**
-6. **Límite de aprobación por proveedor** (hoy es global).
+4. **Condiciones comerciales por proveedor** (mínimo de compra, descuentos por volumen, plazo de pago). `[6/8/2026]` **Resuelto como decisión de diseño**: son reglas a aplicar en cada perfil de proveedor, con pantalla propia (`CondicionesProveedor.jsx`, gate admin) que lee/escribe la tabla `proveedores` — si hacen falta otras reglas más adelante, se agregan ahí. Lo único que sigue pendiente es que **Aris cargue los datos reales** de los 15-20 proveedores principales (ESPERA A OTRA PERSONA), no el diseño.
+   - `[repo 2026-08-05]` Ninguna pantalla vieja consultaba la tabla antes del 6/8 — corregido con `CondicionesProveedor.jsx`.
+5. **Composición de combos y conversión de fraccionados.** `[10/8/2026]` **✅ Resuelto en su mayoría** — tabla `composicion_articulos` creada con 41 filas confirmadas por Aris (7 fraccionados + 34 combos) e integrada al cálculo de demanda. Ver SESIÓN 10/8/2026. `[11/8/2026]` **✅ Cerrado del todo** — Aris confirmó la composición del combo Speedex `21081` (= `21083`+`21084`+`21085`); cargada y validada en vivo. Ver SESIÓN 11/8/2026.
+6. **Límite de aprobación por proveedor** (hoy es global). `[repo 2026-08-06]` Parcialmente resuelto por `CondicionesProveedor.jsx` (columna `limite_aprobacion` por proveedor). `[chrome-live 2026-08-07]` Gap encontrado en vivo: el límite se aplicaba por igual a cualquier usuario, incluido Aris. **✅ Cerrado el mismo 7/8/2026** — commit `41febe8` ("Fix: las órdenes de Aris se confirman directo, sin control de aprobación"), hecho fuera de una sesión con Claude y detectado recién el 11/8 al revisar `NuevaOC.jsx` para otra cosa (ver corrección en SESIÓN 11/8/2026). Hoy `requiereAprobacion` es siempre `false` cuando `esAdmin` — Aris confirma cualquier orden directo, sin límite ni "siempre aprueba".
 
 ---
 
@@ -88,9 +110,9 @@ Soy Federico, de Tulkas LLC. Estoy desarrollando **Dentalab-Compras**, un sistem
 
 ## Las 14 pantallas — ninguna en construcción
 
-Monitor de Stock · Alertas · Órdenes de compra · Seguimiento de OC · Historial de OC · **Nueva OC** · **Predictor de demanda** · Proveedores · Usuarios y accesos · **Datos de la empresa** · **Catálogo de causas** · **Reglas y alertas** · **Templates de mensajes** · Conector YiQi
+Monitor de Stock · Alertas · Órdenes de compra · Seguimiento de OC · Historial de OC · **Nueva OC** · **Predictor de demanda** · Proveedores · Usuarios y accesos · **Datos de la empresa** · **Catálogo de causas** · **Reglas y alertas** · **Templates de mensajes** · Conector YiQi · **Condiciones comerciales** (nueva, 6/8/2026)
 
-`[repo 2026-08-05]` **Verificado.** `App.jsx:26-41` define `PAGINAS_CON_DATOS_REALES` con las 14 claves (`stock, seguimiento, proveedores, historial, usuarios, alertas, ocs, yiqi, predictor, nueva-oc, reglas, causas, empresa, templates`) y `App.jsx:138-155` rutea las 14 a componentes reales. `PaginaEnConstruccion` (`App.jsx:43`) quedó inalcanzable salvo con una `currentPage` fuera de la lista.
+`[repo 2026-08-05]` **Verificado.** `App.jsx:26-41` define `PAGINAS_CON_DATOS_REALES` con las 14 claves (`stock, seguimiento, proveedores, historial, usuarios, alertas, ocs, yiqi, predictor, nueva-oc, reglas, causas, empresa, templates`) y `App.jsx:138-155` rutea las 14 a componentes reales. `PaginaEnConstruccion` (`App.jsx:43`) quedó inalcanzable salvo con una `currentPage` fuera de la lista. `[repo 2026-08-06]` se sumó `condiciones` como 15ª página (`CondicionesProveedor.jsx`).
 
 ## Arquitectura de datos
 
@@ -103,6 +125,8 @@ El frontend **no llama a YiQi en vivo**. Dos capas:
 2. **Lectura:** las pantallas leen de las tablas propias con fetch paralelo. ~1 segundo.
 
 ⚠️ **`update cron.job set active=...` da "permission denied" desde el SQL Editor.** Usar `select cron.alter_job(3, active := false);`
+
+`[chrome-live 2026-08-07]` **Validado que el cron sigue autenticando correctamente tras el fix de autorización**: se comparó el token que usa `cron.job` contra el `service_role` actual del dashboard (sin que ninguno de los dos valores pasara por Claude) — Federico confirmó "Coinciden." antes de deployar. Falta confirmar el próximo tick automático o revisar logs de la función para el 100% de certeza operativa.
 
 ## Las 4 smarties core en YiQi
 
@@ -128,6 +152,8 @@ Perdió 8 columnas, probablemente porque alguien la confundió con la pestaña "
 
 Script de auditoría: comparar `$r.columns.field` contra esa lista.
 
+`[repo 2026-08-06]` **Cosmético, no urgente:** `yiqi-connector/index.ts:45-47,385,390` sigue documentando los smartieId viejos (2340/2341/2343) en comentarios y ejemplos; el sync real usa 2344/2345/2346 correctamente (N-2, sigue abierto).
+
 ## Tablas en Supabase
 
 **Espejo de YiQi** (nunca mezclar con lógica propia):
@@ -138,12 +164,15 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 
 **Lógica propia:**
 - `usuarios_config` (rol admin/operador) · `usuario_proveedor` (permisos) · `yiqi_config`
-- `ordenes_propias` + `ordenes_propias_items` — circuito de OC
+- `ordenes_propias` + `ordenes_propias_items` — circuito de OC. `[10/8/2026]` Ahora tiene columnas `archivada_en`/`archivada_por` (papelera reversible) — ver sección 7 de SESIÓN 10/8/2026. Las OC #3 y #4 (pruebas confirmadas del 7/8) quedaron archivadas; #2, #5, #6, #7 son órdenes reales de Ivana/Aris, no tocar.
 - `reglas_compra` — límite $1.000.000, máx 2 bultos, 2 meses de cobertura
 - `empresa_config` — membrete del PDF
 - `catalogo_causas` + `declaraciones_causa`
 - `templates_mensaje`
-- `proveedores` — condiciones comerciales, **vacía**
+- `proveedores` — condiciones comerciales, decididas como reglas por perfil de proveedor (ver "Lo que falta y SÍ depende de respuestas" ítem 4). `[repo 2026-08-06]` ya tiene UI (`CondicionesProveedor.jsx`); sigue vacía de datos reales — ver ESPERA A OTRA PERSONA.
+- `composicion_articulos` — fraccionados y combos (**44 filas** desde el 11/8/2026: las 41 originales + 3 del combo Speedex `21081`). La fila de `21087` (kit chico discontinuado, componente masa inválido `21082`) quedó sin tocar a propósito — SKU muerto, no afecta ningún cálculo. Ver SESIÓN 11/8/2026.
+- `articulos_excluidos_alertas` — `[11/8/2026, NUEVA]` exclusión permanente por SKU del conteo de alertas (admin-only). Ver SESIÓN 11/8/2026, sección 8.
+- `alertas_pausadas` — `[11/8/2026, NUEVA]` pausa temporal de 15 días por SKU (cualquier usuario logueado). `reactivar_en` la fija siempre un trigger a partir de `pausada_en`, no el frontend. Ver SESIÓN 11/8/2026, sección 8.
 
 ## Permisos — frontend + RLS
 
@@ -155,13 +184,13 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 3. Dependencia del `useEffect` por **clave derivada string**, no por el objeto
 4. `onAuthStateChange` **también dispara al refrescar el token** (al volver a la pestaña). Hay un `useRef` con el user.id que evita recargar si no cambió realmente.
 
-**Fase B:** funciones `SECURITY DEFINER` + `STABLE`: `es_admin()`, `mis_codigos_proveedor()`, `mis_nombres_proveedor()`. Políticas en `material_yiqi`, `ordenes_yiqi`, `ventas_mensual_yiqi`.
+**Fase B:** funciones `SECURITY DEFINER` + `STABLE`: `es_admin()`, `mis_codigos_proveedor()`, `mis_nombres_proveedor()`. Políticas en `material_yiqi`, `ordenes_yiqi`, `ventas_mensual_yiqi`. `[10/8/2026]` Se sumó `nombres_usuarios(uuid[])`, mismo patrón, para exponer el nombre de cualquier usuario (nada sensible) sin saltarse el resto de RLS de `usuarios_config`.
 
 `[repo 2026-08-05]` **Fase A verificada y en uso.** `usePermisos.js:182` exporta `filtrarMaterial()`, `:203` `filtrarOrdenes()`. `MonitorStock.jsx:31` y `:48` lo aplican en la query de `count` y en las páginas paralelas (el cuidado #1 se cumple); `:96` corta si `permisos.cargando`; `:113-115` usa clave derivada string; `usePermisos.js` tiene el `useRef` del `user.id`. Los 4 cuidados están implementados. 13 pantallas + `App.jsx` importan `usePermisos`.
 
 `[sin verificar]` **Fase B (RLS en Postgres) no se pudo confirmar** — requiere prod. Es lo único que separa "el frontend filtra" de "los datos están protegidos": sin las políticas, cualquiera con la anon key lee las tablas espejo por PostgREST salteando el frontend.
 
-⚠️ `[repo 2026-08-05]` **`UsuariosAccesos.jsx:259` miente.** El texto en pantalla dice *"Esta asignación todavía no se aplica como filtro"* — es un cartel viejo (archivo del 23/7, `usePermisos.js` es del 31/7). El filtro **sí** se aplica. Ese cartel es el origen de 4 riesgos falsos en Tulkas. **Borrarlo.**
+✅ `[10/8/2026]` **`UsuariosAccesos.jsx:259` ya no miente.** El cartel falso ("Esta asignación todavía no se aplica como filtro") se borró y se agregó gate `esAdmin` real (bloqueo total de contenido para no-admin, no solo deshabilitar botones) — commit `edce81b`. El backend (`admin-usuarios` Edge Function) ya rechazaba a no-admins desde el 7/8 (`verificarLlamador({soloAdmin:true})`), así que esto era un cierre de UX/defensa en profundidad, no un agujero activo. Ver N-3/N-4 (cerrados) y PENDIENTE INMEDIATO #7.
 
 ⚠️ **En el SQL Editor `auth.uid()` es NULL.** Verificar siempre en el navegador logueado.
 
@@ -173,16 +202,19 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 
 | Función | Qué hace |
 |---|---|
-| `contadores_sidebar()` | Badges reales. **Sin** `SECURITY DEFINER` a propósito |
+| `contadores_sidebar()` | Badges reales. **Sin** `SECURITY DEFINER` a propósito. `[11/8/2026]` Ahora también excluye de `alertasCriticas`/`alertasPreventivas` los SKU de `articulos_excluidos_alertas` y los que tienen una pausa vigente en `alertas_pausadas`, y suma `alertasPausadasVencidas` — ver SESIÓN 11/8/2026, sección 8. Cuerpo completo capturado con `pg_get_functiondef` antes de tocarla, no se asumió nada |
 | `historial_ventas(p_meses)` | Historial por SKU |
 | `historial_ventas_json(p_meses)` | Igual pero en un jsonb — **esquiva el tope de 1.000 filas de PostgREST** |
 | `sugerencias_compra(p_proveedor)` | Qué y cuánto comprar. Lee `reglas_compra` |
 | `proveedores_con_alertas()` | Ordenado por **demanda en riesgo**, no por cantidad |
-| `es_comprable(nombre, proveedor)` | Excluye `###` de ML, discontinuados y producción propia |
+| `es_comprable(nombre, proveedor)` | Excluye `###` de ML, discontinuados (por patrón de nombre) y producción propia (proveedor = Dentalab). `[11/8/2026]` **No se tocó** en la limpieza de alertas: recibe nombre/proveedor, no el código del SKU, así que no puede consultar `articulos_excluidos_alertas`/`alertas_pausadas` sin cambiarle la firma y tocar `sugerencias_compra()` (otra pantalla, ya funciona bien). El filtro de alertas quedó en `contadores_sidebar()` y `Alertas.jsx` en cambio |
+| `nombres_usuarios(uuid[])` | `[10/8/2026]` Nombre de un usuario por su `user_id`, sin saltarse RLS de `usuarios_config` — usado por la columna "Creada por" de Órdenes de compra y, desde el 11/8, por las columnas "Excluido por"/"Pausada por" de Alertas |
 
 ⚠️ **PostgREST corta las respuestas de tipo TABLA en 1.000 filas y el tope es del servidor** — `.range()` desde el frontend no lo levanta. Solución: devolver todo en un jsonb.
 
 ⚠️ **`AVG()` miente** en `ventas_mensual_yiqi`: las celdas vacías no generan fila. Usar `SUM() / N_meses`.
+
+`[chrome-live 2026-08-07]` **`contadores_sidebar()` devuelve:** `alertasCriticas`, `alertasPreventivas`, `alertasStock`, `aprobacionPendiente`, `ocsActivas`, `seguimientoPendiente`, `ultimaSync`. `[11/8/2026]` Ahora también `alertasPausadasVencidas`. **Corrección sobre lo que decía este documento hasta el 10/8:** el sidebar SÍ tiene el badge de `aprobacionPendiente` cableado (`Sidebar.jsx`, azul, dentro del NavItem de Alertas, con comentario en el código "El flujo es Sprint 2, hoy siempre 0 -> no se dibuja") — no es que falte conectarlo en la UI (como decía N-12), sino que la función de Postgres nunca devuelve un valor distinto de 0 hoy porque el flujo de aprobación en dos pasos (Sprint 2) no está construido. N-12 queda corregido con esta aclaración.
 
 ---
 
@@ -198,6 +230,10 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 8. **Decimales en stock** = artículos de fraccionamiento/producción. Dato legítimo.
 9. **Proveedores raros en OC:** "Dentalab" = producción propia (**no se compra, se fabrica**). "PROVEEDURIA" = proveedor real. "VARIOS" = casos raros.
 10. **Costos:** el campo es **`MATE_CRM`** ("CRM Neto", sin impuestos) y `MATE_CRM_FINAL` (con impuestos). **6.243 de 7.173 artículos (87%)** tienen costo.
+11. `[chrome-live 2026-08-07]` **El límite de aprobación automática es sobre Ivana, no sobre Aris.** Aris, como dueño, puede pedir lo que quiera sin pasar por aprobación. **✅ Implementado** — commit `41febe8` (7/8/2026): `NuevaOC.jsx` hace `requiereAprobacion = !esAdmin && (...)`, así que para Aris (`esAdmin`) la orden se confirma directo, sin límite, sin "siempre aprueba", sin excepción. Detectado recién el 11/8 que este fix ya estaba en producción sin quedar documentado — ver SESIÓN 11/8/2026.
+12. `[11/8/2026]` **La masa del kit Speedex ya no se vende en la presentación chica** (kit trial de MercadoLibre, `21087`, 362g). Se vende la presentación grande (`21081`), cuya composición confirmó Aris: `21081 = 21083 (masa) + 21084 (light) + 21085 (activador)` — cargado en `composicion_articulos`. Ver SESIÓN 11/8/2026.
+13. `[11/8/2026]` **Condiciones comerciales = reglas a aplicar en cada perfil de proveedor**, decisión ya cerrada (no es un punto de diseño abierto): si hacen falta reglas nuevas más adelante, se agregan a `CondicionesProveedor.jsx`/tabla `proveedores`, sin rediscutir el enfoque.
+14. `[11/8/2026]` **Limpieza de alertas** (más de 3000 alertas activas hoy): Federico pidió dos reglas — (a) dejar de contar alertas de artículos que hace 3 años no se compran o no tienen ingresos de mercadería (discontinuados, cambio de SKU, saldos — sin borrar nada), y (b) poder pausar la alerta de faltante de un proveedor puntual, con un aviso a los 15 días para revisar si sigue igual. Ver SESIÓN 11/8/2026, sección 8, para el diseño en dos etapas acordado y lo que se construyó hoy.
 
 ---
 
@@ -229,17 +265,23 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 
 # LO QUE SIGUE, EN ORDEN
 
-1. **🔴 Crear los usuarios reales** en Supabase Auth + su fila en `usuarios_config` (sin la fila, el sistema falla cerrado y no ven nada). Copiar las asignaciones de proveedores de la Ivana demo.
+1. **🔴 Crear los usuarios reales** en Supabase Auth + su fila en `usuarios_config` (sin la fila, el sistema falla cerrado y no ven nada). Copiar las asignaciones de proveedores de la Ivana demo. `[chrome-live 2026-08-07]` **Parcialmente hecho**: ambas cuentas reales ya existen con `usuarios_config` resuelto. Falta que Aris inicie sesión con la suya al menos una vez.
 2. **🔴 Envío de la OC al proveedor** — Resend para email. Los templates y el PDF ya están.
 3. **🔴 Escritura en YiQi** (`POST /ORDEN_DE_COMPRA`) — el mayor riesgo técnico pendiente desde el inicio.
-4. **Condiciones comerciales por proveedor** — depende de que Aris complete los datos.
+4. **Condiciones comerciales por proveedor** — depende de que Aris complete los datos. `[repo 2026-08-06]` La pantalla (`CondicionesProveedor.jsx`) ya existe. `[11/8/2026]` Diseño confirmado como cerrado (decisión de negocio #13).
 5. **Comparación de precios** (`LISTA_DE_PRECIO_COMP` / `PRECIO_ARTICULO_COMP`).
-6. **Composición de combos y fraccionados** — tabla de mapeo a mano + definición de Aris.
+6. ~~Composición de combos y fraccionados — tabla de mapeo a mano + definición de Aris.~~ **✅ HECHO 10/8/2026, cerrado del todo 11/8/2026** — tabla `composicion_articulos` (44 filas) creada, con RLS, e integrada en `sugerencias_compra()` e `historial_ventas()` (migration `20260810120000`), validada en vivo. El único punto pendiente (código de la masa del kit Speedex) se cerró el 11/8 con la confirmación de Aris sobre el combo `21081` — ver SESIÓN 11/8/2026.
 7. **Declarar causas desde las pantallas** — el catálogo existe, falta el modal donde se usa.
-8. **Límite de aprobación por proveedor** — hoy global. Se agrega columna a `proveedores` y la lógica pasa a "el del proveedor si tiene, si no el global".
+8. **Límite de aprobación por proveedor** — `[repo 2026-08-06]` ya no es puramente global: `CondicionesProveedor.jsx` permite cargar un límite por proveedor. Falta que Aris cargue los datos y falta el ítem 12 (Aris no debería tener límite).
 9. **Capacitación de Ivana** — criterio 7 del MVP.
-10. **Badge del sidebar no se refresca** tras aprobar (se corrige recargando).
-11. **Módulo de stock por depósito** — entidades ya identificadas: `CONSULTA_DE_STOCK`, `MOVIMIENTO_STOCK` (25.302 registros de ingresos), `ACTUALIZACION_DE_STO` (60.616), `PUNTO_DE_PEDIDO_POR` (punto de pedido por ubicación, solo 5 cargados).
+10. ~~Badge del sidebar no se refresca tras aprobar (se corrige recargando).~~ **✅ HECHO 7/8/2026** — `App.jsx` ahora usa `useCallback`/`useRef` y pasa `onCambioOrdenes` a `OrdenesCompra`/`NuevaOC` (commit `c0ea403`, desplegado a Vercel). Validado en vivo con Claude in Chrome, con un matiz importante: ver **VALIDACIÓN EN VIVO 7/8/2026**.
+11. **Módulo de stock por depósito** — entidades confirmadas contra la API real: `STOCK` (no `CONSULTA_DE_STOCK`), `MOVIMIENTO_STOCK` (1.373.423 registros — mucho más que los 25.302 que se había estimado antes), `ACTUALIZACION_DE_STO` (60.616, sin confirmar todavía), `PUNTO_DE_PEDIDO_POR` (punto de pedido por ubicación, solo 5 cargados). `[14/8/2026]` `yiqi-connector` ya tiene el whitelist corregido y las 2 smarties (`STOCK`/2360, `MOVIMIENTO_STOCK`/2359) responden en vivo — falta diseñar las tablas propias y el sync para que esto se automatice, hoy solo se puede consultar a demanda. `[11/8/2026]` Este es el dato que falta para automatizar la regla (a) de la limpieza de alertas (3 años sin compra/ingreso) — ver SESIÓN 11/8/2026, sección 8, Etapa 2.
+12. ~~El límite de aprobación no distingue quién crea la orden.~~ **✅ HECHO 7/8/2026, detectado recién el 11/8** — commit `41febe8`, la misma tarde del hallazgo en vivo: `NuevaOC.jsx` exime a Aris (`esAdmin`) de cualquier control de aprobación. El commit está en producción desde entonces, pero nunca quedó registrado en este documento — se encontró al revisar el archivo el 11/8 por otro motivo (ver SESIÓN 11/8/2026).
+13. `[10/8/2026]` **NUEVO — Parte B de la papelera de Órdenes de compra**: poder editar una orden ya aprobada (ítems, cantidades, recalcular total), y desde ahí regenerar y reenviar por WhatsApp, dejando registro de "modificado por Aris". Decisión explícita de Federico: se construyó solo la Parte A (unificar pantalla, nombre del creador, orden con pendientes arriba, archivar/restaurar/eliminar) el 10/8; esto queda para diseñar con más tiempo porque toca montos e inventario y hoy no existe ninguna forma de editar una orden ya creada.
+14. ~~Cargar el código correcto de la masa Speedex en `composicion_articulos`.~~ **✅ HECHO 11/8/2026** — Aris confirmó la composición del combo `21081` (masa+light+activador); cargada con `INSERT ... WHERE NOT EXISTS` (migration `20260811000200`) y validada en vivo con `SELECT`. Ver SESIÓN 11/8/2026.
+15. ~~Deploy y validación en vivo de la limpieza de alertas (Etapa 1).~~ **✅ HECHO 11/8/2026** — `Alertas.jsx`, `Sidebar.jsx` y las 2 migraciones (`20260811000000`, `20260811000100`) en producción (commit `9146741`); validado en vivo con Chrome de punta a punta (badges, tabs Excluidos/Pausadas, modal de Excluir/Pausar). Ver SESIÓN 11/8/2026, sección 8.
+16. `[11/8/2026]` **NUEVO, Etapa 2 (futura, no urgente) — sincronizar `MOVIMIENTO_STOCK` desde YiQi** para automatizar la regla de "3 años sin compra/ingreso" de la limpieza de alertas, hoy resuelta con exclusión manual (ítem 14 de decisiones de negocio). Ligado al ítem 11 de esta lista.
+17. ~~Pedido de Aris — en "Nueva OC", poder agregar cualquier artículo del proveedor a mano.~~ **✅ HECHO 15/8/2026, deployado y validado en vivo** — commit `f1e416f`, migration `20260815160000_buscar_articulos_proveedor.sql` aplicada por Federico vía SQL Editor. Ver SESIÓN 15/8/2026, sección 6.
 
 ---
 
@@ -278,35 +320,37 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 
 | # | Qué decía | Qué encontré | Cómo lo verifiqué |
 |---|---|---|---|
-| D-1 | Tulkas registra el proyecto con repo `federicoaf79/dentalab-compras`, como si el código estuviera publicado | **No hay remoto configurado.** Un único commit (`db2b8f8`, instalación de skills). `frontend/` y `supabase/` untracked. Todo el proyecto vive en un solo disco sin backup | `[repo 2026-08-05]` `git remote -v` → vacío; `git log --oneline` → 1 línea; `git status --porcelain` → `?? frontend/`, `?? supabase/` |
-| D-2 | Este MD presenta la seguridad como resuelta ("Fase B: RLS real en Postgres", criterio 1 ✅ COMPLETO) | **La RLS está salteada por diseño.** Las 3 Edge Functions corren con `service_role` y ninguna valida al llamante. Lo que pase por ellas ignora las políticas | `[repo 2026-08-05]` `grep "getUser\|rol\|esAdmin"` en las 3 → ninguna validación; `yiqi-connector:234`, `admin-usuarios:121`, `sync-yiqi:422` crean el client con `SUPABASE_SERVICE_ROLE_KEY` |
+| D-1 | Tulkas registra el proyecto con repo `federicoaf79/dentalab-compras`, como si el código estuviera publicado | **No había remoto configurado.** Un único commit (`db2b8f8`, instalación de skills). `frontend/` y `supabase/` untracked. Todo el proyecto vivía en un solo disco sin backup | `[repo 2026-08-05]` `git remote -v` → vacío; `git log --oneline` → 1 línea; `git status --porcelain` → `?? frontend/`, `?? supabase/`. **✅ Resuelto 6/8/2026** — ver INFRAESTRUCTURA |
+| D-2 | Este MD presenta la seguridad como resuelta ("Fase B: RLS real en Postgres", criterio 1 ✅ COMPLETO) | **La RLS estaba salteada por diseño.** Las 3 Edge Functions corrían con `service_role` y ninguna validaba al llamante. Lo que pasaba por ellas ignoraba las políticas | `[repo 2026-08-05]` `grep "getUser\|rol\|esAdmin"` en las 3 → ninguna validación; `yiqi-connector:234`, `admin-usuarios:121`, `sync-yiqi:422` creaban el client con `SUPABASE_SERVICE_ROLE_KEY`. **✅ Resuelto y validado en vivo 7/8/2026** — ver VALIDACIÓN EN VIVO |
 | D-3 | Este MD no menciona en ningún lugar que falten migrations | **`supabase/migrations/` no existe, y no hay ni un `.sql` en todo el repo.** El repo no describe la base | `[repo 2026-08-05]` `ls supabase/migrations` → No such file; `find . -name "*.sql"` → 0 resultados |
-| D-4 | `dentalabs_Sup_KW.txt` figuraba en Tulkas 8 veces como riesgo abierto — pero sin confirmar si seguía vivo | **Sigue sin gitignorear y con la password de Postgres en claro.** Corregido en esta sesión (`.gitignore`), pero **la credencial ya estuvo expuesta y hay que rotarla** | `[repo 2026-08-05]` `git check-ignore dentalabs_Sup_KW.txt` → no ignorado; aparecía en `git status ??` |
+| D-4 | `dentalabs_Sup_KW.txt` figuraba en Tulkas 8 veces como riesgo abierto — pero sin confirmar si seguía vivo | **Sigue sin gitignorear y con la password de Postgres en claro.** Corregido en esta sesión (`.gitignore`), pero **la credencial ya estuvo expuesta y hay que rotarla** | `[repo 2026-08-05]` `git check-ignore dentalabs_Sup_KW.txt` → no ignorado; aparecía en `git status ??`. Rotación de credenciales sigue pendiente — Federico la hace directamente, Claude no maneja esas claves |
 | D-5 | Este MD (31/7) describe el estado del proyecto | **Hay trabajo del 2/8 que el MD no refleja**: `App.jsx`, `Sidebar.jsx`, `OrdenesPropias.jsx`, `pdfOrden.js`, `Empresa.jsx`, `TemplatesMensajes.jsx`, `CatalogoCausas.jsx`, `ReglasAlertas.jsx`. De ahí salen H-1 y H-2 | `[repo 2026-08-05]` `find -newermt "2026-07-31"` sobre `frontend/src` |
 
 ## NUEVO — apareció y no estaba documentado en ningún lado
 
 | # | Hallazgo | Evidencia |
 |---|---|---|
-| N-1 | **Copias `.bak` dentro de `supabase/functions/sync-yiqi/`** (`index.ts.bak`, `.bak2`). `supabase functions deploy` empaqueta el directorio entero: van al bundle de Deno en producción | `[repo 2026-08-05]` `find supabase/functions -name "*.bak*"` |
-| N-2 | **Los smartieId documentados en `yiqi-connector` son los viejos.** El comentario dice 2340/2341/2343 y los ejemplos usan 2341; el sync real usa 2344/2345/2346 | `[repo 2026-08-05]` `yiqi-connector/index.ts:45-47,385,390` vs `sync-yiqi/index.ts:379-381` |
-| N-3 | **`UsuariosAccesos.jsx:259` muestra un cartel falso al usuario**: "Esta asignación todavía no se aplica como filtro". El archivo es del 23/7, `usePermisos.js` del 31/7. Es el origen de los 4 riesgos falsos de H-1 | `[repo 2026-08-05]` `UsuariosAccesos.jsx:259` + fechas de mtime |
-| N-4 | **`UsuariosAccesos.jsx` no importa `usePermisos`** — es la única pantalla operativa sin gate de rol. Cualquier usuario logueado puede reasignar proveedores | `[repo 2026-08-05]` `grep esAdmin UsuariosAccesos.jsx` → 0 resultados; no figura en la lista de importadores de `usePermisos` |
-| N-5 | **Son 21 archivos `.bak`**, no 18 ni 19: 19 en `frontend/src` + 2 en `supabase/functions` | `[repo 2026-08-05]` `find -name "*.bak*"` |
-| N-6 | **La integración de Tulkas con GitHub está rota.** `get_commits(dentalab)` devuelve `Bad credentials`. Las auditorías de Tulkas **no están leyendo commits** — coherente con D-1 (no hay nada que leer) | `[tulkas 2026-08-05]` respuesta de la herramienta |
+| N-1 | **Copias `.bak` dentro de `supabase/functions/sync-yiqi/`** (`index.ts.bak`, `.bak2`). `supabase functions deploy` empaqueta el directorio entero: van al bundle de Deno en producción | `[repo 2026-08-05]` `find supabase/functions -name "*.bak*"`. **✅ Cerrado 10/8/2026** — ver PENDIENTE INMEDIATO #8 |
+| N-2 | **Los smartieId documentados en `yiqi-connector` son los viejos.** El comentario dice 2340/2341/2343 y los ejemplos usan 2341; el sync real usa 2344/2345/2346 | `[repo 2026-08-05]` `yiqi-connector/index.ts:45-47,385,390` vs `sync-yiqi/index.ts:379-381` — **sigue abierto, cosmético** |
+| N-3 | **`UsuariosAccesos.jsx:259` muestra un cartel falso al usuario**: "Esta asignación todavía no se aplica como filtro". El archivo es del 23/7, `usePermisos.js` del 31/7. Es el origen de los 4 riesgos falsos de H-1 | `[repo 2026-08-05]` `UsuariosAccesos.jsx:259` + fechas de mtime. `[chrome-live 2026-08-07]` confirmado que el cartel seguía en producción. **✅ Cerrado 10/8/2026** — commit `edce81b` |
+| N-4 | **`UsuariosAccesos.jsx` no importa `usePermisos`** — es la única pantalla operativa sin gate de rol. Cualquier usuario logueado puede reasignar proveedores | `[repo 2026-08-05]` `grep esAdmin UsuariosAccesos.jsx` → 0 resultados; no figura en la lista de importadores de `usePermisos`. **✅ Cerrado 10/8/2026** — gate `esAdmin` real agregado, commit `edce81b`. El backend ya rechazaba a no-admins desde el 7/8, así que esto era UX/defensa en profundidad, no una vulnerabilidad activa |
+| N-5 | **Son 21 archivos `.bak`**, no 18 ni 19: 19 en `frontend/src` + 2 en `supabase/functions` | `[repo 2026-08-05]` `find -name "*.bak*"`. **✅ Cerrado 10/8/2026** |
+| N-6 | **La integración de Tulkas con GitHub está rota.** `get_commits(dentalab)` devuelve `Bad credentials`. Las auditorías de Tulkas **no están leyendo commits** — coherente con D-1 (no había nada que leer) | `[tulkas 2026-08-05]` respuesta de la herramienta. Con el remoto ya creado (6/8), revisar si esto se resuelve solo o si falta configurar credenciales de Tulkas contra el nuevo repo |
 | N-7 | **Tulkas tiene 98 riesgos abiertos que son ~41 problemas reales.** 74 entradas son duplicados de 17 issues. El mismo problema entra con severidad distinta según la auditoría (los badges del sidebar están como CRITICAL y como LOW a la vez) | `[tulkas 2026-08-05]` agrupación de los 98 |
-| N-8 | **El Project de Claude "Módulo Compras Dentalab" está vacío** (0 docs, 0 archivos). El MD de contexto vive solo en el repo | `[claude-project 2026-08-05]` `project_info` |
+| N-8 | **El Project de Claude "Módulo Compras Dentalab" está vacío** (0 docs, 0 archivos). El MD de contexto vive solo en el repo | `[claude-project 2026-08-05]` `project_info`. **Resuelto** — este doc vive ahora en el Project |
 | N-9 | **`App.jsx:187` pasa `onLoginExitoso={() => {}}`** — prop muerta. El login funciona solo por el listener `onAuthStateChange` | `[repo 2026-08-05]` `App.jsx:187`, `Login.jsx:27` |
-| N-10 | **`ReglasAlertas.jsx:87-89` usa `Number()` sin validar** — un input vacío guarda 0 en `limite_aprobacion` en silencio | `[repo 2026-08-05]` `ReglasAlertas.jsx:87-89` |
+| N-10 | **`ReglasAlertas.jsx:87-89` usa `Number()` sin validar** — un input vacío guarda 0 en `limite_aprobacion` en silencio | `[repo 2026-08-05]` `ReglasAlertas.jsx:87-89` — **sigue abierto** |
 | N-11 | **No hay CI, ni tests, ni `.github/`** en el repo | `[repo 2026-08-05]` `ls .github` → no existe; `find "*.test.*"` → 0 |
+| N-12 | `[chrome-live 2026-08-07]` **`aprobacionPendiente` (de `contadores_sidebar()`) no se ve en el sidebar hoy.** `[corregido 11/8/2026]` El motivo real no es que falte cablearlo en la UI (`Sidebar.jsx` YA tiene `<Badge valor={aprobacionPendiente} clase="nb-blu" />` dentro del NavItem de Alertas) — es que la función de Postgres nunca devuelve un valor distinto de 0 hoy, porque el flujo de aprobación en dos pasos (Sprint 2) todavía no está construido. Confirmado leyendo `Sidebar.jsx` línea por línea el 11/8 | `[chrome-live 2026-08-07]` capturas + llamada directa a `contadores_sidebar()` vía RPC comparada contra el DOM del sidebar. `[repo 2026-08-11]` lectura completa de `Sidebar.jsx` |
+| N-13 | `[10/8/2026]` **Código muerto en `NuevaOC.jsx`**: el componente `ListaOrdenes` y las funciones `abrirOrden`/`decidir`/`enviarAAprobacion`/`borrarOrden` no tienen ningún botón que las invoque en la pantalla actual (la vista "lista" real es un selector de proveedor, `SelectorProveedor`). `decidir()`/`borrarOrden()` todavía usan `window.prompt`/`window.confirm` nativos — los mismos que se reemplazaron en `OrdenesPropias.jsx` el 10/8 — pero al ser código inalcanzable no hay riesgo activo para el usuario. Limpieza pendiente, no urgente | `[repo 2026-08-10]` `grep -n "ListaOrdenes\|abrirOrden\|onAbrir"` en `NuevaOC.jsx`: `ListaOrdenes` se define pero nunca se renderiza; `abrirOrden` se define pero nada la llama |
 
 ## CONTRADICCIONES
 
-**C-1 — Edge Functions: ¿validan sesión o no? — RESUELTA PARCIALMENTE.**
-Tulkas tiene las dos versiones: "no valida sesión del llamante" y "solo valida JWT válido, no rol de negocio". `[repo 2026-08-05]` En el código **no hay ninguna validación**: cero `getUser`, cero chequeo de rol en las 3 funciones. `config.toml` no declara `verify_jwt` por función, así que aplica el default de plataforma — que exige un JWT válido, **pero la anon key ES un JWT válido y es pública**. Las dos versiones son parcialmente ciertas y el efecto práctico es el mismo: cualquiera con la anon key entra. `[sin verificar]` Falta confirmar en prod si se desplegaron con `--no-verify-jwt`.
+**C-1 — Edge Functions: ¿validan sesión o no? — RESUELTA.**
+Tulkas tenía las dos versiones: "no valida sesión del llamante" y "solo valida JWT válido, no rol de negocio". `[repo 2026-08-05]` En el código **no había ninguna validación**: cero `getUser`, cero chequeo de rol en las 3 funciones. Las dos versiones eran parcialmente ciertas y el efecto práctico era el mismo: cualquiera con la anon key entraba. **✅ Cerrada 7/8/2026**: se agregó `supabase/functions/_shared/auth.ts` (`verificarLlamador()`) a las 3 funciones + CORS restringido a `ALLOWED_ORIGIN`. `[chrome-live 2026-08-07]` Validado en vivo contra producción: llamada solo con anon key → **401** en las 3 (`admin-usuarios`, `yiqi-connector`, `sync-yiqi`); llamada con la sesión real de Aris → **200**, devuelve los 4 usuarios reales correctamente.
 
-**C-2 — Tabla `proveedores`: ¿existe? — SIN RESOLVER.**
-Este MD dice "existe pero está vacía". Tulkas dice "sin tabla ni UI". `[repo 2026-08-05]` Ninguna pantalla la consulta, así que el repo no decide la cuestión. `[sin verificar]` Requiere prod. **Se deja escrita como contradicción.**
+**C-2 — Tabla `proveedores`: ¿existe? — RESUELTA.**
+Este MD decía "existe pero está vacía". Tulkas decía "sin tabla ni UI". `[repo 2026-08-06]` La tabla existe y ahora tiene UI (`CondicionesProveedor.jsx`). Sigue vacía de datos reales — eso pasa a ESPERA A OTRA PERSONA, ya no es una contradicción.
 
 **C-3 — Lógica de paginación duplicada: ¿6 o 7? — RESUELTA.**
 Tulkas dice "7 pantallas" en un riesgo y "6 componentes" en otro. `[repo 2026-08-05]` Son **7**: `Alertas`, `HistorialOC`, `MonitorStock`, `OrdenesCompra`, `Proveedores`, `SeguimientoOC`, `UsuariosAccesos`. La versión de 6 omitía `UsuariosAccesos.jsx`.
@@ -315,40 +359,418 @@ Tulkas dice "7 pantallas" en un riesgo y "6 componentes" en otro. `[repo 2026-08
 
 Cada uno de estos es un hallazgo, no un vacío:
 
-- **`supabase/migrations/`** — no existe. Tampoco hay ningún `.sql` en el repo.
+- **`supabase/migrations/`** — no existe. Tampoco hay ningún `.sql` en el repo. Sigue así al 7/8/2026.
 - **`schema.sql`** — un riesgo CRITICAL de Tulkas ("Bearer token YiQi sin encriptar") cita `schema.sql:15` como evidencia. **Ese archivo no existe.** El riesgo apunta a la línea de un archivo fantasma; la preocupación de fondo (token en claro en `yiqi_config`, sin Vault) sigue en pie pero `[sin verificar]`.
 - **`dentalab-compras-prototipo-v7.html`** — no existe. El archivo del repo es **v8**. Dos riesgos de Tulkas citan el v7 con números de línea.
 - **`NOMBRE_ART`** — 0 apariciones en `frontend/src`.
 - **`Fragment` / `<>` en `SeguimientoOC.jsx`** — 0 apariciones.
 - **Cualquier `POST` a `/ORDEN_DE_COMPRA`** — 0 apariciones. Solo la whitelist de lectura en `yiqi-connector/index.ts:57`.
-- **Código de Resend, WhatsApp o Puppeteer** — 0 líneas. Los dos riesgos HIGH de Tulkas ("Puppeteer incompatible con Deno", "dominio Resend sin verificar") son preocupaciones sobre código que **todavía no existe**. No son defectos; son requisitos del ítem 2 de PENDIENTE INMEDIATO.
-- **Remoto de git, CI, tests** — nada de eso existe.
+- **Código de Resend, WhatsApp o Puppeteer** — 0 líneas de integración automática. `[10/8/2026]` Matiz: sí existe un botón "Enviar por WhatsApp" en `NuevaOC.jsx` que arma un link `wa.me` con un template — abre WhatsApp con el texto ya cargado, pero el envío final lo hace la persona a mano, no es una API. Los dos riesgos HIGH de Tulkas ("Puppeteer incompatible con Deno", "dominio Resend sin verificar") siguen siendo preocupaciones sobre código que **todavía no existe** para el envío automático. No son defectos; son requisitos del ítem 2 de PENDIENTE INMEDIATO.
+- **Remoto de git, CI, tests** — el remoto ya no aplica (creado 6/8/2026). CI y tests siguen sin existir.
 
 ---
 
 # PENDIENTE INMEDIATO
 
-Ocho, por impacto.
+Nueve, por impacto — actualizado 10/8/2026 con lo ya cerrado.
 
-1. **Commitear todo y crear un remoto.** `[repo 2026-08-05]` Un solo commit, sin remoto, `frontend/` y `supabase/` untracked. Un disco que se rompe se lleva el proyecto entero. Es el riesgo más grande y el más barato de cerrar.
-2. **Rotar la password de Postgres y la anon key**, y sacar `dentalabs_Sup_KW.txt` del repo. El `.gitignore` ya lo cubre `[repo 2026-08-05]`, pero la credencial estuvo en claro en disco: ignorarla no la des-expone.
-3. **Autorización en las 3 Edge Functions.** `[repo 2026-08-05]` Corren con `service_role` sin validar al llamante. Mientras siga así, la RLS de Fase B no protege nada de lo que pase por ellas.
-4. **Capturar el baseline de migrations desde prod** → `scripts/capturar-baseline.ps1`. Sin esto el repo no describe la base y la próxima sesión vuelve a adivinar.
-5. **Verificar Fase B (RLS) en vivo** → `scripts/verificar-prod.ps1`, **logueado como Ivana en `https://dentalab-compras.vercel.app/login`** (no desde el SQL Editor: ahí `auth.uid()` es NULL). Es lo único que separa "el frontend filtra" de "los datos están protegidos".
-6. **Crear los usuarios reales** en Supabase Auth + su fila en `usuarios_config` (Aris y Ivana). Sin la fila el sistema falla cerrado y no ven nada.
-7. **Borrar el cartel falso de `UsuariosAccesos.jsx:259`** y agregarle gate de `esAdmin` a la pantalla (N-3 y N-4). Hoy miente al usuario y no restringe.
-8. **Limpiar los 21 `.bak`**, empezando por los 2 de `supabase/functions/sync-yiqi/` que se despliegan a producción (N-1).
+1. ~~Commitear todo y crear un remoto.~~ **✅ HECHO 6/8/2026** — `github.com/federicoaf79/dentalas_erp`, rama `main`, pusheado y confirmado por Federico.
+2. **Rotar la password de Postgres y la anon key**, y sacar `dentalabs_Sup_KW.txt` del repo. El `.gitignore` ya lo cubre `[repo 2026-08-05]`, pero la credencial estuvo en claro en disco: ignorarla no la des-expone. **Sigue pendiente** — es una acción que hace Federico directamente en el dashboard, Claude no maneja esas credenciales. `[decisión 10/8/2026]` **Federico decidió explícitamente NO rotarlas por ahora**: confirmó que la credencial nunca salió de su entorno. Distinto del Personal Access Token de la CLI (`sbp_...`), que sí quedó expuesto en el chat dos veces esta sesión y **fue revocado** — ver SESIÓN 10/8/2026.
+3. ~~Autorización en las 3 Edge Functions.~~ **✅ HECHO y validado en vivo 7/8/2026** — `verificarLlamador()` + CORS restringido, deployado, probado con anon-key-only (401 en las 3) y con sesión real (200). Ver contradicción C-1.
+4. **Capturar el baseline de migrations desde prod** → `scripts/capturar-baseline.ps1`. Sin esto el repo no describe la base y la próxima sesión vuelve a adivinar. **Sigue pendiente** — Federico lo corre localmente. `[10/8/2026]` Se intentó: el script en sí tenía un bug (no chequea el exit code, reportaba "Listo" con archivos de 0 bytes) y además `supabase db dump --linked` ahora **requiere Docker Desktop instalado y corriendo localmente** (dependencia nueva de versiones recientes de la CLI). Se pospuso — no es urgente, no bloqueaba nada más esta sesión (las funciones que hacía falta ver se sacaron directo por SQL Editor). Instalar Docker Desktop implica permisos de administrador; evaluar cuándo convenga hacerlo.
+5. **Verificar Fase B (RLS) en vivo** → `scripts/verificar-prod.ps1`, **logueado como Ivana en `https://dentalab-compras.vercel.app/login`** (no desde el SQL Editor: ahí `auth.uid()` es NULL). Es lo único que separa "el frontend filtra" de "los datos están protegidas". **Sigue pendiente** — no se corrió en ninguna sesión de agosto todavía.
+6. **Crear los usuarios reales** en Supabase Auth + su fila en `usuarios_config` (Aris y Ivana). Sin la fila el sistema falla cerrado y no ven nada. **✅ Parcialmente hecho** — ambas cuentas ya existen y resuelven rol correctamente (validado 7/8/2026). Falta que Aris inicie sesión con la suya al menos una vez.
+7. ~~Borrar el cartel falso de `UsuariosAccesos.jsx:259` y agregarle gate de `esAdmin` a la pantalla (N-3 y N-4).~~ **✅ HECHO 10/8/2026** — commit `edce81b`: gate `esAdmin` real (bloqueo total de contenido, no solo deshabilitar botones) + cartel corregido. Validado con esbuild. El backend ya rechazaba a no-admins desde el 7/8, así que esto cerraba UX/defensa en profundidad, no una vulnerabilidad activa.
+8. ~~Limpiar los 21 `.bak`, empezando por los 2 de `supabase/functions/sync-yiqi/` que se despliegan a producción (N-1).~~ **✅ HECHO 10/8/2026** — movidos a `_to_delete/` (incluidos los 2 de `sync-yiqi/`); confirmado que `sync-yiqi/` quedó con solo `index.ts`. El mecanismo exacto de la limpieza final tuvo un detalle no del todo diagnosticado (ver SESIÓN 10/8/2026), pero el estado final (cero `.bak` en el repo) se verificó de forma independiente.
+9. ~~Borrar o marcar las OC de prueba creadas en producción.~~ **✅ HECHO 10/8/2026, con una corrección importante en el camino:** se construyó una papelera reversible en `OrdenesPropias.jsx` (archivar → restaurar o eliminar definitivamente) en vez de un DELETE directo. Se archivaron **#3 (BERNABO) y #4 (QUINTANA ANA MARIA)** — las únicas confirmadas como prueba del 7/8. Se había asumido en un momento de esta misma sesión que **#6 y #7 (DENTAL MEDRANO) también eran de prueba — eso era incorrecto** y se corrigió antes de tocar nada: se verificó en vivo que DENTAL MEDRANO es proveedor real (código 3, 1.811 artículos en `material_yiqi`, con stock actual) y que las OC #2, #5, #6, #7 fueron creadas por Ivana y Aris (columna "Creada por", nueva) en el uso real del sistema. Ninguna de esas cuatro se tocó. Detalle completo en SESIÓN 10/8/2026, sección 7.
+10. ~~Deployar y validar en vivo la limpieza de alertas (Etapa 1).~~ **✅ HECHO 11/8/2026** — `git push` (commit `9146741`) + `vercel --prod` confirmados; validación en vivo con Chrome (baseline 2603/450/3053, ciclos completos de pausar/reactivar y excluir/restaurar sobre SKU 1107, sin datos de prueba residuales). Ver SESIÓN 11/8/2026, sección 8.
 
 # ESPERA A OTRA PERSONA
 
 | Qué se necesita | De quién | Desde cuándo | Qué bloquea |
 |---|---|---|---|
-| Condiciones comerciales de los 15-20 proveedores principales (mínimo de compra, plazo, descuentos, mail/WhatsApp de pedidos) | **Aris** | 31/7/2026 | Una de las dos causales de OC provisoria. Es lo más bloqueante del lado del cliente |
+| Condiciones comerciales de los 15-20 proveedores principales (mínimo de compra, plazo, descuentos, mail/WhatsApp de pedidos) | **Aris** | 31/7/2026 | Cargar los datos en `CondicionesProveedor.jsx` (el diseño — reglas por perfil de proveedor — ya está confirmado y cerrado, decisión de negocio #13). Es lo más bloqueante del lado del cliente |
 | Confirmar que el **módulo Compras está activo en la licencia de YiQi** | **Aris** / soporte YiQi | desde el inicio del proyecto | `POST /ORDEN_DE_COMPRA` — criterio 5 del MVP. Sin esto no se puede ni probar |
 | Decisión sobre las smarties: avisar al equipo vs. crear usuario `sistema@dentalab.com.ar` con Integrador | **Aris** | 31/7/2026 (tras el incidente de la 2344) | Que se repita la pérdida de columnas en los 7.173 artículos |
-| Lista de composición de combos ML (49) y fraccionados (`-F`, 234) | **Aris** | 31/7/2026 | El cálculo de consumo promedio; hoy sugiere comprar de menos |
-| ¿Límite de aprobación por proveedor, o sigue global en $1.000.000? | **Aris** | 31/7/2026 | Ítem 8 del roadmap |
+| ~~Lista de composición de combos ML (49) y fraccionados (`-F`, 234)~~ | **Aris** | 31/7/2026 → **respondido y cargado 8-11/8/2026** | **✅ Resuelto por completo** — 44 filas cargadas en `composicion_articulos` (41 del 10/8 + 3 del combo Speedex `21081` confirmado por Aris el 11/8), integradas al cálculo |
+| ~~¿Límite de aprobación por proveedor, o sigue global en $1.000.000?~~ | **Aris** | 31/7/2026 → **respondido y implementado 7/8/2026** | **✅ Resuelto por completo** — el límite es sobre Ivana; Aris confirma cualquier orden directo (commit `41febe8`) |
 | ¿Se corrige el −58 de "En tránsito" del SKU 1002 en YiQi? | **Aris** | 31/7/2026 | Nada crítico; queda como dato sucio |
 | Qué significa el campo **Asunto** de las OC (29 de 55 dicen "Listo- dsps borrar contenido") | **Ivana** | 31/7/2026 | Convertirlo en estado del pedido, si es que lo es |
 | Validación del catálogo de causas y de su rutina diaria de pedidos | **Ivana** | 31/7/2026 | Ajuste fino del flujo operativo |
 | **Capacitación** (1 hora) | **Ivana** | pendiente, sin fecha | Criterio 7 del MVP — el último que falta para cerrar el contrato |
+| **Feedback del testeo del sitio** — Federico les mandó la guía de testeo (Word, 11/8/2026: qué está construido, qué probar esta ronda — alertas, condiciones comerciales, WhatsApp —, qué no hace todavía, y qué datos cargar) | **Aris** e **Ivana** | 11/8/2026 | Saber si algo de lo construido no funciona como esperan antes de seguir avanzando |
+| ~~Crear en YiQi una smartie (vista guardada) para "Stock por Depósito" y otra para "Movimientos de Stock"~~ | **Federico** | 11/8/2026 → **hecho 14/8/2026** | **✅ Resuelto.** `Z.API_Stock_Por_Deposito_NO_BORRAR` (smartieId **2360**, entidad `STOCK`, pivot SKU × Ubicación con Cantidad) y `Z.API_Movimientos_Stock_NO_BORRAR` (smartieId **2359**, entidad `MOVIMIENTO_STOCK`, sin pivot) creadas y guardadas con prefijo `Z.` para no ensuciar la lista de vistas. Ver SESIÓN 14/8/2026 |
+| **Confirmar si Acritone/NewcryL son productos activos o descontinuados** — el documento nuevo de Aris dice que se manejan 100% en local con alta disponibilidad; la sesión del 10/8 los había anotado como descontinuados (mismo criterio que BM4) | **Aris** | 11/8/2026 | Posible contradicción sin resolver — no se asumió ninguna de las dos versiones. Ver `ARIS_Especificacion_Reposicion_Interna_y_Produccion.md` |
+| ~~Regenerar el token de integración con YiQi (`POST /token` con las credenciales de la cuenta de integración) y cargarlo en `yiqi_config`~~ | **Federico** | 14/8/2026 → **hecho el mismo día** | **✅ Resuelto.** Token nuevo generado (265 caracteres) y cargado en `yiqi_config`; sync probado en vivo (7185 filas de MATERIAL) y confirmado en el Monitor de Stock. Ver SESIÓN 14/8/2026 |
+
+---
+
+# VALIDACIÓN EN VIVO 7/8/2026
+
+**Contexto:** tras crear el repo remoto (6/8) y cerrar el hueco de autorización en las 3 Edge Functions (deploy `3ef2edc` + `supabase functions deploy`), y tras deployar el fix del badge del sidebar (commit `c0ea403`, subido a Vercel por Federico), se validó todo en vivo contra **producción** (`https://dentalab-compras.vercel.app`) usando Claude in Chrome, logueado como Aris.
+
+**Metodología de acá en adelante (instrucción explícita de Federico):** revisar siempre lo hecho antes de cambiar algo, no romper nada, validar cada construcción — en vivo cuando aplica — y priorizar gaps de seguridad/vulnerabilidades.
+
+## Qué se validó
+
+1. **Fix del badge (`c0ea403`) — deployado y sin errores, con un matiz importante.**
+   - `[chrome-live 2026-08-07]` Se confirmó que el bundle de producción (`index-CQKK2wJ0.js`) contiene el wiring `onCambioOrdenes` (evidencia de que el commit está desplegado).
+   - Se creó una OC de prueba (#3, BERNABO, $1.174.573 — supera el límite de $1.000.000) → quedó "Esperando aprobación de Aris" → se aprobó sin recargar la página → la lista de "Órdenes de compra" pasó de `Esperando aprobación (1)` a `(0)` **instantáneamente, sin F5**.
+   - Se creó una segunda OC de prueba (#4, QUINTANA ANA MARIA, ~$3.413 — dentro del límite) → se auto-confirmó directo.
+   - **Matiz:** el badge numérico del sidebar junto a "Órdenes de compra" (`ocsActivas`) **no cambió** en ningún momento de la prueba (se mantuvo en 51). Se verificó con una llamada directa a `contadores_sidebar()` que el valor mostrado siempre coincidió con el valor real en base — es decir, no hubo staleness, pero tampoco se pudo observar el badge "subir" porque `ocsActivas` cuenta únicamente OC en estado `Enviada`, y **ninguna OC nueva llega hoy a ese estado** (el paso de envío al ERP/proveedor no está construido — lo dice el propio banner de la pantalla). Y `aprobacionPendiente` (que sí hubiera reflejado la OC #3 mientras esperaba aprobación) sí está cableado en el sidebar (badge azul, ver corrección de N-12), pero como siempre valió 0 en esa prueba puntual (la OC ya se había aprobado para cuando se revisó), no se vio "subir" en esa validación puntual.
+   - **Conclusión:** el fix está deployado y funcionando (confirmado a nivel código y a nivel de la lista de "Esperando aprobación" que sí se refresca sola). No se pudo reproducir visualmente el síntoma original exacto ("el badge no bajaba") porque, con los datos de prueba disponibles, ese contador específico no varía todavía por diseño del flujo actual. Si el síntoma que reportaron era otro (por ejemplo el badge de "Seguimiento de OC"), avisar para probarlo puntualmente.
+
+2. **Autorización de las 3 Edge Functions — sin regresión tras el último deploy.**
+   - `admin-usuarios`, `yiqi-connector`, `sync-yiqi`: llamada con **solo la anon key** (sin sesión) → **401 "Sesión inválida o vencida"** en las 3.
+   - `admin-usuarios?accion=listar` con la sesión real de Aris → **200**, devuelve los 4 usuarios reales.
+   - Sin errores de consola durante todo el flujo.
+
+3. **Hallazgo de negocio (no técnico):** Federico aclaró en esta sesión que el límite de aprobación es sobre Ivana, no sobre Aris — y la prueba en vivo mostró que en ese momento el código no hacía esa distinción. `[actualización 11/8/2026]` Se corrigió esa misma tarde del 7/8 (commit `41febe8`), fuera de esta sesión — el hallazgo quedó cerrado el mismo día en que se abrió, pero el documento nunca se actualizó para reflejarlo hasta que se encontró el commit el 11/8. Ver DECISIONES DE NEGOCIO CONFIRMADAS POR ARIS #11 y SESIÓN 11/8/2026.
+
+## Qué quedó pendiente de esta validación
+
+- Confirmar el próximo tick automático del cron de `sync-yiqi` (jobid 3, cada 15 min) o revisar logs de la función, para el 100% de certeza de que el token de `pg_cron` sigue funcionando tras el redeploy.
+- ~~Borrar o marcar como prueba las OC #3 y #4 (PENDIENTE INMEDIATO #9).~~ **✅ HECHO 10/8/2026.**
+- Decidir la implementación del ítem 12 (Aris sin límite de aprobación).
+
+
+---
+
+# SESIÓN 10/8/2026
+
+**Contexto:** mientras se esperaban las últimas respuestas de Aris (kit Speedex, BM4, Abrebocas), se avanzó todo lo posible del lado técnico. Instrucción explícita de Federico para la sesión: *"quiero precisión y certezas de que todo se hace bien"* — no asunciones.
+
+## 1. UI — modal propio reemplaza diálogos nativos
+
+`OrdenesPropias.jsx`: los `window.prompt()`/`window.confirm()` nativos (aprobar/rechazar/borrar OC) se reemplazaron por un modal propio, con los mismos tokens visuales del resto de la app. Commit `ac7cf7a`. Validado en vivo: se aprobó la OC #7 y el badge de "Alertas" desapareció sin recargar.
+
+## 2. Fix de deploy de Vercel
+
+`vercel --prod` tiene que correrse **desde la raíz del repo** (`C:\dentalab-compras`), no desde `frontend\` — el Root Directory ya está configurado en el proyecto de Vercel. Corriéndolo desde `frontend\` fallaba.
+
+## 3. Tabla `composicion_articulos` — creada, con RLS, y poblada
+
+Resuelve el gap documentado desde el 31/7 ("Composición de combos y conversión de fraccionados"): el consumo se registraba sobre el código que aparece en la venta (ej. "245-F", o una publicación de ML como "251"), pero lo que hay que comprar es otro código, en otra proporción.
+
+- **Migration `20260810000000`**: crea la tabla (`codigo_padre`, `codigo_componente`, `cantidad`, `tipo`, `nota`) + 41 filas cargadas, cruzando las respuestas de Aris por WhatsApp contra `PEDIDO_Aris_combos_y_presentaciones.docx`, con **cada código verificado en vivo contra `material_yiqi`** antes de cargarlo (no se asumió ningún código de memoria).
+- **Migration `20260810000100`**: la primera corrida dejó la tabla sin RLS ni GRANT (Supabase no lo hace automático en tablas creadas por SQL crudo) — devolvía `200 OK` con array vacío para cualquier consulta. Se detectó por validación en vivo, no se asumió que "corrió bien" = "funciona". Se agregó: lectura abierta a cualquier usuario logueado, escritura restringida a `es_admin()`. Validado: 41 filas visibles (7 fraccionados + 34 combos).
+
+## 4. Bloque 1 — integración en el cálculo real, con validación matemática
+
+Se obtuvo el código real de `sugerencias_compra()` e `historial_ventas()` vía SQL Editor (no se asumió su contenido) y se modificó el `CTE` que agrupa ventas en ambas para traducir código vendido → código a comprar, vía `composicion_articulos`, antes de calcular promedios. Migration `20260810120000`.
+
+Detalles de diseño:
+- Códigos sin fila en `composicion_articulos` siguen contándose igual que antes (multiplicador 1) — sin cambio de comportamiento para el 99% de los artículos.
+- Combos con varios componentes (ej. "251" → 7 colores) expanden una venta en varias líneas de demanda.
+- Filas con `cantidad` NULL (ej. "244-F", "según necesidad") quedan excluidas del cálculo automático, tal como pidió Aris.
+- En `historial_ventas()` se agregó además una pre-agregación por (código, mes) **antes** de armar el JSON mensual — si no, un componente con ventas directas + traducidas en el mismo mes perdía una de las dos silenciosamente por colisión de clave en `jsonb_object_agg`. Se detectó por revisión de la lógica, no en producción.
+- `proveedor` en `historial_ventas()` pasó a salir de `material_yiqi.clie_nombre` (antes venía de la venta original) — decisión confirmada con Federico, porque para un código traducido el proveedor real del componente puede no coincidir con el de la venta de la publicación.
+
+**Validación en vivo (SQL Editor, no solo "corrió sin error"):**
+- Para "245": venta directa (6u) + venta traducida de "245-F" (386 × 0.05 = 19.3) = 25.3 exacto — coincide con lo que devuelve `historial_ventas()`.
+- Prueba aislada (sin tocar datos reales): una venta simulada del combo "251" se expandió correctamente en las 7 filas de color con la cantidad multiplicada bien; un código sin mapeo pasó igual (multiplicador 1); "244-F" quedó excluido.
+- Los 3 caminos de la lógica (passthrough, combo, exclusión por NULL) quedaron probados con certeza matemática, no solo revisión de código.
+
+**Pendiente:** correr `git push` — quedaron 3 commits locales sin subir a `origin/main` (`326047d`, `5cb1d53`, `a139f47`).
+
+## 5. Supabase CLI — bug de persistencia de token resuelto
+
+`capturar-baseline.ps1` fallaba con `supabase projects list` mostrando siempre "Comunas MVP"/"Curex Lat" en vez de "Dentalabs", pese a que el dashboard (navegando directo) confirmaba a `federico@tulkasmedia.com` como **Owner** de Dentalabs/UrbanTales. Cadena de causas encontradas y cerradas, en orden:
+
+1. Una variable de entorno `SUPABASE_ACCESS_TOKEN` persistente a nivel Usuario en Windows, con un token viejo de otra cuenta, pisaba cualquier login nuevo. Se detectó y se limpió (`[Environment]::SetEnvironmentVariable(...,"User")`).
+2. **CLI duplicada**: instalada por Scoop y por npm a la vez; Windows resolvía siempre la de Scoop, que estaba en v2.104.0 (con un bug real de no persistir el token tras el login). Se actualizó a v2.113.0 con `scoop update supabase`. Pendiente, sin apuro: desinstalar la copia de npm (`npm uninstall -g supabase`) para evitar ambigüedad futura.
+3. Con la CLI actualizada, `supabase login` + `projects list` ya muestra "Dentalabs" correctamente, linkeado (●).
+
+⚠️ **Nuevo hallazgo de seguridad, ya cerrado:** en el proceso de diagnóstico se expuso en el chat un Personal Access Token real (`sbp_c5823cc445a5c4b7e9b68155f5f8b6...`, visible en una captura de pantalla). **Fue revocado por Federico** — confirmado el 10/8/2026.
+
+## 6. Respuestas finales de Aris — verificadas en vivo, no asumidas
+
+- **BM4 Power Bleaching** (`6527-2`, `6539-2`): confirmado discontinuado ("no lo trabajamos más"). Excluido del sistema, mismo criterio que Acritone/NewcryL — no necesita fila en `composicion_articulos`.
+- **Abreboca `40-2`**: la publicación de ML ya no existe (confirmado por Federico). Sin fila necesaria.
+- **Abreboca `41-2`**: confirmado por Aris que no se usa más, mismo tratamiento. Verificado además en vivo que no existe ningún código "41" base ni variantes `41-M`/`41-L` en `material_yiqi` — el único código relacionado en todo el sistema es `41-2`, sin proveedor asignado.
+- **Kit Speedex** (`21087`): Aris dio los códigos `21082`, `21084`, `21085`. Verificado en vivo: `21084` = "Silicona Speedex Light...140ml" ✅ y `21085` = "Silicona Speedex Activador Universal...60ml" ✅ existen. **`21082` (la masa) NO existe en `material_yiqi`** — único punto que sigue abierto. Federico ya le envió la pregunta a Aris; sin responder al cierre de esta sesión. `[11/8/2026]` Continúa en SESIÓN 11/8/2026.
+
+## 7. Papelera reversible para Órdenes de compra
+
+Más tarde el mismo 10/8, mientras se cerraba el Bloque 6 (limpiar OC de prueba), Federico pidió algo más amplio: unificar la gestión de Órdenes de compra en una sola pantalla ordenada por fecha, mostrar quién creó cada orden, priorizar las pendientes de aprobar arriba de todo, y reemplazar cualquier borrado directo por un archivado reversible ("tacho de basura" → papelera → restaurar o eliminar definitivo, con la posibilidad futura de editar y reenviar).
+
+Se dividió el pedido en dos partes con Federico — decisión suya, explícita:
+- **Parte A (hoy):** unificar pantalla, nombre del creador, orden con pendientes arriba, archivar/restaurar/eliminar.
+- **Parte B (otra sesión):** editar una orden ya aprobada y reenviarla por WhatsApp con registro de "modificado por Aris" — no se tocó, toca montos e inventario y merece diseño propio. Ver "LO QUE SIGUE" ítem 13.
+
+**Antes de tocar código** se revisaron `OrdenesPropias.jsx` y `NuevaOC.jsx` completos y se encontraron tres cosas que cambiaron el plan:
+- `NuevaOC.jsx` tiene una implementación duplicada de lista/aprobación de OC (`ListaOrdenes`, `decidir`, `borrarOrden`, con `window.prompt`/`window.confirm` nativos) que resultó ser **código muerto** — inalcanzable desde la UI actual. No se tocó (fuera de alcance), ver N-13.
+- "Enviar por WhatsApp" ya existe, pero solo al crear una orden nueva: arma un link `wa.me` con un template, no envía nada automáticamente.
+- `creada_por` se guardaba desde siempre pero nunca se mostraba en ninguna pantalla.
+
+**Migration `20260810150000`:**
+- `ordenes_propias` suma `archivada_en` / `archivada_por` — no se tocó la columna `estado` existente, para no arriesgar el circuito de aprobación real que ya depende de sus 4 valores exactos en dos archivos distintos.
+- Función `nombres_usuarios(uuid[])` — `SECURITY DEFINER`, mismo patrón que `es_admin()`/`mis_codigos_proveedor()` — porque `usuarios_config` tiene RLS por usuario y el frontend no puede leer el nombre de otro usuario por join directo.
+- Corrida por Federico vía SQL Editor ("Success. No rows returned").
+
+**Frontend (`OrdenesPropias.jsx`):**
+- Columna "Creada por" (resuelta vía la función nueva).
+- Orden: pendientes de aprobar siempre arriba, resto por fecha de creación descendente.
+- Tacho 🗑 (solo admin) en cada fila de la vista activa → archiva, reversible. Pestaña "🗑 Papelera" (solo admin) → "Restaurar" o "Eliminar definitivamente" (esto sí irreversible, con modal de confirmación nuevo, distinto del modal de borrar-borrador que ya existía).
+- Validado con esbuild antes de entregar. Commit `fa39d48`, pusheado y deployado a producción por Federico (`vercel --prod`).
+
+**Validado en vivo (Chrome, logueado como Aris) después del deploy:**
+- Columna "Creada por" mostró correctamente **Ivana** (OC #7, #6, #2) y **Aris** (OC #5, #4, #3) — confirma que `nombres_usuarios()` funciona.
+- Se archivaron en vivo **OC #3 y #4** (único par confirmado como prueba) con el tacho nuevo: "Órdenes (6)"→"(4)", "Papelera (0)"→"(2)", mensaje de confirmación en pantalla, ambas reaparecieron en la pestaña Papelera con "Restaurar"/"Eliminar definitivamente" disponibles.
+- **No se tocaron** OC #2 (BUDA PABLO, creada por Ivana), #5, #6, #7 (DENTAL MEDRANO, creadas por Ivana y Aris). Dato importante: en esta misma sesión se había asumido en un momento que #6/#7 también eran de prueba del 7/8 — **esa asunción era incorrecta**, y se corrigió antes de archivar nada: se verificó en vivo contra `material_yiqi` y `ordenes_yiqi` que DENTAL MEDRANO (código 3, 1.811 artículos, con stock actual en Monitor de Stock) y BUDA PABLO (código 242, 4 OC históricas reales en `ordenes_yiqi`) son proveedores reales y activos, y que esas 4 órdenes las crearon Ivana y Aris en el uso normal del sistema.
+
+## Pendientes para la próxima sesión
+
+1. ~~Código de la masa del kit Speedex (Aris dio "21082", no existe).~~ **✅ Cerrado 11/8/2026** — Aris confirmó la composición del combo `21081` (masa `21083` + light `21084` + activador `21085`); cargado en `composicion_articulos`. Ver SESIÓN 11/8/2026.
+2. `scripts/verificar-prod.ps1` logueado como Ivana (Fase B / RLS) — PENDIENTE INMEDIATO #5. Requiere el login real de Federico/Ivana, Claude no maneja esas credenciales.
+3. **Código muerto en `NuevaOC.jsx`** (N-13) — no es urgente, no afecta producción, pero conviene limpiarlo para que no confunda a una futura sesión (tiene `window.prompt`/`window.confirm` que parecen vigentes y no lo están).
+4. Capturar el baseline con `capturar-baseline.ps1` una vez que se instale Docker Desktop (no urgente).
+5. Desinstalar la copia duplicada de la CLI de Supabase vía npm (`npm uninstall -g supabase`), no urgente.
+6. **Parte B de la papelera de Órdenes de compra** (ver "LO QUE SIGUE" ítem 13): editar una orden ya aprobada, recalcular el total, regenerar y reenviar por WhatsApp, con registro de "modificado por Aris". Funcionalidad nueva — no se abordó esta sesión a propósito (decisión explícita de Federico: solo Parte A hoy).
+
+---
+
+# SESIÓN 11/8/2026
+
+**Contexto:** Federico aclaró que la masa del kit Speedex ya no se vende en la presentación chica (la del kit trial de MercadoLibre, código `21087`, 362g) — hoy se vende la presentación grande u otra presentación existente. Esto apunta a resolver el único punto pendiente de la integración de `composicion_articulos` del 10/8 (el código "21082" que había dado Aris nunca existió en `material_yiqi`).
+
+**Investigación en vivo (SQL Editor, `material_yiqi`, proveedor DENTAL MEDRANO):**
+
+| Código | Nombre | Stock |
+|---|---|---|
+| 21081 | COMBO - Silicona Speedex Combo Kit Putty 1.48kg + Light + Activador | 485 |
+| 21083 | Silicona Speedex Putty Masa COLTENE 1.48kg | 157 |
+| 21084 | Silicona Speedex Light (Liviana 7 días) COLTENE x 140ml | 314 |
+| 21085 | Silicona Speedex Activador Universal COLTENE 60ml | 863 |
+| 21087 | ### MercadoLibre SILICONA SPEEDEX TRIAL KIT MASA 362G + Light 60ml + Activador 40ml | **0** |
+
+El kit de MercadoLibre (`21087`, el que tiene la masa chica de 362g) tiene **stock 0** — coherente con que Federico confirmó que esa presentación ya no se vende. La masa en presentación grande es `21083` ("Masa COLTENE 1.48kg"), que además coincide en tamaño con el combo `21081` (también 1.48kg). Conclusión técnica: **`21083` es el candidato correcto** para reemplazar el código inexistente `21082` que había dado Aris como componente del kit en `composicion_articulos`.
+
+**Decisión de Federico (en el momento):** dejarlo anotado como pendiente de validación explícita — no cargar el código en `composicion_articulos` todavía. Se le pidió confirmación directa a Aris antes de tocar la tabla, siguiendo el criterio de la sesión de no asumir datos de negocio sin que el cliente los confirme, aun cuando la evidencia técnica ya fuera consistente.
+
+**✅ Confirmado y cargado, más tarde el mismo 11/8/2026.** Aris contestó: **"21081 = 21083+21084+21085"** — no sobre `21087` (el kit chico, ya confirmado que no se vende más), sino sobre `21081` (el combo grande, "COMBO - Silicona Speedex Combo Kit Putty 1.48kg + Light + Activador"), la presentación que sí se vende hoy. La respuesta confirma exactamente lo que había encontrado la investigación técnica: `21083` = masa, `21084` = light, `21085` = activador.
+
+Antes de escribir el `INSERT` se le pidió a Federico una muestra de las filas de combos ya cargadas (`select ... where tipo = 'combo' limit 5`) para no adivinar el formato — confirmó que `cantidad` es la unidad de cada componente por combo y `tipo='combo'`. Con eso se armó la migration **`20260811000200_agregar_combo_21081_speedex.sql`**: un `INSERT ... WHERE NOT EXISTS` (idempotente, no duplica si se corre dos veces) que agrega las 3 filas de `21081` sin tocar `21087` — esa fila queda con su componente inválido (`21082`) sin corregir, a propósito, porque el SKU está discontinuado y no afecta ningún cálculo real.
+
+Corrida por Federico vía SQL Editor ("Success. No rows returned") y **validada en vivo** con `select ... where codigo_padre = '21081'`: devolvió las 3 filas esperadas (`21083` masa, `21084` light, `21085` activador), cada una con `cantidad=1` y la nota descriptiva correcta.
+
+**Gap de "Composición de combos y conversión de fraccionados" cerrado por completo** — `composicion_articulos` queda en 44 filas.
+
+**No se tocó ninguna otra tabla ni migration en esta parte de la sesión.**
+
+## 8. Limpieza de alertas — Etapa 1
+
+**Contexto:** más tarde el mismo día, Federico compartió capturas del Monitor de Stock en producción mostrando **2603 alertas críticas + 450 preventivas = 3053 en total**, y pidió reducir el ruido con dos reglas: (a) dejar de contar alertas de artículos que hace 3 años no se compran o no tienen ingresos de mercadería (sin borrarlos — se dejaron de fabricar, cambiaron de SKU, lo que hay en stock son saldos, etc.), y (b) poder pausar la alerta de faltante de un proveedor puntual, con un recordatorio a los 15 días para revisar si sigue en el mismo estado. También corrigió que "condiciones comerciales" ya es una decisión de diseño cerrada (reglas por perfil de proveedor), no un punto abierto — ver decisión de negocio #13.
+
+**Por qué había 3053 alertas:** `Alertas.jsx` (`calcularAlerta()`) y `contadores_sidebar()` calculaban el nivel de alerta puramente por stock vs. umbral, **sin ningún filtro** — a diferencia de `sugerencias_compra()`, que ya excluye Mercado Libre, discontinuados (por patrón de nombre) y producción propia vía `es_comprable()`.
+
+**Investigación de qué datos existen** antes de proponer una solución (no se asumió que "3 años sin compra" fuera algo que ya se pudiera calcular):
+- `material_yiqi` es un espejo puro de stock (confirmado releyendo `mapearMaterial()` en `sync-yiqi/index.ts`) — no tiene fecha de última compra ni de último ingreso.
+- `ordenes_yiqi` tiene fecha, pero son solo ~55 OC / ~291 líneas recientes (smartie "API_OC_Recientes") — insuficiente para una ventana de 3 años.
+- `MOVIMIENTO_STOCK` (25.302 registros de ingresos) tiene lo que hace falta, pero no está sincronizado — ya estaba identificado como pendiente futuro (ítem 11 de "LO QUE SIGUE").
+- No existe en ningún lado del esquema un mecanismo de "excluido"/"discontinuado" — confirmado con grep de todo el repo (`.sql`/`.ts`/`.jsx`) y revisando las 4 migrations existentes.
+
+**Diseño acordado con Federico** (4 rondas de `AskUserQuestion`, resumidas):
+1. Fuente de datos para la regla de 3 años → **las dos, en etapas**: exclusión manual ahora (Etapa 1), sincronizar `MOVIMIENTO_STOCK` más adelante (Etapa 2, ligada al ítem 11/16 de "LO QUE SIGUE").
+2. Alcance de la pausa → **por artículo** (SKU puntual, no por proveedor completo).
+3. Tipo de aviso a los 15 días → **aviso activo** (badge en el sidebar), no solo que la alerta reaparezca en silencio.
+4. Sin integración de email/WhatsApp todavía → **badge/banner en la app** (no esperar a esa infraestructura).
+
+Con el "dale" de Federico, se construyó la **Etapa 1**:
+
+**Base de datos** (2 migraciones, corridas por Federico vía SQL Editor, "Success. No rows returned" en las dos, validadas en vivo):
+- `20260811000000_alertas_exclusion_pausa.sql` — crea `articulos_excluidos_alertas` (SKU + motivo obligatorio + quién + cuándo; RLS: lectura para cualquier logueado, escritura solo admin — mismo criterio que `reglas_compra`/`composicion_articulos`, porque afecta el conteo de todos) y `alertas_pausadas` (SKU + motivo opcional + quién + cuándo + `reactivar_en`; RLS: lectura y escritura abiertas a cualquier logueado, porque pausar es una acción operativa del día a día, no una decisión de negocio). `reactivar_en` **no** se hizo con `GENERATED ALWAYS AS` (Postgres lo rechazó: error `42P17`, sumar un `interval` a un `timestamptz` no es IMMUTABLE por el cambio de horario de verano) — se resolvió con un trigger `BEFORE INSERT OR UPDATE` que siempre recalcula `reactivar_en = pausada_en + 15 días`, sin depender de lo que mande el frontend.
+- `20260811000100_integrar_exclusion_pausa_en_contadores.sql` — `CREATE OR REPLACE` completo de `contadores_sidebar()` (se obtuvo el cuerpo exacto vía `pg_get_functiondef` antes de tocarla, no se asumió nada): la CTE `mat` ahora descarta los códigos excluidos y los pausados vigentes (`reactivar_en > now()`); se agregó la CTE `pausadas_vencidas` y la clave `alertasPausadasVencidas` al jsonb de salida. `oc`, `oc_estado` y `propias` quedaron sin ningún cambio.
+- **No se tocó `es_comprable()`**: recibe nombre/proveedor, no el código del artículo — no puede consultar estas tablas nuevas sin cambiarle la firma y tocar `sugerencias_compra()`, que es otra pantalla y ya funciona bien.
+- **Validado en vivo** con `select contadores_sidebar();` después de las dos migraciones: `alertasCriticas: 2603, alertasPreventivas: 450` (exactamente los mismos números que las capturas de producción, porque las tablas nuevas estaban vacías), `alertasPausadasVencidas: 0` (clave nueva, presente y en 0), resto de los contadores sin cambios.
+
+**Frontend** (`Alertas.jsx` reescrito a v4, `Sidebar.jsx` con un campo nuevo; ambos validados con esbuild, entregados, y escritos en el repo local vía el puente al dispositivo):
+- `conAlertaTodas` ahora descarta los códigos excluidos y los pausados vigentes, con la misma lógica que `contadores_sidebar()`.
+- Pestañas nuevas junto a "Alertas": **"Excluidos"** (solo visible para admin) y **"Pausadas"** (visible para cualquiera).
+- Botón "⏸ Pausar" en cada fila de alerta (cualquier usuario) y "🚫 Excluir" (solo admin) — abren un modal propio con motivo (obligatorio para excluir, opcional para pausar), mismo patrón visual que el modal de `OrdenesPropias.jsx` (no `window.prompt`/`window.confirm`).
+- Pestaña Excluidos: tabla con motivo, quién y cuándo (vía `nombres_usuarios()`, mismo patrón que "Creada por" de Órdenes de compra) + botón "♻ Restaurar".
+- Pestaña Pausadas: igual, más la fecha en que reactiva o un badge "Vencida — volvió a contar" si ya pasó, + botón "▶ Reactivar ahora" para sacar la pausa antes de que venza.
+- Banner ámbar arriba de la vista de Alertas cuando hay pausas vencidas, con link directo a la pestaña Pausadas.
+- `Sidebar.jsx`: nuevo badge azul (`nb-blu`, clase ya existente en `index.css`) para `alertasPausadasVencidas`, mismo patrón que los demás badges (no se dibuja si es 0).
+
+**✅ Deployado y validado en vivo — 11/8/2026.** Federico corrió `git add`/commit/`git push`, resolviendo en el camino dos rondas de locks de git stale (`index.lock` primero, después `HEAD.lock` + `objects/maintenance.lock`, ambos con fecha de varios días antes de esta sesión — confirmado como stale, no un proceso corriendo de verdad, porque `git push` funcionaba igual de forma independiente): commit **`9146741`** en `main`. `vercel --prod` confirmó la URL de producción activa.
+
+**Validación en vivo (Chrome, logueado como Aris, contra `https://dentalab-compras.vercel.app`):**
+- Baseline confirmado sin tocar nada: **2603 críticas / 450 preventivas / 3053 total** — coincide exacto con las capturas de producción de antes de esta sesión.
+- **Ciclo de pausa** sobre SKU **1107**: pausar → contadores bajan a 2602/450/3052, la fila aparece en la pestaña "Pausadas" con nombre de quien pausó y fechas correctas (pausada el / reactiva el) → "▶ Reactivar ahora" → contadores vuelven a 2603/450/3053, pestaña Pausadas vuelve a 0.
+- **Ciclo de exclusión** sobre el mismo SKU 1107: excluir (con motivo) → contadores bajan, la fila aparece en la pestaña "Excluidos" (solo admin) con motivo/nombre/fecha correctos → "♻ Restaurar" → contadores vuelven a la baseline, pestaña Excluidos vuelve a 0.
+- Ambos ciclos se probaron y revirtieron limpiamente: **no quedaron datos de prueba colgando** en `articulos_excluidos_alertas` ni en `alertas_pausadas`.
+
+**Etapa 1 cerrada por completo** — badges, tabs, modales y ambas tablas funcionando de punta a punta en producción.
+
+**Etapa 2 (futura, explícitamente diferida):** sincronizar `MOVIMIENTO_STOCK` desde YiQi para automatizar la detección de "3 años sin compra/ingreso" en vez de depender de la carga manual — ítem 16 de "LO QUE SIGUE", ligado al ítem 11 (Módulo de stock por depósito).
+
+## Pendiente
+
+- Etapa 2 de la limpieza de alertas (sincronizar `MOVIMIENTO_STOCK`) — futura, no urgente, ítem 16 de "LO QUE SIGUE".
+
+## 9. Preparando el envío a testeo — se encontró info vieja en el documento
+
+Federico pidió armar una guía de testeo en Word para mandarle a Aris e Ivana. Al redactar la sección de "qué no hace todavía" se escribió, por copiar lo que decía este documento, que el límite de aprobación de $1.000.000 le pedía aprobación también a Aris. Federico marcó que eso estaba mal: "Aris no tiene límites para pedir ni comprar ni nada."
+
+**Investigación (no se asumió que Federico tuviera razón sin revisar el código, ni que el documento tuviera razón sin revisar el código):** se leyó `NuevaOC.jsx` en el repo real del usuario y se encontró que `requiereAprobacion = !esAdmin && (...)` — para Aris (`esAdmin`) es siempre `false`, sin excepción. Se cruzó contra `git log`: commit **`41febe8`**, *"Fix: las órdenes de Aris se confirman directo, sin control de aprobación"*, fechado **7/8/2026 18:30 UTC** — la misma tarde en que se había detectado el gap en la validación en vivo de esa sesión. Está en `origin/main`, entró a producción con el deploy de `c0ea403`/`ac7cf7a` de esa misma semana.
+
+**Conclusión: Federico tenía razón, el documento estaba desactualizado.** El fix se hizo fuera de una sesión con Claude (no hay registro de quién lo escribió) y nunca se reflejó acá — quedó como "pendiente" en "LO QUE SIGUE" ítem 12 y en la decisión de negocio #11 durante más de 3 días después de estar ya resuelto y en producción. Se corrigió todo el documento (ítem 6 de "Lo que falta...", decisión #11, "LO QUE SIGUE" #12, la fila de ESPERA A OTRA PERSONA, y esta nota en VALIDACIÓN EN VIVO 7/8/2026) y se corrigió también el Word ya enviado (se reenvió la versión corregida).
+
+**Chequeo más amplio, a pedido de Federico** ("¿revisás si hay algo más que se te haya pasado?"): se comparó `git log --oneline --all` completo (12 commits) contra cada commit que menciona este documento — **`41febe8` era el único no documentado**, no es un patrón repetido.
+
+**Segundo punto, revisado y cerrado — no era un bug.** Revisando el mismo archivo aparecieron los nombres de campo que `NuevaOC.jsx` espera del resultado de `condiciones_proveedor()`: `limite`, `siempre_aprueba`, `minimo_compra`, `minimo_es_unidades`, `whatsapp`, `limite_es_propio` — mientras que la tabla `proveedores` guarda esos mismos conceptos con otros nombres de columna (`limite_aprobacion`, `siempre_requiere_aprobacion`, `whatsapp_pedidos`). Como el par `siempre_aprueba`↔`siempre_requiere_aprobacion` nunca se había probado en ninguna sesión (a diferencia de `limite` y `whatsapp`, ya usados y validados), quedó como sospecha de bug silencioso hasta confirmar. **Se pidió a Federico el cuerpo real de la función** (`pg_get_functiondef`) y confirma que sí rebautiza el campo correctamente: `'siempre_aprueba', coalesce(p.siempre_requiere_aprobacion, false)`. El checkbox "este proveedor siempre requiere aprobación de Aris" funciona como se espera — no hizo falta tocar nada.
+
+**Cierre de la auditoría de esta sesión:** se corrigió la única info vieja encontrada (ítem 12, ya resuelto desde el 7/8 sin quedar documentado) y se descartó la única sospecha nueva (el mapeo de `siempre_aprueba`, confirmado correcto). No quedan puntos abiertos de esta revisión.
+
+---
+
+# SESIÓN 14/8/2026 — Smarties nuevas + sincronización de YiQi rota hace 10 días
+
+## 1. Dos smarties nuevas creadas en YiQi, a mano, con Claude in Chrome
+
+A pedido de Federico ("Armemos nosotros las Smartis"), se crearon en vivo, con Federico manejando el mouse/teclado y Claude guiando paso a paso desde la pantalla de configuración de cada entidad en YiQi:
+
+- **`Z.API_Stock_Por_Deposito_NO_BORRAR`** — smartieId **2360**, entidad real `STOCK` (no `CONSULTA_DE_STOCK` como estaba whitelisted hasta ahora — ver punto 3). Pivot: fila = SKU + Artículo-Nombre, columna = Ubicación-Nombre, valor = Cantidad (suma). Se sacaron del pivot los campos `Nro de serie` y `Proveedor Artículo` porque duplicaban filas por SKU. Resultado validado en vivo: una fila por SKU, una columna por cada ubicación — incluye las 4 físicas (Depósito 1-Local, Depósito Central, Depósito 7-Jorge, Depósito ML Full) y varias virtuales que ya existían en YiQi (Baja, Diferencia de.., En tránsito, Exposiciones, Reclamo Proveedores, Reserva) — no se filtraron, no molestan.
+- **`Z.API_Movimientos_Stock_NO_BORRAR`** — smartieId **2359**, entidad real `MOVIMIENTO_STOCK` (no `CONSUL_MOV_DE_STOCK`). Sin pivot: Artículo-SKU, Artículo-Nombre, Cantidad, Ubicación origen-Nombre, Ubicación destino-Nombre, Entidad Origen, Observaciones, Fecha de creación. Se buscó un campo de "fecha de pedido"/"fecha de recepción" separado y no existe — un movimiento interno es un hecho único, no un proceso en dos etapas como sí lo es una compra a proveedor externo.
+- El prefijo `Z.` es deliberado: hace que las vistas caigan al final de cualquier selector alfabético en YiQi y no aparezcan mezcladas con las vistas de uso diario de Aris/Ivana/ventas.
+- Se probó "Hacerla pública" en ambas por las dudas — no era la causa del problema que se describe abajo, pero no está de más tenerlas públicas.
+
+**✅ Resuelto — mismatch de nombre de entidad cerrado del todo.** Se probó primero directo contra la API real de YiQi (bypaseando `yiqi-connector`, con el token nuevo ya cargado): `GET /api/public/STOCK/smartie?smartieId=2360...` → `200 OK`, 7.149 filas; `GET /api/public/MOVIMIENTO_STOCK/smartie?smartieId=2359...` → `200 OK`, página de 50 sobre un total de 1.373.423. Confirmado: los nombres de entidad reales son `STOCK` y `MOVIMIENTO_STOCK` — **no** `CONSULTA_DE_STOCK`/`CONSUL_MOV_DE_STOCK`, que eran una suposición de julio nunca antes probada. Se corrigió el whitelist `ENTIDADES_PERMITIDAS` en `yiqi-connector/index.ts` (reemplazo directo, sin dejar los nombres viejos — se confirmó con grep que no se usaban en ningún otro lado del repo), se deployó, y se volvió a probar **a través del conector** (no directo a YiQi): mismos resultados, 7.149 y 50/1.373.423 filas. Mismatch cerrado de punta a punta.
+
+⚠️ **Hallazgo nuevo del gateway de Supabase, al probar el conector:** mandar `apikey` (JWT legacy `eyJ...`) junto con `Authorization: Bearer` (key nueva `sb_secret_...`) en la misma llamada da `401 Conflicting API keys` — el gateway rechaza la mezcla de un key legacy con uno del sistema nuevo. Solución: para probar Edge Functions a mano con la `sb_secret_...`, mandar **solo** el header `Authorization`, sin `apikey`. La nota vieja de este documento ("hacen falta los dos headers: Authorization + apikey") queda desactualizada para este caso — sigue valiendo para llamadas con la anon key legacy.
+
+**`MOVIMIENTO_STOCK` es una tabla enorme** (1,37 millones de registros) comparada con el resto de las entidades sincronizadas hoy (la más grande, `material_yiqi`, tiene ~7.170). El día que se sincronice (Etapa 2, ítem 16 de "LO QUE SIGUE", todavía no ahora) va a hacer falta un filtro por fecha/rango, no traer todo el historial de una.
+
+**Pendiente, sin bloquear nada:** decidir el diseño de sincronización de estas dos entidades a tablas propias (`stock_por_deposito`/similar) cuando se retome el módulo de Reposición interna — hoy solo están accesibles vía `yiqi-connector` a demanda, no hay tablas espejo ni cron para ellas todavía.
+
+## 2. Al probar las smarties nuevas, se encontró que el sync automático de YiQi lleva 10 días roto
+
+Antes de sumar las smarties a `sync-yiqi`, se probaron a mano vía `yiqi-connector`. Devolvían 401. La investigación paso a paso (sin asumir la primera hipótesis, con control tests en cada paso — mismo criterio que la investigación de `/search` vs `/smartie` de la sesión anterior):
+
+1. **Primera hipótesis (correcta a medias):** el nombre de entidad whitelisted (`CONSULTA_DE_STOCK`/`CONSUL_MOV_DE_STOCK`) no coincide con el real (`STOCK`/`MOVIMIENTO_STOCK`) — descartada como causa única al ver el paso 2.
+2. **Control test decisivo:** se probó `MATERIAL`/smartieId `2341` — la combinación que **siempre funcionó**, la misma que usa el sync cada 15 minutos — y **también** devolvió 401 de YiQi. Esto descartó que el problema fuera específico de las smarties nuevas.
+3. **Se revisó el Monitor de Stock en producción:** "última actualización de YiQi" mostraba **4/8/2026, 10:30** — **10 días desactualizado**, hoy es 14/8. Esto incluye toda la ventana en que se le mandó a Aris e Ivana la guía de testeo (11/8) diciéndoles que el stock sincroniza cada 15 minutos.
+4. **Trampa encontrada en `cron.job_run_details`:** el cron (jobid 3, `sync-material-cada-15-min`) mostraba `succeeded, 1 row` en **cada corrida**, sin un solo fallo visible, durante los 10 días. Esto es engañoso: el comando del job es `select net.http_post(...)`, y `net.http_post` de pg_net **encola** el pedido y devuelve éxito con solo lograr anotarlo en la cola — no espera ni refleja la respuesta HTTP real. La tabla `net._http_response` (la que sí tiene la respuesta real) mostró, para cada corrida reciente: `status_code 401`, body `{"ok":false,"error":"Sesión inválida o vencida"}`.
+5. **Ese mensaje no es un error de YiQi — es de nuestro propio código.** Viene de `verificarLlamador()` en `supabase/functions/_shared/auth.ts` (agregado el 7/8/2026, ver VALIDACIÓN EN VIVO 7/8/2026), que exige o bien un usuario logueado real, o bien que el Authorization Bearer sea **exactamente igual** a la variable de entorno reservada `SUPABASE_SERVICE_ROLE_KEY`. Los 3 cron jobs (jobid 3, 4, 5) mandan una service_role key hardcodeada en el comando SQL — y esa comparación estaba fallando.
+6. **Se descartaron, en orden, con pruebas reales (no supuestos):** que la key estuviera pegada con espacios/saltos de línea invisibles en el comando del cron (se probó con la key recién copiada del dashboard: mismo error); que la función tuviera cacheada una key vieja (se redeployó `sync-yiqi`: mismo error); que Federico hubiera puesto una key de prueba en vez de la real en los tests anteriores (confirmó que no, siempre usó la real, solo tapó la pantalla en las capturas para no exponerla en el chat).
+7. **Causa real:** el proyecto de Supabase migró al sistema de API keys nuevo (pestañas "Publishable and secret API keys" vs "Legacy anon, service_role API keys" en Settings → API). La variable reservada `SUPABASE_SERVICE_ROLE_KEY` que leen las Edge Functions ahora resuelve a la key nueva (`sb_secret_...`), no a la JWT legacy (`eyJ...`) que seguía hardcodeada en los 3 cron jobs desde que se crearon. Confirmado probando `sync-yiqi` a mano con la `sb_secret_...`: pasó la validación de sesión y llegó hasta el punto esperado (el 401 de YiQi del punto 8).
+
+## 3. Arreglado: los 3 cron jobs actualizados con la key nueva
+
+Federico corrió `cron.alter_job(job_id := 3/4/5, command := ...)` para los tres jobs (`sync-material-cada-15-min`, `sync-oc-y-clientes-diario`, `sync-ventas-diario`), reemplazando la Authorization Bearer legacy por la `sb_secret_...` nueva. Confirmado en Supabase (resultado `alter_job` en los 3). **No hizo falta tocar `yiqi-connector` ni `admin-usuarios`** — esas dos las llaman usuarios reales desde el navegador (camino 2 de `verificarLlamador`, autenticación por sesión), que nunca dejó de funcionar; solo el camino 1 (service_role, usado por el cron) estaba roto.
+
+## 4. Segundo problema, ya resuelto también: el token de YiQi
+
+Con el cron ya arreglado, `sync-yiqi` pasaba nuestra propia validación de sesión sin problema — pero al llamar a YiQi con el token guardado en `yiqi_config`, **YiQi seguía respondiendo 401** (confirmado con `MATERIAL`/2341, la combinación históricamente confiable). Es un problema completamente distinto al del punto 2: no era nuestro código, era el token de integración con YiQi en sí.
+
+**✅ Resuelto el mismo 14/8/2026.** Federico generó un token nuevo vía `POST https://api.yiqi.com.ar/token` (`username`/`password`/`grant_type=password`, credenciales de la cuenta de integración `ventas@dentalab.com.ar`, con permiso "Integrador" — no existe un tipo de usuario de integración separado, es una cuenta normal con ese flag activado) — el token nuevo tiene **265 caracteres** (el anterior tenía 512; la diferencia de longitud no resultó ser un problema, se validó empíricamente). Cargado en `yiqi_config` (fila `7b56cb5b-d7c3-4fc2-b127-e39515ff1bfb`) vía `UPDATE`, con `ultima_sync` reseteado a `null`.
+
+**Validado en vivo, de punta a punta:**
+- Llamada de prueba a `sync-yiqi?entidad=material` con la `sb_secret_...` nueva → `{"ok":true,"resultados":[{"entidad":"material","filasSincronizadas":7185}]}`.
+- Monitor de Stock en producción: "Sincronizado 14/8, 11:37 a.m." / "última actualización de YiQi: 14/8/2026, 11:37:27" (antes: "4/8/2026, 10:30" — 10 días de atraso). Contadores de alertas también se refrescaron (2620 críticas / 457 preventivas, sobre el baseline stale de 2603/450).
+
+**Sync restablecido en el momento — pero ver SESIÓN 15/8/2026: se volvió a cortar en menos de 24hs, con una pista nueva sobre la causa.**
+
+**Investigación abierta — por qué se cortó el token de YiQi:** Federico confirmó que su propia contraseña de acceso a YiQi nunca cambió, así que la causa de que el token de integración se haya invalidado no está clara. La documentación original del proyecto decía que duraban ~4 años sin vencer, y este se cortó mucho antes — y volvió a cortarse al día siguiente de regenerarlo (ver SESIÓN 15/8/2026, hipótesis de la sesión compartida).
+
+## 5. Impacto en el testeo que se le mandó a Aris e Ivana el 11/8
+
+La guía de testeo enviada el 11/8 dice explícitamente que el stock sincroniza cada 15 minutos. Con el corte desde el 4/8, **todo el período de testeo (11/8 en adelante) mostró datos de stock de al menos una semana antes**, sin que nadie se diera cuenta — el cron parecía sano por el mismo motivo que a nosotros nos costó verlo (el falso "succeeded" de pg_cron). Queda a criterio de Federico si vale avisarles, dependiendo de si tomaron alguna decisión de compra basándose en esos números durante estos días.
+
+## 6. Aprendizaje para el proyecto: el cron no es confiable como señal de salud
+
+`cron.job_run_details.status = succeeded` **no significa que la llamada HTTP real haya funcionado** cuando el comando usa `net.http_post` — solo confirma que Postgres pudo encolar el pedido. La fuente de verdad real es `net._http_response` (o los logs de la Edge Function en el dashboard de Supabase). Vale la pena, más adelante y sin apuro, armar algún chequeo real de salud del sync (por ejemplo, que el propio Monitor de Stock muestre una alerta si `ultima_sync` tiene más de X horas) en vez de confiar en que el cron "se ve verde".
+
+---
+
+# SESIÓN 15/8/2026 — El sync se corta de nuevo, y aparece una pista real sobre la causa
+
+**Contexto:** al día siguiente del arreglo del 14/8, Federico notó que el Monitor de Stock seguía mostrando "Sincronizado 14/8, 11:37 a.m." — no había vuelto a sincronizar en casi 4 horas (el cron corre cada 15 min). Se repitió el mismo método de diagnóstico que el día anterior, sin asumir que fuera la misma causa.
+
+## 1. Bug nuevo, distinto al del 14/8: al comando del cron le faltaba "Bearer"
+
+`net._http_response` mostró un error nuevo: `{"code":"UNAUTHORIZED_INVALID_JWT_FORMAT","message":"Auth header is not 'Bearer {token}'"}` — no es el mismo mensaje `"Sesión inválida o vencida"` del día anterior (ese era de `verificarLlamador()`; este viene del gateway de Supabase, antes de llegar a nuestro código). Se leyó el `command` real de `cron.job` (jobid 3, 4 y 5) y se encontró la causa: al correr el `cron.alter_job` del 14/8, el valor cargado en el header `Authorization` era la key sola (`'sb_secret_...'`), **sin el prefijo `Bearer `**. Los 3 jobs tenían el mismo error — probablemente un reemplazo de todo el placeholder `Bearer TU_SECRET_KEY_NUEVA` por la key sola, en vez de solo la parte de la key. **Corregido** con un nuevo `cron.alter_job` en los 3, agregando el `Bearer ` de vuelta. Confirmado releyendo el `command` guardado.
+
+**Importante:** esto significa que el cron automático **nunca llegó a correr solo con éxito** desde el fix del 14/8 — lo que se vio funcionar ese día (7185 filas, "Sincronizado 11:37") fue la llamada manual de prueba por PowerShell, que sí tenía el `Bearer` bien puesto. El sync automático estuvo roto por este motivo *nuevo* durante todo ese tiempo.
+
+## 2. Hallazgo aparte: un bache de ~5 horas sin respuestas registradas en `net._http_response`
+
+Entre las 09:30 y las 14:15 del 15/8, el cron (jobid 3) corrió las 20 veces esperadas (cada 15 min) pero **ninguna quedó con `status_code`/`body` registrados** (ambos `null`) — ni éxito ni error, la respuesta HTTP nunca se completó del lado de `pg_net`/Supabase. Recién a partir de las 14:30 volvieron a aparecer respuestas reales. Es un problema de infraestructura de Supabase, separado del tema del token — anotado como hallazgo, no se investigó más a fondo (no es código nuestro y no bloqueaba nada más).
+
+## 3. El token de YiQi volvió a morir — confirmado en vivo, sin ambigüedad
+
+Con el bug del "Bearer" corregido, `net._http_response` mostró que YiQi volvía a rechazar el token (`401`, `"YiQi respondio 401 en MATERIAL/smartie page 1"`). Para descartar que fuera otro artefacto de nuestra infraestructura (como pasó dos veces seguidas ese mismo día), se probó el token actual **directo contra la API de YiQi, sin pasar por Supabase ni por nuestro código**: `401`, cuerpo vacío. Confirmado sin ambigüedad: el token que se generó el 14/8 a la mañana (~11:30) ya no es válido el 15/8 a la tarde — **duró menos de 24 horas**, muy distinto del token anterior (duró ~3 semanas, del 12/7 al 4/8).
+
+## 4. Hipótesis con evidencia real, no solo una corazonada
+
+La cuenta de integración (`ventas@dentalab.com.ar`, flag "Integrador") **no es una cuenta exclusiva para la API** — en la sesión del 11/8 (ver `ARIS_Especificacion_Reposicion_Interna_y_Produccion.md`) Federico ya había mostrado capturas de esa misma cuenta logueada en la interfaz web de YiQi como "Ventas Online", viendo el menú de Stock. Esto sugiere que alguien en Dentalab usa esa cuenta para trabajar en la web de YiQi, no solo nuestra integración por API. Si YiQi permite una sola sesión/token activo por cuenta (patrón común), cada login web con esa cuenta mataría el token de la API sin que nadie cambie ninguna contraseña — coherente con que Federico confirmó que su contraseña nunca cambió.
+
+**Decisión de Federico:** no regenerar el token todavía — no tiene sentido gastar el paso si la misma cuenta lo puede volver a matar en cualquier momento. **Le pidió confirmación directa a Aris** sobre si alguien está o estuvo logueado con ese usuario. Queda pendiente la respuesta antes de regenerar y, si se confirma la hipótesis, plantear con Aris crear un usuario de YiQi exclusivo para la integración (separado de cualquier login de uso diario) — mismo tipo de solución que ya estaba anotada para proteger las smarties de ediciones accidentales (ver "🔴 INCIDENTE — la 2344 fue editada por alguien de Dentalab").
+
+**Sigue abierto al cierre de esta sesión (15/8/2026):** todavía sin respuesta de Aris sobre la sesión de YiQi — no se regeneró el token.
+
+## 5. Pedido nuevo de Aris sobre "Nueva OC": agregar cualquier artículo del proveedor, no solo los alertados
+
+Mientras se esperaba la respuesta sobre el token, Aris (probando el sistema con Ivana, logueados con la cuenta demo porque su cuenta real "no funcionó" — ver ítem 1 de "LO QUE SIGUE", sigue pendiente) reportó que al armar una orden solo se pueden agregar artículos con alerta de stock, no cualquier artículo del proveedor. **No es un bug**: `ArmarOrden` arma la lista a partir de `sugerencias_compra()`, que por diseño solo trae artículos por debajo del punto de pedido — la pantalla nunca soportó agregar artículos libremente. Consultado, Aris confirmó que quiere **poder agregar cualquier artículo del proveedor a la orden, aunque el sistema no lo sugiera** (la sugerencia automática se mantiene igual, se suma la posibilidad de agregar a mano). Queda como pedido de producto nuevo, sin diseñar todavía — pasa a "LO QUE SIGUE".
+
+## 6. Construido, deployado y validado en vivo: agregar artículo a mano en "Nueva OC"
+
+**Diseño:** función nueva `buscar_articulos_proveedor(p_proveedor, p_busqueda, p_limite)` (migration `20260815160000_buscar_articulos_proveedor.sql`), hermana de `sugerencias_compra()` pero sin el filtro `stock <= umbral` — busca por SKU/nombre en todo el catálogo comprable del proveedor (mismo `es_comprable()`), sin calcular `cantidad_sugerida` (no es un artículo en alerta, no hay necesidad calculada: el campo queda "A definir", lo carga la persona). En `ArmarOrden` (`NuevaOC.jsx`) se agregó un buscador con debounce (350ms, mínimo 2 caracteres) arriba de la tabla; al elegir un resultado se suma a una lista `agregados` que se une con `sugerencias` (`filas = [...sugerencias, ...agregados]`) para todo lo demás — tabla, paginado, valorización, semáforo de aprobación, guardado. Si el artículo elegido ya estaba en la tabla (por alerta o por un agregado previo), no se duplica: solo se tilda. Se agregó `key={proveedorElegido}` al montar `ArmarOrden` para que lo agregado a mano no sobreviva a un cambio de proveedor.
+
+**Deploy:** commit `f1e416f` ("Nueva OC: permitir agregar cualquier articulo del proveedor a mano") pusheado a `main`; migration aplicada por Federico vía SQL Editor ("Success. No rows returned", esperado para un `CREATE OR REPLACE FUNCTION`); `vercel --prod` corrido **desde la raíz del repo** (`C:\dentalab-compras`, no desde `frontend\` — el proyecto de Vercel tiene "Root Directory" = `frontend` configurado en su propio dashboard, así que correrlo ya parado en `frontend\` duplica la ruta a `frontend\frontend` y falla; quedó anotado para no repetir el error).
+
+**Validado en vivo con Chrome, logueado como Aris, sin dejar datos de prueba:**
+- **MASOTTO DANIEL** (1 solo artículo en alerta): buscar "vaso" trajo ese mismo artículo → clic en "+ Agregar" → no lo duplicó, solo lo tildó (semáforo pasó a "$180.000 · Orden directa").
+- **DENTAL MEDRANO** (672 en alerta, catálogo grande): buscar "cera" trajo artículos que no estaban en la tabla de alertas (brackets, calentadores de cera) → se agregó "Calentador de Cera Digital SunBurst" (SKU 35552) → apareció en la tabla, tildado, cantidad 1 editable, "Sin historial" y "sin costo" (correcto: no tiene ventas ni costo cargado en YiQi) → semáforo reflejó bien "$0 · Orden directa — faltan costos en algunos artículos (1 sin costo cargado)".
+- No se guardó ningún borrador ni se confirmó ninguna orden durante la prueba — no quedaron datos de prueba en el sistema.
+
+**Bloqueo de proceso encontrado y resuelto en el camino:** `.git\index.lock` quedó trabado de nuevo (mismo patrón que el 11/8) — la sesión de la nube no tiene permiso para borrar archivos en el disco de Federico, así que lo borró él mismo (`del .git\index.lock`) tras confirmar que no era un `git` realmente colgado (una terminal vieja en otro repo, `comunas-app`, ya había devuelto el prompt — no tenía nada que ver).
+
+
+---
+
+# SESIÓN 17/8/2026 — Causa raíz real del vencimiento del token de YiQi: renovación automática construida, deployada y validada en vivo
+
+**Contexto:** Aris confirmó que nadie de Dentalab usó la cuenta compartida `ventas@dentalab.com.ar` recientemente (ni web ni ninguna otra cosa), y Federico confirmó por su lado que él tampoco inició sesión en la web de YiQi durante toda la investigación. Esto descarta por completo la hipótesis del 15/8 ("un login web de uso diario comparte y mata el token de la API") — hacía falta encontrar la causa real, no seguir suponiendo.
+
+## 1. Investigación en la documentación oficial de YiQi, no en supuestos
+
+Se leyó la documentación pública de YiQi (`apidoc.yiqi.com.ar`) en vez de seguir adivinando. Confirma: el `access_token` es de **vida corta por diseño** (no ~4 años como decía un comentario viejo del código, nunca verificado contra la doc real desde julio), y la forma correcta de renovarlo sin volver a mandar usuario/contraseña es `POST /token` con `grant_type=refresh_token`. El `refresh_token` dura 14 días y **rota en cada uso** — YiQi solo acepta un `refresh_token` vivo por usuario a la vez.
+
+Confirmado empíricamente generando un token real: `expires_in = 86399` segundos (~24hs), exacto.
+
+**Esto cierra la pregunta abierta desde la SESIÓN 14/8/2026** ("por qué se venció el token sin que cambiara la contraseña"): nunca fue un problema de contraseña ni de sesión compartida — el sistema simplemente nunca implementó la renovación que YiQi exige, así que el token moría solo cada ~24hs, con o sin nadie tocando nada.
+
+## 2. Fix construido: renovación automática centralizada
+
+- **`supabase/functions/_shared/yiqiConfig.ts` (nuevo)** — único lugar del repo que lee/escribe `yiqi_config` de ahora en más. `getYiqiConfig()` chequea si el token vence en menos de 2hs (o si no se sabe cuándo vence) y lo renueva solo con el `refresh_token` guardado antes de devolverlo. Nunca deja `yiqi_config` a medias: o guarda los 3 campos juntos (`bearer_token`, `refresh_token`, `token_expira_en`) o no toca nada. Si el refresh falla y el token guardado todavía no venció, sigue usando ese en vez de cortar el sync por una renovación que no hacía falta todavía.
+- **Migration `20260817190000_yiqi_refresh_token.sql`** — agrega `refresh_token` y `token_expira_en` a `yiqi_config`. Aplicada por Federico vía SQL Editor.
+- **`sync-yiqi/index.ts` y `yiqi-connector/index.ts`** — se les sacó cada uno su propia lectura duplicada de `yiqi_config` (sin renovación) y ahora llaman al módulo compartido. De paso se corrigió en `yiqi-connector` el comentario viejo que decía "~4 años, sin refresh token" (nunca fue verdad, quedó de julio).
+
+**Deployado** (`supabase functions deploy sync-yiqi` + `yiqi-connector`) desde la raíz del repo.
+
+## 3. Dos intentos de backfill — el primero falló, y el error diseñado hizo su trabajo
+
+**Intento 1:** se cargó el `refresh_token` capturado un rato antes (durante la investigación de `expires_in`). El primer sync post-deploy lo intentó usar y YiQi lo rechazó: `invalid_grant: Invalid or expired refresh token`. Diagnóstico limpio gracias al manejo de errores diseñado a propósito: `yiqi_config` no quedó tocado, y el error distinguió claramente "no se pudo renovar" de "YiQi está caído" — nunca fue un fallo silencioso como los de antes.
+
+**Causa más probable (sin poder confirmarla al 100%, y no vale la pena perseguirla más):** entre generar ese `refresh_token` y cargarlo en la base pasó un rato en el que se probaron otras cosas por PowerShell — como YiQi solo permite un `refresh_token` vivo por usuario, es probable que algún otro pedido de token en el medio lo haya rotado antes de usarlo. No hay forma de reconstruirlo con certeza y no cambia nada del fix en sí.
+
+**Intento 2:** Federico generó un token limpio, una sola vez, y se cargó el `refresh_token` de inmediato (mismo patrón: 265 caracteres, `expires_in: 86399`). Esta vez funcionó.
+
+## 4. Validado en las tres capas — 17/8/2026, ~23:00 UTC
+
+1. **Base de datos:** `token_expira_en` pasó de `NULL` a `2026-08-18 23:00:01` (~24hs exactas desde la renovación real); `ultima_sync` se actualizó a `2026-08-17 23:00:49`.
+2. **Logs reales (`net._http_response`):** los `500` con `invalid_grant` son todos de *antes* del backfill del intento 2 (22:00–22:45). Ninguno después.
+3. **En vivo (Chrome, sesión de Aris):** Monitor de Stock mostró "última actualización de YiQi: 17/8/2026, 08:00:48 p.m." (=23:00:48 UTC, coincide exacto), **7186 artículos**, origen **✓ Sincronizado**.
+
+El sistema renovó el token solo, sin intervención manual, y el sync corrió con éxito de punta a punta: BD → Edge Function → frontend en producción.
+
+## 5. Riesgo residual, documentado a propósito, sin acción por ahora
+
+Los 3 cron jobs (`sync-material-cada-15-min`, `sync-oc-y-clientes-diario`, `sync-ventas-diario`) coinciden a las **6:00 UTC** (3:00 a.m. Argentina). Como el `refresh_token` rota en cada uso, si dos de esos tres llaman a `getYiqiConfig()` casi al mismo tiempo y ambos necesitan renovar, uno de los dos va a perder la carrera contra YiQi (el mismo error `invalid_grant` que se vio en el intento 1, pero por una causa distinta y esperada). Es de baja probabilidad y **auto-recuperable**: el siguiente ciclo de 15 minutos ya encuentra el token renovado por el que ganó la carrera y sigue solo. **Decisión explícita:** no se agregó locking para esto — es una complejidad que no se justifica para un caso raro y que se cura solo. Si en el futuro aparece un `500` puntual entre las 5:45 y 6:15 UTC, es este caso conocido, no un bug nuevo.
+
+## Pendiente
+
+- **Falta el `git add`/`commit`/`push`** de esta sesión — `supabase functions deploy` no requiere git, así que el código ya está en producción, pero el repo todavía no tiene el commit de estos 4 archivos (`_shared/yiqiConfig.ts`, la migration, y los dos `index.ts` editados). Hacerlo antes de la próxima sesión para no perder el historial.
+- Fila vieja/basura en `yiqi_config` (`57db7796-f8ba-4c91-8ea4-d4a8a0e94666`, 37 caracteres) sigue sin borrar — cosmético, no afecta nada porque el sync siempre usó la fila correcta por `created_at`. Sin apuro.

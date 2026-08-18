@@ -36,6 +36,10 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verificarLlamador, respuestaAuthError } from '../_shared/auth.ts';
+// getYiqiConfig vive en un modulo compartido con yiqi-connector desde
+// el 17/8/2026: ademas de leer la fila, ahora renueva el access_token
+// solo cuando esta por vencer. Ver _shared/yiqiConfig.ts para el porque.
+import { getYiqiConfig } from '../_shared/yiqiConfig.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -47,23 +51,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
-
-// ------------------------------------------------------------
-// Helper: leer la config de YiQi
-// ------------------------------------------------------------
-async function getYiqiConfig(supabaseAdmin: ReturnType<typeof createClient>) {
-  const { data, error } = await supabaseAdmin
-    .from('yiqi_config')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (error || !data) {
-    throw new Error('No hay configuracion de YiQi cargada: ' + (error?.message ?? 'sin datos'));
-  }
-  return data;
-}
 
 // ------------------------------------------------------------
 // Helper: traer UNA pagina de una smartie

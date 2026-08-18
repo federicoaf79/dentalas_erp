@@ -21,10 +21,22 @@
 //     Z.API_Stock_Por_Deposito_NO_BORRAR (2360) y
 //     Z.API_Movimientos_Stock_NO_BORRAR (2359).
 //
-// FLUJO REAL VALIDADO (12-13 julio 2026):
+// CORRECCION 17 agosto 2026:
+//   - El comentario de abajo ("expira en ~4 anios, sin refresh token")
+//     era un supuesto de julio NUNCA confirmado contra la API real, y
+//     era incorrecto. Confirmado en vivo generando un token real:
+//     el access_token vence en ~24hs (expires_in=86399) y SI hay
+//     refresh_token (dura 14 dias, rota en cada uso). Por este
+//     supuesto equivocado el sistema nunca renovaba el token solo, y
+//     cada vez que vencia (cada ~1 dia) el sync quedaba cortado hasta
+//     que alguien lo regeneraba a mano. Arreglado: la renovacion
+//     automatica vive en _shared/yiqiConfig.ts, usada por esta
+//     funcion y por sync-yiqi.
+//
+// FLUJO REAL VALIDADO (12-13 julio 2026, vencimiento corregido 17/8):
 //   1. POST https://api.yiqi.com.ar/token
 //      Body x-www-form-urlencoded: username, password, grant_type=password
-//      -> access_token (JWT, expira en ~4 anios, sin refresh token)
+//      -> access_token (JWT, vence en ~24hs) + refresh_token (14 dias, rota)
 //   2. GET https://api.yiqi.com.ar/api/accountapi/GetLoginInformation
 //      Header: Authorization: Bearer {token}
 //      -> devuelve schemaId (OBLIGATORIO en todas las demas llamadas)
@@ -58,6 +70,10 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verificarLlamador, respuestaAuthError } from '../_shared/auth.ts';
+// getYiqiConfig vive en un modulo compartido con sync-yiqi desde el
+// 17/8/2026: ademas de leer la fila, ahora renueva el access_token
+// solo cuando esta por vencer. Ver _shared/yiqiConfig.ts.
+import { getYiqiConfig } from '../_shared/yiqiConfig.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -88,23 +104,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
-
-// ------------------------------------------------------------
-// Helper: leer la config de YiQi desde la tabla protegida
-// ------------------------------------------------------------
-async function getYiqiConfig(supabaseAdmin: ReturnType<typeof createClient>) {
-  const { data, error } = await supabaseAdmin
-    .from('yiqi_config')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (error || !data) {
-    throw new Error('No hay configuracion de YiQi cargada en yiqi_config: ' + (error?.message ?? 'sin datos'));
-  }
-  return data;
-}
 
 // ------------------------------------------------------------
 // Helper: llamar a una entidad de YiQi via /search
@@ -273,6 +272,11 @@ Deno.serve(async (req: Request) => {
             baseUrl: config.base_url,
             schemaId: config.schema_id,
             ultimaSync: config.ultima_sync,
+            // Visibilidad del vencimiento del token, agregado 17/8/2026
+            // junto con la renovacion automatica -- nunca expone el
+            // token en si, solo cuando vence. Util para confirmar de
+            // un vistazo que la renovacion esta funcionando.
+            tokenExpiraEn: config.token_expira_en ?? null,
             entidadesPermitidas: ENTIDADES_PERMITIDAS,
           }),
           { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
