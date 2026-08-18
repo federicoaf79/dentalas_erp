@@ -936,6 +936,19 @@ export default function NuevaOC({ onCambioOrdenes }) {
           .update(parche)
           .eq('id', cab.id)
         if (errEstado) throw new Error(errEstado.message)
+
+        // Escritura a YiQi: solo si quedó aprobada directo (dentro del
+        // límite, o la armó Aris). Nunca bloquea ni deshace la
+        // aprobación ya confirmada arriba -- si falla, la función
+        // misma guarda yiqi_error en la orden. Ver
+        // supabase/functions/enviar-oc-yiqi.
+        if (estado === 'aprobada') {
+          try {
+            await supabase.functions.invoke('enviar-oc-yiqi', { body: { orden_id: cab.id } })
+          } catch (errYiqi) {
+            console.error('[enviar-oc-yiqi]', errYiqi)
+          }
+        }
       }
 
       setAviso(

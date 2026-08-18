@@ -221,6 +221,19 @@ export default function OrdenesPropias({ onCambio }) {
         })
         .eq('id', orden.id)
       if (error) throw new Error(error.message)
+
+      // Escritura a YiQi: solo si quedó aprobada. Nunca bloquea ni
+      // deshace la aprobación ya confirmada arriba -- si falla, la
+      // función misma guarda yiqi_error en la orden y acá no hacemos
+      // nada más que loguearlo. Ver supabase/functions/enviar-oc-yiqi.
+      if (nuevoEstado === 'aprobada') {
+        try {
+          await supabase.functions.invoke('enviar-oc-yiqi', { body: { orden_id: orden.id } })
+        } catch (errYiqi) {
+          console.error('[enviar-oc-yiqi]', errYiqi)
+        }
+      }
+
       setAviso(`Orden #${orden.id} ${nuevoEstado === 'aprobada' ? 'aprobada' : 'rechazada'}.`)
       setAbierta(null)
       setModal(null)
