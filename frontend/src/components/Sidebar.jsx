@@ -1,14 +1,27 @@
 // ------------------------------------------------------------
-// Estructura de navegación — copiada 1:1 del prototipo v8
-// aprobado por el cliente. No reordenar sin confirmar.
+// Estructura de navegación — copiada 1:1 del prototipo v8 aprobado
+// por el cliente, reorganizada en MÓDULOS el 19/8/2026.
+//
+// Por qué el cambio: "Monitor de stock" y "Reposición interna"
+// vivían sueltos bajo "Principal" junto con "Alertas", sin ninguna
+// agrupación real por módulo. Con el proyecto creciendo hacia más
+// módulos (decisión de Federico, 19/8/2026), se separó en dos
+// secciones con sentido de negocio:
+//   - STOCK: pantallas sobre el inventario físico en sí (cuánto hay,
+//     dónde, y el movimiento interno Local<->Central).
+//   - COMPRAS: todo lo que dispara o gestiona una compra a un
+//     proveedor externo — Alertas incluida, porque es la que dice
+//     "esto hay que comprarlo" (mismo criterio que Nueva OC).
+// Agregar un módulo nuevo en el futuro = agregar un array + una
+// sección, sin tocar el resto.
 // ------------------------------------------------------------
-const NAV_PRINCIPAL = [
+const NAV_STOCK = [
   { key: 'stock', label: 'Monitor de stock', icon: '📦' },
   { key: 'reposicion', label: 'Reposición interna', icon: '🔁' },
-  { key: 'alertas', label: 'Alertas', icon: '🔔' },
 ]
 
 const NAV_COMPRAS = [
+  { key: 'alertas', label: 'Alertas', icon: '🔔' },
   { key: 'ocs', label: 'Órdenes de compra', icon: '📋' },
   { key: 'seguimiento', label: 'Seguimiento de OC', icon: '🔄' },
   { key: 'historial', label: 'Historial de OC', icon: '🕐' },
@@ -110,6 +123,37 @@ export default function Sidebar({
 
   const syncTexto = formatoSyncCorto(ultimaSync)
 
+  // Badges por key, en vez de posición fija en el array — así agregar/
+  // reordenar un item de un módulo no rompe qué badge le corresponde
+  // a cuál (bug que ya pasó una vez, el 19/8/2026, al insertar
+  // "Reposición interna" en el medio del array viejo).
+  const badgesPorKey = {
+    stock: <Badge valor={alertasStock} clase="nb-yel" />,
+    alertas: (
+      <>
+        <Badge valor={alertasCriticas} clase="nb-red" />
+        <Badge valor={alertasPreventivas} clase="nb-yel" />
+        {/* Azul = pedidos que requieren aprobacion de Aris.
+            El flujo es Sprint 2, hoy siempre 0 -> no se dibuja. */}
+        <Badge valor={aprobacionPendiente} clase="nb-blu" />
+      </>
+    ),
+    ocs: <Badge valor={ocsActivas} clase="nb-ind" />,
+    seguimiento: <Badge valor={seguimientoPendiente} clase="nb-yel" />,
+  }
+
+  function renderGrupo(items) {
+    return items.map((item) => (
+      <NavItem
+        key={item.key}
+        item={item}
+        active={currentPage === item.key}
+        onClick={onNavigate}
+        badges={badgesPorKey[item.key]}
+      />
+    ))
+  }
+
   return (
     <aside className="w-[228px] bg-white border-r border-[var(--border)] flex flex-col flex-shrink-0 h-screen">
       <div className="px-3.5 pt-3.5 pb-3 border-b border-[var(--border)]">
@@ -121,56 +165,17 @@ export default function Sidebar({
       </div>
 
       <nav className="px-1.5 py-1.5 flex-1 overflow-y-auto">
-        <NavSection title="Principal" />
-        <NavItem
-          item={NAV_PRINCIPAL[0]}
-          active={currentPage === 'stock'}
-          onClick={onNavigate}
-          badges={<Badge valor={alertasStock} clase="nb-yel" />}
-        />
-        <NavItem
-          item={NAV_PRINCIPAL[1]}
-          active={currentPage === 'reposicion'}
-          onClick={onNavigate}
-        />
-        <NavItem
-          item={NAV_PRINCIPAL[2]}
-          active={currentPage === 'alertas'}
-          onClick={onNavigate}
-          badges={
-            <>
-              <Badge valor={alertasCriticas} clase="nb-red" />
-              <Badge valor={alertasPreventivas} clase="nb-yel" />
-              {/* Azul = pedidos que requieren aprobacion de Aris.
-                  El flujo es Sprint 2, hoy siempre 0 -> no se dibuja. */}
-              <Badge valor={aprobacionPendiente} clase="nb-blu" />
-            </>
-          }
-        />
+        <NavSection title="Stock" />
+        {renderGrupo(NAV_STOCK)}
 
         <NavSection title="Compras" />
-        <NavItem
-          item={NAV_COMPRAS[0]}
-          active={currentPage === 'ocs'}
-          onClick={onNavigate}
-          badges={<Badge valor={ocsActivas} clase="nb-ind" />}
-        />
-        <NavItem
-          item={NAV_COMPRAS[1]}
-          active={currentPage === 'seguimiento'}
-          onClick={onNavigate}
-          badges={<Badge valor={seguimientoPendiente} clase="nb-yel" />}
-        />
-        <NavItem item={NAV_COMPRAS[2]} active={currentPage === 'historial'} onClick={onNavigate} />
-        <NavItem item={NAV_COMPRAS[3]} active={currentPage === 'nueva-oc'} onClick={onNavigate} />
+        {renderGrupo(NAV_COMPRAS)}
 
         <NavSection title="Inteligencia" />
-        <NavItem item={NAV_INTELIGENCIA[0]} active={currentPage === 'predictor'} onClick={onNavigate} />
+        {renderGrupo(NAV_INTELIGENCIA)}
 
         <NavSection title="Configuración" />
-        {NAV_CONFIG.map((item) => (
-          <NavItem key={item.key} item={item} active={currentPage === item.key} onClick={onNavigate} />
-        ))}
+        {renderGrupo(NAV_CONFIG)}
       </nav>
 
       <div className="p-3 border-t border-[var(--border)] flex items-center gap-2.5">
