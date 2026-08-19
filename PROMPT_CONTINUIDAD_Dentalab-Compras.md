@@ -26,6 +26,8 @@
 > **Actualización 15/8/2026:** el sync se cortó de nuevo al día siguiente — dos causas distintas encontradas (un `cron.alter_job` que había cargado la key nueva sin el prefijo `Bearer `, corregido; y el token de YiQi que volvió a morir en menos de 24hs, sin regenerar todavía porque hay una hipótesis fuerte y sin confirmar de que la cuenta de integración se comparte con un login web de uso diario — **esperando respuesta de Aris**). Aparte, **✅ pedido nuevo de Aris — "Nueva OC" ahora permite agregar cualquier artículo del proveedor a mano**, no solo los que trae la alerta automática: migration `buscar_articulos_proveedor()` + buscador en `ArmarOrden`, deployado (commit `f1e416f`) y validado en vivo con Chrome sobre dos proveedores reales, sin dejar datos de prueba. Detalle completo en **SESIÓN 15/8/2026**, al final del documento.
 >
 > **Actualización 17/8/2026 — causa raíz real del vencimiento del token de YiQi, encontrada y resuelta.** Aris confirmó que nadie de Dentalab usó la cuenta compartida recientemente, y Federico confirmó que tampoco inició sesión en la web de YiQi — **la hipótesis del 15/8 (login web comparte y mata el token) queda descartada.** Investigando la documentación oficial de YiQi (`apidoc.yiqi.com.ar`) se confirmó la causa real: el `access_token` es de **vida corta por diseño** (~24hs, confirmado empíricamente: `expires_in = 86399`), no ~4 años como asumía un comentario viejo del código nunca verificado — y el sistema **nunca implementó** la renovación (`grant_type=refresh_token`) que YiQi exige. **✅ Construido, deployado y validado en vivo**: módulo compartido `_shared/yiqiConfig.ts` que renueva el token solo, 2hs antes de vencer, usado ahora por `sync-yiqi` y `yiqi-connector`. Confirmado en base de datos (`token_expira_en` con fecha real), en logs reales (`net._http_response`, sin errores tras el fix) y en vivo en el Monitor de Stock (7186 artículos, "✓ Sincronizado"). Riesgo residual (colisión de renovación entre los 3 cron jobs a las 6:00 UTC) documentado y aceptado a propósito, sin locking — de baja probabilidad y auto-recuperable. Detalle completo en **SESIÓN 17/8/2026**, al final del documento.
+>
+> **Actualización 18/8/2026 — cerrada la incógnita del criterio 5 del MVP: escribir en YiQi (`POST /ORDEN_DE_COMPRA`) SÍ se puede.** Era el mayor riesgo técnico abierto desde julio ("nunca se probó el endpoint"). En vez de preguntarle a Aris si el módulo Compras estaba licenciado (hubiera tardado, y Federico necesita cerrar el desarrollo rápido), se probó directo y sin riesgo: **lectura real** (`GET /ORDEN_DE_COMPRA/1669`, id interno de la OC #1727) devolvió el registro completo con detalle anidado — confirma acceso de lectura. **Escritura real**, con una prueba diseñada para no crear nada (un `POST` con un proveedor inexistente, `CLIE_ID_CLIE=999999999`): YiQi devolvió `400`, *"hace referencia a una instancia inexistente en Empresa"* — validación de integridad referencial real, no un error de permiso/licencia, y **no se creó ninguna orden**. Confirmado: el módulo está habilitado para escribir. Detalle completo, incluyendo por qué se descartó la prueba con body vacío (una OC real de Dentalab ya tiene líneas vacías y $0, así que un POST vacío podría haber creado algo real) y el hallazgo de que YiQi no tiene `DELETE` para estas entidades (solo cancelación, vía `CANCELACION_DE_COMPR`), en **SESIÓN 18/8/2026**, al final del documento.
 
 ---
 
@@ -78,7 +80,7 @@ Soy Federico, de Tulkas LLC. Estoy desarrollando **Dentalab-Compras**, un sistem
 | 2 | Sync de stock con YiQi sin intervención | ✅ **COMPLETO** — 3 cron jobs activos |
 | 3 | Monitor muestra productos bajo punto de reposición | ✅ **COMPLETO** |
 | 4 | OC generada, aprobada, **y enviada al proveedor** | ⚠️ **PARCIAL** — se genera y aprueba; el envío no está |
-| 5 | **OC escrita en YiQi** vía `POST /ORDEN_DE_COMPRA` | ❌ **NO HECHO** — nunca se probó el endpoint |
+| 5 | **OC escrita en YiQi** vía `POST /ORDEN_DE_COMPRA` | ⚠️ **PARCIAL** — `[18/8/2026]` el endpoint existe y **el módulo está confirmado habilitado para escribir** (probado en vivo sin crear nada real, ver SESIÓN 18/8/2026); falta construir el mapeo real de campos (proveedor/artículos/líneas) y la integración en el flujo de la app |
 | 6 | Historial de OC consultable | ✅ **COMPLETO** |
 | 7 | Ivana opera sola tras capacitación | ⏸️ **PENDIENTE** — falta la capacitación |
 
@@ -94,7 +96,7 @@ Soy Federico, de Tulkas LLC. Estoy desarrollando **Dentalab-Compras**, un sistem
 ## Lo que falta y NO se destraba con respuestas del cliente
 
 1. **Envío de la OC al proveedor** (Resend / WhatsApp). Los templates y el PDF están; falta la integración de envío. `[chrome-live 2026-08-07]` Confirmado en vivo: el propio banner de "Órdenes de compra" dice *"Todavía no se envían al ERP ni al proveedor — esa etapa es la siguiente del desarrollo"*. Ninguna OC nueva (creada vía Nueva OC) llega hoy a estado `Enviada`, solo `Aprobada`. Las 51 OC en estado `Enviada` que se ven en el listado son históricas/pre-existentes.
-2. **Escritura en YiQi** (`POST /ORDEN_DE_COMPRA`). Marcado como el mayor riesgo técnico desde el roadmap original. Nunca se probó el formato.
+2. **Escritura en YiQi** (`POST /ORDEN_DE_COMPRA`). Marcado como el mayor riesgo técnico desde el roadmap original. `[18/8/2026]` **La incógnita de "¿se puede?" está cerrada** — probado en vivo (lectura y escritura), el módulo está habilitado, sin crear nada real. Ver SESIÓN 18/8/2026. Lo que falta ahora es trabajo de construcción normal: mapear `CLIE_ID_CLIE`/`COVE_ID_COVE`/artículos reales, armar las líneas del pedido, y decidir cómo se dispara desde la app.
 3. **Comparación de precios entre proveedores** (`LISTA_DE_PRECIO_COMP` / `PRECIO_ARTICULO_COMP`, identificadas pero no exploradas).
 
 ## Lo que falta y SÍ depende de respuestas
@@ -267,7 +269,7 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 
 1. **🔴 Crear los usuarios reales** en Supabase Auth + su fila en `usuarios_config` (sin la fila, el sistema falla cerrado y no ven nada). Copiar las asignaciones de proveedores de la Ivana demo. `[chrome-live 2026-08-07]` **Parcialmente hecho**: ambas cuentas reales ya existen con `usuarios_config` resuelto. Falta que Aris inicie sesión con la suya al menos una vez.
 2. **🔴 Envío de la OC al proveedor** — Resend para email. Los templates y el PDF ya están.
-3. **🔴 Escritura en YiQi** (`POST /ORDEN_DE_COMPRA`) — el mayor riesgo técnico pendiente desde el inicio.
+3. **🔴 Escritura en YiQi** (`POST /ORDEN_DE_COMPRA`) — `[18/8/2026]` confirmado que el módulo está habilitado (ver SESIÓN 18/8/2026); falta el mapeo de campos reales y la integración en el flujo de la app. Ya no es una incógnita de "¿se puede?", es trabajo de construcción.
 4. **Condiciones comerciales por proveedor** — depende de que Aris complete los datos. `[repo 2026-08-06]` La pantalla (`CondicionesProveedor.jsx`) ya existe. `[11/8/2026]` Diseño confirmado como cerrado (decisión de negocio #13).
 5. **Comparación de precios** (`LISTA_DE_PRECIO_COMP` / `PRECIO_ARTICULO_COMP`).
 6. ~~Composición de combos y fraccionados — tabla de mapeo a mano + definición de Aris.~~ **✅ HECHO 10/8/2026, cerrado del todo 11/8/2026** — tabla `composicion_articulos` (44 filas) creada, con RLS, e integrada en `sugerencias_compra()` e `historial_ventas()` (migration `20260810120000`), validada en vivo. El único punto pendiente (código de la masa del kit Speedex) se cerró el 11/8 con la confirmación de Aris sobre el combo `21081` — ver SESIÓN 11/8/2026.
@@ -772,5 +774,99 @@ Los 3 cron jobs (`sync-material-cada-15-min`, `sync-oc-y-clientes-diario`, `sync
 
 ## Pendiente
 
-- **Falta el `git add`/`commit`/`push`** de esta sesión — `supabase functions deploy` no requiere git, así que el código ya está en producción, pero el repo todavía no tiene el commit de estos 4 archivos (`_shared/yiqiConfig.ts`, la migration, y los dos `index.ts` editados). Hacerlo antes de la próxima sesión para no perder el historial.
+- ~~Falta el `git add`/`commit`/`push` de esta sesión~~ **✅ HECHO 17/8/2026** — commit `901efac` ("Fix: renovación automática del token de YiQi"), pusheado a `main`. Tuvo que resolverse un `.git\index.lock` viejo (mismo patrón que 11/8 y 15/8) antes de poder commitear.
 - Fila vieja/basura en `yiqi_config` (`57db7796-f8ba-4c91-8ea4-d4a8a0e94666`, 37 caracteres) sigue sin borrar — cosmético, no afecta nada porque el sync siempre usó la fila correcta por `created_at`. Sin apuro.
+
+
+---
+
+# SESIÓN 18/8/2026 — Cerrada la incógnita de escribir en YiQi (criterio 5 del MVP), sin preguntarle a Aris y sin crear nada real
+
+**Contexto:** con el token de YiQi ya resuelto (SESIÓN 17/8/2026), Federico pidió cerrar el desarrollo lo antes posible. En vez de esperar la respuesta de Aris sobre si el módulo Compras estaba licenciado (paso que se venía planeando para "definiciones pendientes"), se decidió probarlo directo — más rápido y no depende de que Aris conteste.
+
+## 1. El endpoint existe tal cual se asumía desde el inicio
+
+Se descargó el schema completo de la documentación pública de YiQi (`erpdemo.schema-Compras-api.json`, con la conexión real de Federico — la sesión de la nube no llega a `apidoc.yiqi.com.ar`). Una primera lectura resumida (vía herramienta de fetch) sugirió, incorrectamente, que el módulo Compras solo exponía la entidad `DESPACHO` — resultó ser una lectura parcial de un JSON grande, no la realidad. Con la descarga completa y el archivo parseado en PowerShell, la lista real de rutas confirma **`/ORDEN_DE_COMPRA`** con el mismo patrón que toda entidad de YiQi (`POST`, `GET/{id}`, `search`, `smartie`, `query`, `changestate`, `changestatemultiple`, `file`, `report`) — el endpoint que se asumió desde julio existe de verdad.
+
+## 2. Prueba de lectura — confirmada, sin cambios de código
+
+Se encontró que `ORDEN_DE_COMPRA` **ya estaba en el whitelist de `yiqi-connector`** desde hace semanas (no hizo falta tocar código ni deployar). Usando el id interno real de una OC existente (`yiqi_id=1669`, correspondiente a la OC visible `#1727` — **importante: el número visible de OC y el id interno de YiQi son campos distintos**, `nro_oc` vs `yiqi_id` en nuestra tabla `ordenes_yiqi`), Federico corrió:
+
+```
+GET /functions/v1/yiqi-connector?entidad=ORDEN_DE_COMPRA&id=1669
+```
+
+Devolvió `200 OK` con el registro completo: proveedor, fechas, estado (`302 — En preparación`), y los arrays anidados `DETALLE`/`REMITOS`/histórico de estados. Confirma acceso de lectura al módulo Compras vía API.
+
+**Hallazgo aparte, sin acción:** esa OC real tiene `ORDC_RAZON_DE_RECHAZO: "Prueba"` — parece una orden de prueba preexistente en el YiQi real de Dentalab, ajena a este proyecto. Solo se leyó, no se tocó.
+
+## 3. Prueba de escritura — diseñada a propósito para no crear nada, y no creó nada
+
+**Se descartó la prueba obvia (POST con body vacío)** antes de correrla: la misma OC real leída en el paso 2 tiene `DETALLE: []` y `ORDC_IMPORTE_TOTAL: 0` — es decir, **YiQi acepta órdenes sin líneas y en $0 como válidas**. Un POST vacío corría el riesgo real de crear una orden de verdad en el YiQi de Dentalab, no de rebotar con un error de validación.
+
+**Segundo hallazgo, también antes de tocar nada:** ninguna entidad de este módulo tiene método `DELETE` en el schema — solo `POST`/`GET`/`PUT` (mismo patrón en las ~30 entidades listadas). Existe una entidad separada `CANCELACION_DE_COMPR`, lo que sugiere que en YiQi las órdenes **no se borran, se cancelan** (quedarían con estado "Cancelada" en el historial, visibles para Aris/Ivana, no desaparecen). Esto significa que si el POST de prueba llegaba a crear algo real, no había forma limpia de borrarlo — solo de marcarlo cancelado, dejando rastro.
+
+**Diseño de la prueba, con esto en mente:** un `POST /ORDEN_DE_COMPRA` con un proveedor inexistente (`CLIE_ID_CLIE = 999999999`) y el resto de los campos con valores reales y válidos (tomados de la OC real ya leída: `COVE_ID_COVE=3`, `MONE_ID_MONE=171`), para que lo único inválido del pedido fuera justo eso — apostando a que la integridad referencial de la base de YiQi rechazara la operación completa antes de guardar nada, sin depender de que hubiera validaciones de negocio más laxas (como ya sabíamos, por el punto anterior, que las hay).
+
+**Resultado — exactamente lo esperado:**
+```
+Status: 400
+{"title":"No se puede guardar ésta instancia de Orden de Compra, ya que hace referencia a una instancia inexistente en Empresa","status":400}
+```
+
+`400` de validación de integridad referencial, no `403` de permiso — **confirma que el módulo está habilitado para escribir**, y el mensaje de error deja en claro que no se guardó nada (rechazado por apuntar a un proveedor que no existe, antes de persistir).
+
+## 4. Conclusión: criterio 5 del MVP deja de ser una incógnita
+
+Desde el inicio del proyecto, "escribir la OC en YiQi" estaba marcado como el mayor riesgo técnico, con la duda abierta de si el endpoint existía, si el módulo estaba licenciado, y si había que esperar una confirmación de Aris para poder ni empezar a probar. Las tres dudas quedaron resueltas hoy, en vivo, sin bloquear nada del lado del cliente:
+
+- El endpoint existe, documentado y confirmado.
+- El módulo está habilitado para leer y para escribir.
+- No hizo falta preguntarle nada a Aris — se pudo probar de forma segura con datos ya conocidos y una prueba diseñada para fallar sin crear nada.
+
+**Lo que queda ahora es trabajo de construcción normal, no una incógnita de "¿se puede?":** mapear los ids reales de proveedor (`CLIE_ID_CLIE`) y artículos desde nuestras tablas propias hacia los campos de YiQi, armar el array de líneas (`DETALLE`) con el formato real que YiQi espera, y decidir en qué punto del flujo de la app se dispara el POST (por ejemplo, al aprobar la orden en "Nueva OC"/"Órdenes de compra").
+
+## 5. Formato real de `DETALLE` y mapeos confirmados (misma sesión, continuación)
+
+La OC #1727 resultó atípica (`ORDC_RAZON_DE_RECHAZO: "Prueba"`, $0, sin líneas) — no representativa. Se repitió la misma lectura (sin riesgo, solo `GET`) contra una orden real y grande: **OC #1725 (DIS DEN, `yiqi_id=1667`, ~$14.8M, 27 líneas según nuestra propia base)**. Esta vez `DETALLE` vino completo, con las 27 líneas.
+
+**Formato real de una línea de `DETALLE`:**
+```json
+{
+  "MATE_ID_MATE": 416,
+  "DEDO_NOMBRE_MATE": "Pinza Adson s/ Diente BELKYS",
+  "DEDO_CANTIDAD": 5,
+  "TIUN_ID_TIUN": 2,
+  "ALIV_ID_ALIV": 3,
+  "DEDO_PRECIO_UNITARIO_ACOR": 8678.0000,
+  "DEDO_PRECIO_ACORDADO": 10500.3800,
+  "DEDO_SUBTOTAL_NETO": 43390,
+  "DEDO_SUBTOTAL": 52501.9,
+  "DEDO_IVA": 9111.9,
+  "DEDO_TOTAL": 52501.9
+}
+```
+(`MATE_ID_MATE` = artículo, `DEDO_CANTIDAD` = cantidad, `TIUN_ID_TIUN` = unidad — `2` en todas las líneas vistas, `ALIV_ID_ALIV` = alícuota de IVA — `3` en todas las líneas vistas, precios netos vs. con impuesto, y los subtotales/IVA/total ya calculados por línea.)
+
+**Mapeos confirmados contra nuestras propias tablas, sin necesidad de sincronizar nada nuevo:**
+- **Artículo:** `material_yiqi.yiqi_id` = `MATE_ID_MATE` de YiQi. Confirmado con dato real: `yiqi_id=416` → `mate_nombre="Pinza Adson s/ Diente BELKYS"`, coincide exacto con la línea de la OC. Importante: `yiqi_id` (416) **es distinto** de `mate_codigo` (11218, el SKU que se usa en toda la app) — son dos campos separados, hay que usar el correcto en cada contexto.
+- **Proveedor:** `clientes_yiqi.yiqi_id` = `CLIE_ID_CLIE` de YiQi. Confirmado con dato real: `yiqi_id=3954` → `clie_nombre="DIS DEN"`, coincide con el proveedor de la OC #1725. Mismo patrón: distinto de `clie_codigo` (432).
+
+Con esto, los dos mapeos más importantes (artículo y proveedor) están resueltos usando datos que ya sincronizamos hoy — no hace falta tocar `sync-yiqi` para esta parte.
+
+**Resuelto con un chequeo masivo (vía `yiqi-connector?entidad=ORDEN_DE_COMPRA`, trae ~500 órdenes de `/search`):**
+- **`MONE_ID_MONE` es constante de verdad: `171` en el 100% de las órdenes.** Se usa siempre, sin depender de Aris.
+- **`COVE_ID_COVE` varía (`3`, `4`, `6` en un subconjunto chico), pero la gran mayoría de las órdenes reales lo dejan vacío.** No hace falta resolver qué significa cada valor para escribir la primera versión — alcanza con dejarlo vacío/null, igual que la mayoría de las OC reales de Dentalab. Qué significan esos valores puntuales (y si alguna vez conviene setear uno al crear desde la app) queda anotado para cuando Aris conteste — no bloquea nada.
+
+## Nota de seguridad menor
+
+Durante esta sesión, el `bearer_token` completo de YiQi quedó pegado en el chat por Federico dos veces (al armar la variable `$token` en PowerShell para las pruebas). Riesgo bajo — no es una contraseña, y con la renovación automática de la SESIÓN 17/8/2026 va a rotar solo en menos de 24hs — pero se marca por transparencia, mismo criterio que exposiciones parciales anteriores en este proyecto (14/8, 15/8). No requirió ninguna acción.
+
+## Pendiente
+
+- ~~Ver el formato real de `DETALLE` con datos reales~~ **✅ HECHO** — ver punto 5 arriba, con OC #1725/yiqi_id 1667.
+- ~~Confirmar mapeo artículo/proveedor contra nuestras tablas~~ **✅ HECHO** — ver punto 5 arriba (`material_yiqi.yiqi_id`, `clientes_yiqi.yiqi_id`).
+- ~~Confirmar si `MONE_ID_MONE` es constante~~ **✅ HECHO** — `171` en el 100% de ~500 órdenes reales revisadas. Se usa siempre.
+- Qué significan los valores puntuales de `COVE_ID_COVE` (`3`/`4`/`6`) — **no bloquea la escritura** (se deja vacío, igual que la mayoría de las OC reales), pero queda anotado para preguntarle a Aris cuando conteste, por si conviene setear algo específico más adelante.
+- ~~Diseñar en qué momento del flujo de la app se dispara la escritura real a YiQi~~ **✅ DECIDIDO 18/8/2026** — Federico confirmó: **al aprobar la orden desde la app** (no un botón aparte).
+- ~~Definir qué pasa si el POST a YiQi falla al aprobar~~ **✅ DECIDIDO 18/8/2026** — **se aprueba local igual, no se bloquea a Ivana/Aris**. Decisión de Federico, con buen motivo: YiQi ya tuvo varios cortes reales este mes (token vencido, cron mal configurado) — bloquear la aprobación cada vez que YiQi tenga un problema paralizaría la operación de Dentalab por algo que no depende de ellos. La orden queda marcada con un aviso claro tipo **"Error de vinculación a YiQi"** y pendiente de reenviar (reintento automático, mismo patrón que el resto del sync). Diseño técnico pendiente de armar: columnas nuevas en `ordenes_propias` (`yiqi_enviada_en`, `yiqi_error`, `yiqi_id_creado`), badge/aviso en la UI de Órdenes de compra/Seguimiento de OC, y mecanismo de reintento (cron o botón manual "Reintentar envío").

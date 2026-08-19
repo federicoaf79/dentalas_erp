@@ -201,7 +201,9 @@ Deno.serve(async (req: Request) => {
 
       // ---- Armar header + POST a YiQi ----
       const hoy = new Date().toISOString().slice(0, 10) + 'T00:00:00';
-      const payload = {
+      const config = await getYiqiConfig(supabaseAdmin);
+      // Datos reales del registro a crear.
+      const datosRegistro = {
         CLIE_ID_CLIE: clienteMatch.yiqi_id,
         MONE_ID_MONE: MONE_ID_MONE_ARS,
         ORDC_FECHA: hoy,
@@ -209,8 +211,16 @@ Deno.serve(async (req: Request) => {
         ORDC_OBSERVACIONES: orden.notas ?? null,
         DETALLE: detalle,
       };
+      // Primer intento (orden #9, 18/8/2026) mandaba estos campos sueltos
+      // en la raíz del body -> "data cannot be empty". Esta API espera
+      // el registro envuelto en "data" (con schemaId como hermano), no
+      // los campos sueltos -- mismo patrón que devolvió el error anterior
+      // de "schemaId cannot be empty" cuando solo iba en la query string.
+      const payload = {
+        schemaId: config.schema_id,
+        data: datosRegistro,
+      };
 
-      const config = await getYiqiConfig(supabaseAdmin);
       const url = `${config.base_url}/api/public/ORDEN_DE_COMPRA?schemaId=${config.schema_id}`;
       const respYiqi = await fetch(url, {
         method: 'POST',
@@ -227,7 +237,18 @@ Deno.serve(async (req: Request) => {
       }
 
       const dataYiqi = await respYiqi.json().catch(() => null);
-      const yiqiIdCreado = dataYiqi?.id ?? dataYiqi?.data?.id ?? null;
+      // La respuesta de creacion puede traer la clave como "id" o "ID"
+      // (mismo problema de casing confirmado el 19/8/2026 en la lectura
+      // de REPORTE_DE_OC via sync-yiqi -- YiQi no es consistente entre
+      // endpoints/smarties), y puede venir en la raiz o envuelta en
+      // "data". Se prueban las 4 combinaciones antes de rendirse.
+      const yiqiIdCreado =
+        dataYiqi?.id ?? dataYiqi?.ID ?? dataYiqi?.data?.id ?? dataYiqi?.data?.ID ?? null;
+      if (yiqiIdCreado == null) {
+        console.warn(
+          `enviar-oc-yiqi: no se pudo extraer el id creado de la respuesta de YiQi para la orden #${ordenId}. Respuesta cruda: ${JSON.stringify(dataYiqi).slice(0, 500)}`
+        );
+      }
 
       const { error: errUpdate } = await supabaseAdmin
         .from('ordenes_propias')

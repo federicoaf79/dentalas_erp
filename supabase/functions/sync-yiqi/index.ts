@@ -137,6 +137,10 @@ async function hashDeObjeto(obj: Record<string, unknown>): Promise<string> {
 async function mapearMaterial(filas: any[]) {
   const resultado = [];
   for (const f of filas) {
+    // Ver nota de casing en mapearOrdenes: YiQi puede devolver la clave
+    // como "ID" (mayuscula) o "id" segun la smartie -- se soportan las dos.
+    const yiqiId = f.id ?? f.ID ?? null;
+    if (yiqiId == null) continue;
     const camposNegocio = {
       mate_codigo: f.MATE_CODIGO ?? null,
       mate_nombre: f.MATE_NOMBRE ?? null,
@@ -159,7 +163,7 @@ async function mapearMaterial(filas: any[]) {
       mate_crm_final: f.MATE_CRM_FINAL ?? null,
     };
     resultado.push({
-      yiqi_id: f.id,
+      yiqi_id: yiqiId,
       ...camposNegocio,
       hash_datos: await hashDeObjeto(camposNegocio),
     });
@@ -172,7 +176,22 @@ async function mapearMaterial(filas: any[]) {
 // ------------------------------------------------------------
 async function mapearOrdenes(filas: any[]) {
   const resultado = [];
+  let sinId = 0;
   for (const f of filas) {
+    // yiqi_id es NOT NULL en ordenes_yiqi (es la clave real del registro
+    // en YiQi). BUG REAL encontrado el 18/8/2026: este codigo leia
+    // "f.id" (minuscula), pero la smartie REPORTE_DE_OC devuelve la
+    // clave como "ID" (mayuscula, igual que el resto de sus campos:
+    // NRO_OC, PROVEEDOR, etc.) -- confirmado inspeccionando la respuesta
+    // cruda. Eso hacia que TODAS las filas se saltearan silenciosamente
+    // (sync "exitoso" con 0 filas, sin error). Ahora se acepta "id" o
+    // "ID" para no volver a pisar el mismo problema si algun dia YiQi
+    // cambia el casing de vuelta o difiere entre entidades.
+    const yiqiId = f.id ?? f.ID ?? null;
+    if (yiqiId == null) {
+      sinId++;
+      continue;
+    }
     const camposNegocio = {
       nro_oc: f.NRO_OC != null ? String(f.NRO_OC) : null,
       proveedor: f.PROVEEDOR ?? null,
@@ -188,10 +207,13 @@ async function mapearOrdenes(filas: any[]) {
       total: f.TOTAL ?? null,
     };
     resultado.push({
-      yiqi_id: f.id,
+      yiqi_id: yiqiId,
       ...camposNegocio,
       hash_datos: await hashDeObjeto(camposNegocio),
     });
+  }
+  if (sinId > 0) {
+    console.warn(`mapearOrdenes: se saltearon ${sinId} fila(s) de REPORTE_DE_OC sin "id"/"ID".`);
   }
   return resultado;
 }
@@ -202,6 +224,9 @@ async function mapearOrdenes(filas: any[]) {
 async function mapearClientes(filas: any[]) {
   const resultado = [];
   for (const f of filas) {
+    // Ver nota de casing en mapearOrdenes: se acepta "id" o "ID".
+    const yiqiId = f.id ?? f.ID ?? null;
+    if (yiqiId == null) continue;
     const camposNegocio = {
       clie_codigo: f.CLIE_CODIGO ?? null,
       clie_nombre: f.CLIE_NOMBRE ?? null,
@@ -213,7 +238,7 @@ async function mapearClientes(filas: any[]) {
       telefono: f.CLIE_TE1 ?? null,
     };
     resultado.push({
-      yiqi_id: f.id,
+      yiqi_id: yiqiId,
       ...camposNegocio,
       hash_datos: await hashDeObjeto(camposNegocio),
     });

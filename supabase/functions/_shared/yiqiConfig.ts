@@ -111,6 +111,10 @@ async function refrescarToken(baseUrl: string, refreshToken: string) {
 // el proximo diagnostico no confunda "se vencio el refresh token"
 // con "YiQi esta caido".
 // ------------------------------------------------------------
+// Cuanto dura el lock antes de considerarse abandonado (por si una
+// invocación se cae a mitad de la renovación y nunca llega a liberarlo).
+const LOCK_DURACION_MS = 30 * 1000;
+
 export async function getYiqiConfig(supabaseAdmin: ReturnType<typeof createClient>): Promise<YiqiConfig> {
   const config = await leerConfig(supabaseAdmin);
 
@@ -121,6 +125,50 @@ export async function getYiqiConfig(supabaseAdmin: ReturnType<typeof createClien
     return config;
   }
 
+  // Lock (agregado 18/8/2026): antes de intentar renovar, tratamos de
+  // "tomar" el lock con un UPDATE condicional. Si otra invocación ya
+  // lo tiene (o lo tomó hace instantes), NO competimos por el mismo
+  // refresh_token -- YiQi solo permite uno vivo por usuario y la
+  // segunda llamada perdería la carrera con un 401 invalid_grant que
+  // deja todo roto. En vez de eso, esperamos un toque y releemos: lo
+  // más probable es que el que ganó el lock ya haya guardado un token
+  // fresco para cuando volvemos a mirar.
+  const ahora = new Date();
+  const { data: lockTomado } = await supabaseAdmin
+    .from('yiqi_config')
+    .update({ refresh_lock_hasta: new Date(ahora.getTime() + LOCK_DURACION_MS).toISOString() })
+    .eq('id', config.id)
+    .or(`refresh_lock_hasta.is.null,refresh_lock_hasta.lt.${ahora.toISOString()}`)
+    .select('id')
+    .maybeSingle();
+
+  if (!lockTomado) {
+    console.log('yiqi_config: otra invocación ya está renovando el token -- esperando y releyendo en vez de competir.');
+    await new Promise((r) => setTimeout(r, 1500));
+    const configReleida = await leerConfig(supabaseAdmin);
+    // Si ya quedó renovado por la otra invocación, listo. Si todavía
+    // no (venció el lock sin que nadie lo liberara, por ejemplo), se
+    // usa tal cual -- mejor un token viejo-pero-quizás-vigente que
+    // sumar una tercera renovación en danza.
+    return configReleida;
+  }
+
+  try {
+    return await renovarYGuardar(supabaseAdmin, config, expiraEn);
+  } finally {
+    await supabaseAdmin.from('yiqi_config').update({ refresh_lock_hasta: null }).eq('id', config.id);
+  }
+}
+
+// ------------------------------------------------------------
+// La renovación real, separada de getYiqiConfig para poder envolverla
+// en el lock de arriba con un try/finally prolijo.
+// ------------------------------------------------------------
+async function renovarYGuardar(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  config: YiqiConfig,
+  expiraEn: Date | null,
+): Promise<YiqiConfig> {
   if (!config.refresh_token) {
     // Config vieja (cargada antes de este cambio) sin refresh_token
     // guardado. No hay forma de renovar solo -- hace falta un login

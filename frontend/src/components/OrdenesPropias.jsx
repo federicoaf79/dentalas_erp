@@ -246,6 +246,42 @@ export default function OrdenesPropias({ onCambio }) {
       setOcupado(false)
     }
   }
+  // Reintento manual del envío a YiQi (botón "Reintentar envío" / badge de
+  // error). Mismo endpoint que dispara la aprobación automáticamente y que
+  // barre el sweep de pg_cron -- enviar-oc-yiqi es idempotente, así que no
+  // hay riesgo de duplicar en YiQi si esta orden ya se había enviado bien.
+  async function reintentarEnvioYiqi(orden) {
+    setOcupado(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('enviar-oc-yiqi', {
+        body: { orden_id: orden.id },
+      })
+      if (error) throw new Error(error.message)
+      if (data?.ok && data?.enviada) {
+        setAviso(`Orden #${orden.id} vinculada a YiQi (OC #${data.yiqi_id}).`)
+      } else if (data?.ok) {
+        setAviso(data?.motivo ? `Orden #${orden.id}: ${data.motivo}` : `Orden #${orden.id}: sin cambios.`)
+      } else {
+        setError(data?.error || 'No se pudo reenviar la orden a YiQi.')
+      }
+      await cargar()
+      // Si el detalle de esta orden está abierto, se relee directo para
+      // que el panel muestre yiqi_id_creado/yiqi_error al toque, sin
+      // depender del timing de los setState de cargar().
+      if (abierta?.id === orden.id) {
+        const { data: fresca } = await supabase
+          .from('ordenes_propias')
+          .select('*')
+          .eq('id', orden.id)
+          .maybeSingle()
+        if (fresca) setAbierta((prev) => (prev ? { ...prev, ...fresca } : prev))
+      }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
   async function enviarAAprobacion(orden) {
     setOcupado(true)
     try {
@@ -427,6 +463,14 @@ export default function OrdenesPropias({ onCambio }) {
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${est.clase}`}>
                         {est.label}
                       </span>
+                      {o.estado === 'aprobada' && !o.yiqi_id_creado && (
+                        <span
+                          title={o.yiqi_error || 'Todavía no se envió a YiQi.'}
+                          className="block mt-1 text-[10px] font-semibold text-[#b45309]"
+                        >
+                          ⚠ Error de vinculación a YiQi
+                        </span>
+                      )}
                     </td>
                     <td className="px-3.5 py-2.5 font-semibold tabular-nums text-[13px]">
                       {o.total_estimado != null ? formatoMoneda(o.total_estimado) : '—'}
@@ -480,6 +524,16 @@ export default function OrdenesPropias({ onCambio }) {
                             Eliminar
                           </button>
                         </>
+                      )}
+                      {filtro === 'activas' && permisos.esAdmin && o.estado === 'aprobada' && !o.yiqi_id_creado && (
+                        <button
+                          disabled={ocupado}
+                          onClick={() => reintentarEnvioYiqi(o)}
+                          title={o.yiqi_error || 'Todavía no se envió a YiQi.'}
+                          className="text-sm font-semibold text-[#b45309] hover:underline mr-3 disabled:opacity-40"
+                        >
+                          Reintentar envío
+                        </button>
                       )}
                       {filtro === 'activas' && permisos.esAdmin && (
                         <button
@@ -543,11 +597,29 @@ export default function OrdenesPropias({ onCambio }) {
               </button>
             </div>
           </div>
-          {abierta.estado === 'aprobada' && (
+          {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
             <Aviso tipo="filtro" className="mb-3">
-              Orden aprobada. El envío automático al ERP y al proveedor es la etapa siguiente del desarrollo:
-              por ahora queda registrada y aprobada en el sistema.
+              Vinculada a YiQi (OC #{abierta.yiqi_id_creado}) el {formatoFecha(abierta.yiqi_enviada_en)}.
             </Aviso>
+          )}
+          {abierta.estado === 'aprobada' && !abierta.yiqi_id_creado && (
+            <div className="border border-[#fde68a] bg-[#fffbeb] text-[#92400e] rounded-lg px-3.5 py-2.5 text-[13px] mb-3 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="font-semibold">⚠ Error de vinculación a YiQi</div>
+                <div className="mt-0.5 opacity-90">
+                  {abierta.yiqi_error || 'Todavía no se pudo enviar esta orden a YiQi.'}
+                </div>
+              </div>
+              {permisos.esAdmin && (
+                <button
+                  disabled={ocupado}
+                  onClick={() => reintentarEnvioYiqi(abierta)}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[#b45309] text-white hover:opacity-90 disabled:opacity-40"
+                >
+                  {ocupado ? 'Reintentando…' : 'Reintentar envío'}
+                </button>
+              )}
+            </div>
           )}
           {abierta.notas && (
             <div className="border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
