@@ -55,11 +55,25 @@ function formatoFechaHora(fechaStr) {
   }
 }
 
-function num(v, decimales = 0) {
+// Default 2 decimales + separador de miles (es-AR: punto de miles, coma
+// decimal) para cualquier cantidad — incluye stock, porque Aris confirmó
+// que los decimales en stock son datos legítimos (fraccionados/producción),
+// no hay que truncarlos a entero.
+function num(v, decimales = 2) {
   if (v == null) return '—'
   const n = Number(v)
   if (Number.isNaN(n)) return '—'
   return n.toLocaleString('es-AR', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+}
+
+// Para inputs numéricos nativos (type="number"): SIN separador de miles
+// (el navegador lo rechaza) pero sí topeado a 2 decimales, para no mostrar
+// el float crudo (ej. 230.41666666666666 -> "230.42").
+function numInput(v) {
+  if (v == null) return ''
+  const n = Number(v)
+  if (Number.isNaN(n)) return ''
+  return n.toFixed(2)
 }
 
 // ------------------------------------------------------------
@@ -98,7 +112,7 @@ async function traerPaginado(builder) {
 // el resto de la app (rounded-xl, bordes suaves, sin window.prompt).
 // ------------------------------------------------------------
 function ModalAccion({ fila, variante, onCerrar, onConfirmar, guardando }) {
-  const [cantidad, setCantidad] = useState(fila.cantidad != null ? String(fila.cantidad) : '')
+  const [cantidad, setCantidad] = useState(numInput(fila.cantidad))
   const [motivo, setMotivo] = useState('')
   const esMovido = variante === 'movido'
   const motivoInvalido = !esMovido && motivo.trim() === ''
@@ -376,7 +390,7 @@ export default function ReposicionInterna() {
           <div className="text-[12px] text-[var(--sub)] mt-0.5">
             {cargandoAlgo
               ? 'Cargando…'
-              : `${totalAccionables} para mover · ${num(totalAMover, 0)} unidades totales`}
+              : `${num(totalAccionables, 0)} para mover · ${num(totalAMover, 2)} unidades totales`}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -437,7 +451,7 @@ export default function ReposicionInterna() {
               : 'bg-white text-gray-600 border-gray-200'
           }`}
         >
-          Todas ({filas.length})
+          Todas ({num(filas.length, 0)})
         </button>
         {prioridadesDisponibles.map((p) => {
           const etiqueta = filas.find((f) => f.prioridad_orden === p)?.prioridad_label ?? `Prioridad ${p}`
@@ -451,7 +465,7 @@ export default function ReposicionInterna() {
                   : 'bg-white text-gray-600 border-gray-200'
               }`}
             >
-              {etiqueta} ({contadoresPorPrioridad[p]})
+              {etiqueta} ({num(contadoresPorPrioridad[p], 0)})
             </button>
           )
         })}
@@ -529,7 +543,7 @@ export default function ReposicionInterna() {
                   <td className="px-3.5 py-2.5">{num(f.stock_central)}</td>
                   <td className="px-3.5 py-2.5 text-gray-400">{f.clase_abc ?? '—'}</td>
                   <td className="px-3.5 py-2.5 font-bold">
-                    {f.cantidad > 0 ? num(f.cantidad, 1) : f.faltante_a_pedir > 0 ? `falta ${num(f.faltante_a_pedir, 1)}` : '—'}
+                    {f.cantidad > 0 ? num(f.cantidad, 2) : f.faltante_a_pedir > 0 ? `falta ${num(f.faltante_a_pedir, 2)}` : '—'}
                   </td>
                   <td className="px-3.5 py-2.5 text-gray-400">
                     {f.cobertura_dias_local != null ? `${num(f.cobertura_dias_local, 0)} d` : '—'}
