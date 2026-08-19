@@ -11,13 +11,15 @@
 //   GET .../sync-yiqi?entidad=oc         -> sincroniza REPORTE_DE_OC (~291 filas)
 //   GET .../sync-yiqi?entidad=clientes   -> sincroniza CLIENTE (~1.151 filas)
 //   GET .../sync-yiqi?entidad=ventas     -> sincroniza REPORTE_DE_VENTAS (pivoteado)
-//   GET .../sync-yiqi?entidad=todos      -> las 4, en secuencia
+//   GET .../sync-yiqi?entidad=stock      -> sincroniza STOCK por depósito (pivoteado)
+//   GET .../sync-yiqi?entidad=todos      -> las 5, en secuencia
 //
-// OJO CON "ventas": la smartie 2353 devuelve una tabla PIVOT (una fila
-// por SKU+proveedor, una COLUMNA por mes). Esta funcion la APLANA a
-// filas (mate_codigo, proveedor, periodo, cantidad) antes de guardarla.
-// Los nombres de las columnas de mes son genericos (C2..C21) y vienen
-// desordenados: el mes real se lee del mapeo field->title que YiQi manda
+// OJO CON "ventas" Y "stock": ambas smarties (2353 y 2360) devuelven
+// una tabla PIVOT -- una fila por SKU(+proveedor en ventas), una
+// COLUMNA genérica (C2..C21) por cada mes/depósito. Estas dos
+// funciones APLANAN el pivot antes de guardarlo. Los nombres de
+// columna genéricos vienen desordenados: el significado real se lee
+// del mapeo field->title que YiQi manda
 // en "columns". Por eso NO hay nada hardcodeado y los meses nuevos
 // entran solos cuando pasa el tiempo.
 //
@@ -247,6 +249,117 @@ async function mapearClientes(filas: any[]) {
 }
 
 // ------------------------------------------------------------
+// Mapeo STOCK (PIVOTEADO por depósito, smartie 2360) -> filas para
+// upsert_stock_yiqi. 1 fila por SKU (a diferencia de ventas, acá no
+// hay que aplanar a múltiples filas -- cada SKU ya es una sola fila
+// con una columna por depósito/categoría).
+// ------------------------------------------------------------
+// Títulos reales confirmados en vivo el 19/8/2026 -> nombre de
+// columna propio. Se resuelve por TÍTULO, nunca por el nombre de
+// campo genérico (C2, C3...), porque YiQi puede reordenar/renumerar
+// esos campos si se toca el pivot en la smartie.
+const TITULOS_STOCK: Record<string, string> = {
+  'Deposito 1 - Local': 'stock_local',
+  'Deposito Central': 'stock_central',
+  'Deposito 7 - Jorge': 'stock_jorge',
+  'Deposito ML Full': 'stock_ml_full',
+  'Baja': 'baja',
+  'Diferencia de Stock': 'diferencia_stock',
+  'En tránsito': 'en_transito',
+  'Exposiciones': 'exposiciones',
+  'Reclamo Proveedores': 'reclamo_proveedores',
+  'Reserva': 'reserva',
+};
+
+// YiQi devuelve algunos títulos con entidades HTML sin decodificar
+// (visto en vivo: "En tr&#225;nsito" en vez de "En tránsito") -- se
+// decodifican antes de comparar contra TITULOS_STOCK.
+function decodificarEntidadesHtml(s: string): string {
+  return s.replace(/&#(\d+);/g, (_, cod) => String.fromCharCode(Number(cod)));
+}
+
+async function mapearStock(filas: any[], columnas: any[]) {
+  const fieldPorColumna: Record<string, string> = {};
+  for (const c of columnas ?? []) {
+    const titulo = decodificarEntidadesHtml(String(c?.title ?? '').trim());
+    const columnaPropia = TITULOS_STOCK[titulo];
+    if (columnaPropia && c?.field) {
+      fieldPorColumna[columnaPropia] = String(c.field);
+    }
+  }
+  const faltantes = Object.keys(TITULOS_STOCK).filter((t) => !fieldPorColumna[TITULOS_STOCK[t]]);
+  if (faltantes.length > 0) {
+    console.warn(
+      `mapearStock: no se encontraron en la respuesta de YiQi las columnas esperadas: ${faltantes.join(', ')}. ` +
+      'Puede haber cambiado el pivot de la smartie STOCK (2360) -- revisar a mano.'
+    );
+  }
+
+  const resultado = [];
+  let sinSku = 0;
+  for (const f of filas) {
+    // SKU como texto SIEMPRE (regla de Aris: nunca convertir a número --
+    // hay casos reales como "31110 T", "66679-F").
+    const sku = f.STOC_SKU != null ? String(f.STOC_SKU).trim() : '';
+    if (!sku) {
+      sinSku++;
+      continue;
+    }
+    const valorColumna = (columnaPropia: string): number | null => {
+      const field = fieldPorColumna[columnaPropia];
+      if (!field) return null;
+      const v = f[field];
+      return v == null ? null : Number(v);
+    };
+    const camposNegocio = {
+      mate_nombre: f.MATE_NOMBRE ?? null,
+      stock_local: valorColumna('stock_local'),
+      stock_central: valorColumna('stock_central'),
+      stock_jorge: valorColumna('stock_jorge'),
+      stock_ml_full: valorColumna('stock_ml_full'),
+      baja: valorColumna('baja'),
+      diferencia_stock: valorColumna('diferencia_stock'),
+      en_transito: valorColumna('en_transito'),
+      exposiciones: valorColumna('exposiciones'),
+      reclamo_proveedores: valorColumna('reclamo_proveedores'),
+      reserva: valorColumna('reserva'),
+    };
+    resultado.push({
+      sku,
+      ...camposNegocio,
+      hash_datos: await hashDeObjeto(camposNegocio),
+    });
+  }
+  if (sinSku > 0) {
+    console.warn(`mapearStock: se saltearon ${sinSku} fila(s) de STOCK sin SKU.`);
+  }
+  return resultado;
+}
+
+// ------------------------------------------------------------
+// Sincroniza STOCK (caso especial, igual que ventas: pivot -> hay
+// que pedir "columns" además de "data").
+// ------------------------------------------------------------
+async function sincronizarStock(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  config: any,
+) {
+  const { filas, columnas } = await traerSmartieCompleta(
+    config.base_url,
+    'STOCK',
+    '2360', // Z.API_Stock_Por_Deposito_NO_BORRAR
+    config.schema_id,
+    config.bearer_token,
+  );
+  const filasMapeadas = await mapearStock(filas, columnas);
+  const { error } = await supabaseAdmin.rpc('upsert_stock_yiqi', { p_rows: filasMapeadas });
+  if (error) {
+    throw new Error(`Error en upsert_stock_yiqi: ${error.message}`);
+  }
+  return { entidad: 'stock', filasSincronizadas: filasMapeadas.length };
+}
+
+// ------------------------------------------------------------
 // Mapeo REPORTE_DE_VENTAS (PIVOTEADO) -> filas planas
 // ------------------------------------------------------------
 // La smartie 2353 devuelve algo asi:
@@ -447,11 +560,11 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const entidadParam = url.searchParams.get('entidad');
 
-    const ENTIDADES_VALIDAS = ['material', 'oc', 'clientes', 'ventas', 'todos'];
+    const ENTIDADES_VALIDAS = ['material', 'oc', 'clientes', 'ventas', 'stock', 'todos'];
     if (!entidadParam || !ENTIDADES_VALIDAS.includes(entidadParam)) {
       return new Response(
         JSON.stringify({
-          error: 'Parametro "entidad" invalido. Usar: material | oc | clientes | ventas | todos',
+          error: 'Parametro "entidad" invalido. Usar: material | oc | clientes | ventas | stock | todos',
         }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
@@ -462,15 +575,20 @@ Deno.serve(async (req: Request) => {
 
     const entidadesAProcesar =
       entidadParam === 'todos'
-        ? (['material', 'oc', 'clientes', 'ventas'] as const)
+        ? (['material', 'oc', 'clientes', 'ventas', 'stock'] as const)
         : ([entidadParam] as const);
 
     for (const entidad of entidadesAProcesar) {
-      // ventas va por su propio camino: pivot + tandas + otro nombre de param
-      const resultado =
-        entidad === 'ventas'
-          ? await sincronizarVentas(supabaseAdmin, config)
-          : await sincronizarEntidad(supabaseAdmin, config, entidad as 'material' | 'oc' | 'clientes');
+      // ventas y stock van por su propio camino: pivot (piden "columns"
+      // además de "data"), a diferencia del resto que es plano.
+      let resultado;
+      if (entidad === 'ventas') {
+        resultado = await sincronizarVentas(supabaseAdmin, config);
+      } else if (entidad === 'stock') {
+        resultado = await sincronizarStock(supabaseAdmin, config);
+      } else {
+        resultado = await sincronizarEntidad(supabaseAdmin, config, entidad as 'material' | 'oc' | 'clientes');
+      }
       resultados.push(resultado);
     }
 
