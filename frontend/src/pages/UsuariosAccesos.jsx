@@ -68,6 +68,15 @@ async function actualizarAsignacion(userId, proveedorCodigo, proveedorNombre, ac
   return data
 }
 
+async function restablecerPassword(userId, password) {
+  const { data, error } = await supabase.functions.invoke('admin-usuarios?accion=resetPassword', {
+    body: { userId, password },
+  })
+  if (error) throw new Error(error.message || 'Error restableciendo contraseña')
+  if (!data?.ok) throw new Error(data?.error || 'No se pudo restablecer la contraseña')
+  return data
+}
+
 function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
   try {
@@ -170,6 +179,55 @@ function PanelAsignacion({ usuario, proveedores, onCambioOptimista }) {
   )
 }
 
+// ------------------------------------------------------------
+// Modal para restablecer la contraseña de un usuario (19/8/2026).
+// Mismo lenguaje visual que el resto de la app (rounded-xl, sin
+// window.prompt). Se precarga con la clave de las cuentas demo por
+// default (Dentalab2026!) porque hoy son cuentas internas chicas —
+// editable por si hace falta poner otra.
+// ------------------------------------------------------------
+function ModalPassword({ usuario, onCerrar, onConfirmar, guardando }) {
+  const [password, setPassword] = useState('Dentalab2026!')
+  const invalida = password.trim().length < 8
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-xl border border-[var(--border)] shadow-lg w-full max-w-sm p-5">
+        <div className="text-[15px] font-bold mb-1">🔑 Restablecer contraseña</div>
+        <div className="text-[12px] text-[var(--sub)] mb-3">{usuario.email}</div>
+
+        <label className="text-[12px] text-gray-600 font-semibold">Nueva contraseña</label>
+        <input
+          type="text"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="mt-1 w-full border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono"
+        />
+        <div className="text-[11px] text-gray-400 mt-1">
+          Mínimo 8 caracteres. Se aplica al toque — avisale a la persona la clave nueva por fuera del sistema.
+        </div>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <button
+            onClick={onCerrar}
+            disabled={guardando}
+            className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onConfirmar(password.trim())}
+            disabled={guardando || invalida}
+            className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--indigo,#4338ca)] disabled:opacity-50"
+          >
+            {guardando ? 'Guardando…' : 'Restablecer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function UsuariosAccesos() {
   const permisos = usePermisos()
   const esAdmin = permisos.esAdmin
@@ -179,6 +237,9 @@ export default function UsuariosAccesos() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [usuarioExpandido, setUsuarioExpandido] = useState(null)
+  const [modalPassword, setModalPassword] = useState(null) // usuario o null
+  const [guardandoPassword, setGuardandoPassword] = useState(false)
+  const [avisoPassword, setAvisoPassword] = useState(null)
 
   async function cargarTodo() {
     setLoading(true)
@@ -238,6 +299,21 @@ export default function UsuariosAccesos() {
     setUsuarioExpandido((actual) => (actual === id ? null : id))
   }
 
+  async function confirmarPassword(password) {
+    if (!modalPassword) return
+    setGuardandoPassword(true)
+    try {
+      await restablecerPassword(modalPassword.id, password)
+      setModalPassword(null)
+      setAvisoPassword(`Contraseña actualizada para ${modalPassword.email}.`)
+      setTimeout(() => setAvisoPassword(null), 5000)
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    } finally {
+      setGuardandoPassword(false)
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
       {/* Header */}
@@ -271,6 +347,12 @@ export default function UsuariosAccesos() {
             Usuarios y accesos define qué proveedores ve cada usuario — solo el administrador puede consultarla y
             editarla.
           </p>
+        </div>
+      )}
+
+      {esAdmin && avisoPassword && (
+        <div className="mx-4 mt-4 bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-2.5 text-[13px]">
+          {avisoPassword}
         </div>
       )}
 
@@ -327,12 +409,21 @@ export default function UsuariosAccesos() {
                       )}
                     </td>
                     <td className="px-3.5 py-2.5">
-                      <button
-                        onClick={() => toggleUsuario(u.id)}
-                        className="text-sm text-[var(--indigo,#4338ca)] hover:underline"
-                      >
-                        {usuarioExpandido === u.id ? 'Cerrar' : 'Gestionar accesos'}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => toggleUsuario(u.id)}
+                          className="text-sm text-[var(--indigo,#4338ca)] hover:underline"
+                        >
+                          {usuarioExpandido === u.id ? 'Cerrar' : 'Gestionar accesos'}
+                        </button>
+                        <button
+                          onClick={() => setModalPassword(u)}
+                          className="text-sm text-gray-500 hover:underline"
+                          title="Restablecer contraseña"
+                        >
+                          🔑 Contraseña
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   {usuarioExpandido === u.id && (
@@ -348,6 +439,15 @@ export default function UsuariosAccesos() {
           </table>
         )}
       </div>
+      )}
+
+      {modalPassword && (
+        <ModalPassword
+          usuario={modalPassword}
+          guardando={guardandoPassword}
+          onCerrar={() => setModalPassword(null)}
+          onConfirmar={confirmarPassword}
+        />
       )}
     </div>
   )

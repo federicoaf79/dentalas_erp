@@ -20,6 +20,14 @@
 //     Body JSON: { userId, proveedorCodigo, proveedorNombre, accion: "agregar" | "quitar" }
 //     -> agrega o quita UNA fila de usuario_proveedor
 //
+//   POST ?accion=resetPassword   [nuevo, 19/8/2026]
+//     Body JSON: { userId, password }
+//     -> fija la contraseña de ese usuario directo, vía
+//        auth.admin.updateUserById(). Pensado para habilitar cuentas
+//        reales (Aris/Ivana) que existen en Supabase Auth pero cuya
+//        contraseña original nadie conoce. Admin-only, igual que el
+//        resto de esta función.
+//
 // TABLA REQUERIDA (ya creada, 14 julio 2026):
 //   usuario_proveedor (id, user_id, proveedor_codigo, proveedor_nombre, created_at)
 // ============================================================
@@ -74,6 +82,23 @@ async function listarUsuarios(supabaseAdmin: ReturnType<typeof createClient>) {
   });
 
   return usuarios;
+}
+
+// ------------------------------------------------------------
+// Helper: fijar la contraseña de un usuario directo (sin mandar
+// mail de recuperación) — para habilitar cuentas reales que ya
+// existen en Auth pero nunca se usaron.
+// ------------------------------------------------------------
+async function resetearPassword(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  nuevaPassword: string,
+) {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: nuevaPassword });
+  if (error) {
+    throw new Error(`Error actualizando contraseña: ${error.message}`);
+  }
+  return { ok: true };
 }
 
 // ------------------------------------------------------------
@@ -161,8 +186,32 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (accionQuery === 'resetPassword') {
+      const body = await req.json();
+      const { userId, password } = body;
+
+      if (!userId || !password) {
+        return new Response(
+          JSON.stringify({ error: 'Faltan campos: userId, password son obligatorios' }),
+          { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (String(password).length < 8) {
+        return new Response(
+          JSON.stringify({ error: 'La contraseña debe tener al menos 8 caracteres' }),
+          { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const resultado = await resetearPassword(supabaseAdmin, userId, password);
+      return new Response(
+        JSON.stringify(resultado),
+        { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: 'Falta el parámetro "accion" (listar | asignar)' }),
+      JSON.stringify({ error: 'Falta el parámetro "accion" (listar | asignar | resetPassword)' }),
       { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     );
 
