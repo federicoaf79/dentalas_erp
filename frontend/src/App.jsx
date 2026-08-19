@@ -18,6 +18,7 @@ import CatalogoCausas from './pages/CatalogoCausas'
 import Empresa from './pages/Empresa'
 import TemplatesMensajes from './pages/TemplatesMensajes'
 import CondicionesProveedor from './pages/CondicionesProveedor'
+import ReposicionInterna from './pages/ReposicionInterna'
 
 // ------------------------------------------------------------
 // Páginas que YA tienen datos reales conectados para la demo.
@@ -40,6 +41,7 @@ const PAGINAS_CON_DATOS_REALES = [
   'empresa',
   'templates',
   'condiciones',
+  'reposicion',
 ]
 
 function PaginaEnConstruccion({ nombre }) {
@@ -59,6 +61,7 @@ function PaginaEnConstruccion({ nombre }) {
 
 const TITULOS = {
   alertas: 'Alertas',
+  reposicion: 'Reposición interna',
   ocs: 'Órdenes de compra',
   historial: 'Historial de OC',
   'nueva-oc': 'Nueva OC',
@@ -147,6 +150,7 @@ function AppLogueada({ session, onLogout }) {
       />
 
       {currentPage === 'stock' && <MonitorStock />}
+      {currentPage === 'reposicion' && <ReposicionInterna />}
       {currentPage === 'seguimiento' && <SeguimientoOC />}
       {currentPage === 'proveedores' && <Proveedores />}
       {currentPage === 'historial' && <HistorialOC />}

@@ -4,6 +4,7 @@
 // ------------------------------------------------------------
 const NAV_PRINCIPAL = [
   { key: 'stock', label: 'Monitor de stock', icon: '📦' },
+  { key: 'reposicion', label: 'Reposición interna', icon: '🔁' },
   { key: 'alertas', label: 'Alertas', icon: '🔔' },
 ]
 
@@ -105,7 +106,6 @@ export default function Sidebar({
     aprobacionPendiente = 0,
     ocsActivas = 0,
     seguimientoPendiente = 0,
-    alertasPausadasVencidas = 0,
   } = contadores
 
   const syncTexto = formatoSyncCorto(ultimaSync)
@@ -130,6 +130,11 @@ export default function Sidebar({
         />
         <NavItem
           item={NAV_PRINCIPAL[1]}
+          active={currentPage === 'reposicion'}
+          onClick={onNavigate}
+        />
+        <NavItem
+          item={NAV_PRINCIPAL[2]}
           active={currentPage === 'alertas'}
           onClick={onNavigate}
           badges={
@@ -139,10 +144,6 @@ export default function Sidebar({
               {/* Azul = pedidos que requieren aprobacion de Aris.
                   El flujo es Sprint 2, hoy siempre 0 -> no se dibuja. */}
               <Badge valor={aprobacionPendiente} clase="nb-blu" />
-              {/* Azul tambien: pausas de 15 dias ya vencidas, el
-                  "aviso activo" que pidio Federico (11/8/2026) para
-                  que no reaparezcan en silencio. Ver Alertas.jsx. */}
-              <Badge valor={alertasPausadasVencidas} clase="nb-blu" />
             </>
           }
         />
