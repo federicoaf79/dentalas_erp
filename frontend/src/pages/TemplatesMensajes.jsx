@@ -7,10 +7,13 @@ import Aviso from '../components/Aviso'
 // TemplatesMensajes.jsx
 // Plantillas para enviarle la orden al proveedor.
 //
-// ACLARACIÓN IMPORTANTE que se muestra en pantalla: el envío
-// automático todavía no está construido. Hoy estos templates sirven
-// para copiar el texto ya armado y pegarlo en el mail o el WhatsApp.
-// No decir esto sería sugerir una función que no existe.
+// ACLARACIÓN IMPORTANTE que se muestra en pantalla: [19/8/2026] el
+// template "tpl_wa_oc" ya se usa solo, desde el botón 💬 de Órdenes de
+// compra (orden aprobada) y desde Nueva OC — abre WhatsApp con el texto
+// ya completado. Sigue habiendo un paso manual (arrastrar el PDF a la
+// conversación): WhatsApp no permite adjuntar un archivo por link, así
+// que eso no es "semi" por elección de diseño, es un límite de WhatsApp.
+// El envío por email todavía no está construido.
 // ============================================================
 
 // Datos de ejemplo para la vista previa. Son inventados a propósito y
@@ -179,9 +182,10 @@ export default function TemplatesMensajes() {
       )}
 
       <Aviso tipo="info" id="templates-alcance" className="mx-4 mt-4">
-        El envío automático por email o WhatsApp todavía no está implementado — es la etapa siguiente del
-        desarrollo. Por ahora estas plantillas sirven para copiar el texto ya armado y pegarlo donde
-        corresponda, y quedan listas para cuando se conecte el envío.
+        La plantilla de WhatsApp ya se usa sola desde el botón 💬 de una orden aprobada (Órdenes de
+        compra) y desde Nueva OC: abre WhatsApp con este texto completado. Queda un paso manual —
+        arrastrar el PDF de la orden a la conversación — porque WhatsApp no permite adjuntar un archivo
+        por link. El envío automático por email todavía no está implementado.
       </Aviso>
 
       {cargando ? (

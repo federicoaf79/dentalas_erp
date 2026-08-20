@@ -7,7 +7,18 @@
 // "Guardar como PDF" en el mismo diálogo, y no agrega dependencias.
 // La contra es que pasa por el diálogo de impresión en lugar de bajar
 // el archivo directo.
+//
+// [19/8/2026] Se sumó `generarPdfOrdenDescargable()`, más abajo: para el
+// envío semi-automático por WhatsApp hace falta un archivo .pdf real que
+// se descargue solo, sin pasar por el diálogo de impresión (WhatsApp no
+// tiene forma de recibir un archivo por link — la persona lo arrastra a
+// mano una vez que ya está descargado). Usa jsPDF + jspdf-autotable.
+// La función vieja (generarPdfOrden, arriba) sigue igual, para no tocar
+// el botón "PDF"/"Descargar PDF" que ya funciona en producción.
 // ============================================================
+
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 function moneda(n) {
   const num = Number(n)
@@ -194,4 +205,132 @@ export function generarPdfOrden({ orden, items, empresa, proveedor }) {
   }
   win.document.write(html)
   win.document.close()
+}
+
+// Nombre de archivo prolijo: "OC-9-dental-medrano.pdf". Sin acentos ni
+// espacios, para que no rompa al arrastrarlo a WhatsApp en ningún SO.
+function nombreArchivoOrden(orden) {
+  const prov = String(orden.proveedor_nombre ?? 'proveedor')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+  return `OC-${orden.id}-${prov || 'proveedor'}.pdf`
+}
+
+// Genera un PDF real (no un diálogo de impresión) y lo descarga solo,
+// vía jsPDF. Pensado para el flujo semi-automático de WhatsApp: se llama
+// justo antes de abrir wa.me, así el archivo ya está en Descargas cuando
+// la persona quiere arrastrarlo a la conversación.
+export function generarPdfOrdenDescargable({ orden, items, empresa, proveedor }) {
+  const e = empresa ?? {}
+  const totalCalculado = items.reduce((acc, i) => {
+    const c = Number(i.costo_unitario)
+    return acc + (Number.isFinite(c) ? c * Number(i.cantidad || 0) : 0)
+  }, 0)
+  const sinCosto = items.filter((i) => !i.costo_unitario).length
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const margenX = 14
+  const margenDer = 196
+  let y = 18
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(15)
+  doc.setTextColor(31, 41, 55)
+  doc.text(e.nombre || 'Dentalab', margenX, y)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(107, 114, 128)
+  let yEmp = y + 5
+  ;[
+    e.razon_social,
+    e.cuit ? `CUIT ${e.cuit}` : null,
+    e.direccion ? `${e.direccion}${e.localidad ? ', ' + e.localidad : ''}` : null,
+    e.telefono ? `Tel. ${e.telefono}` : null,
+    e.email,
+  ].filter(Boolean).forEach((linea) => { doc.text(String(linea), margenX, yEmp); yEmp += 4 })
+
+  doc.setTextColor(31, 41, 55)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(13)
+  doc.text('ORDEN DE COMPRA', margenDer, y, { align: 'right' })
+  doc.setFontSize(18)
+  doc.text(`#${orden.id}`, margenDer, y + 7, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(107, 114, 128)
+  doc.text(`Emitida ${fecha(orden.creada_en)}`, margenDer, y + 12, { align: 'right' })
+
+  y = Math.max(yEmp, y + 16) + 6
+  doc.setDrawColor(31, 41, 55)
+  doc.setLineWidth(0.6)
+  doc.line(margenX, y - 4, margenDer, y - 4)
+
+  doc.setTextColor(156, 163, 175)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.text('PROVEEDOR', margenX, y)
+  doc.setTextColor(31, 41, 55)
+  doc.setFontSize(11)
+  doc.text(String(orden.proveedor_nombre ?? ''), margenX, y + 5)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(107, 114, 128)
+  let yProv = y + 10
+  ;[
+    proveedor?.clie_cuit ? `CUIT ${proveedor.clie_cuit}` : null,
+    proveedor?.telefono ? `Tel. ${proveedor.telefono}` : null,
+    proveedor?.mail,
+  ].filter(Boolean).forEach((linea) => { doc.text(String(linea), margenX, yProv); yProv += 4 })
+
+  y = Math.max(yProv, y + 10) + 4
+
+  const filas = items.map((i) => [
+    i.mate_codigo ?? '',
+    i.mate_nombre ?? '',
+    numero(i.cantidad),
+    i.costo_unitario ? moneda(i.costo_unitario) : 'a confirmar',
+    i.costo_unitario ? moneda(Number(i.costo_unitario) * Number(i.cantidad || 0)) : '—',
+  ])
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margenX, right: 14 },
+    head: [['SKU', 'Artículo', 'Cantidad', 'Precio unit.', 'Subtotal']],
+    body: filas,
+    styles: { fontSize: 8.5, cellPadding: 2, textColor: [31, 41, 55] },
+    headStyles: { fillColor: [243, 244, 246], textColor: [107, 114, 128], fontStyle: 'bold', fontSize: 8 },
+    columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+    foot: [['', '', '', 'TOTAL ESTIMADO', moneda(totalCalculado)]],
+    footStyles: { fillColor: [255, 255, 255], textColor: [31, 41, 55], fontStyle: 'bold', fontSize: 10 },
+  })
+
+  let yFinal = doc.lastAutoTable.finalY + 8
+
+  if (sinCosto > 0) {
+    const texto = `${sinCosto} ${sinCosto === 1 ? 'artículo no tiene' : 'artículos no tienen'} precio de referencia cargado: el total es estimativo.`
+    doc.setFillColor(254, 243, 199)
+    doc.roundedRect(margenX, yFinal - 4, margenDer - margenX, 8, 1.5, 1.5, 'F')
+    doc.setTextColor(146, 64, 14)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.text(texto, margenX + 3, yFinal + 1)
+    yFinal += 12
+  }
+
+  if (orden.notas) {
+    doc.setTextColor(31, 41, 55)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('Notas', margenX, yFinal)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(55, 65, 81)
+    const notasWrap = doc.splitTextToSize(String(orden.notas), margenDer - margenX)
+    doc.text(notasWrap, margenX, yFinal + 5)
+  }
+
+  doc.save(nombreArchivoOrden(orden))
 }

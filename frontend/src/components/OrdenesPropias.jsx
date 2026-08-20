@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from './Aviso'
-import { generarPdfOrden } from '../lib/pdfOrden'
+import { generarPdfOrden, generarPdfOrdenDescargable } from '../lib/pdfOrden'
+import { renderTemplate } from '../pages/TemplatesMensajes'
 // ============================================================
 // OrdenesPropias.jsx
 // Órdenes generadas DESDE el sistema (tablas ordenes_propias /
@@ -70,6 +71,10 @@ export default function OrdenesPropias({ onCambio }) {
   //   { tipo: 'aprobar' | 'rechazar' | 'borrar', orden, nuevoEstado? }
   const [modal, setModal] = useState(null)
   const [comentarioModal, setComentarioModal] = useState('')
+  // Id de la orden que se está mandando por WhatsApp ahora mismo — estado
+  // propio, separado de `ocupado`, para no deshabilitar Aprobar/Rechazar
+  // de otras filas mientras se arma el PDF y se abre WhatsApp de esta.
+  const [enviandoWaId, setEnviandoWaId] = useState(null)
 
   useEffect(() => {
     if (!modal) return
@@ -194,6 +199,102 @@ export default function OrdenesPropias({ onCambio }) {
       .limit(1)
       .maybeSingle()
     generarPdfOrden({ orden, items: lista, empresa, proveedor: prov ?? null })
+  }
+  // Envío semi-automático por WhatsApp (19/8/2026): descarga el PDF real
+  // de la orden (jsPDF, se guarda solo en Descargas) y abre WhatsApp con
+  // el texto de la plantilla "tpl_wa_oc" ya completado con los datos
+  // reales de esta orden, al número de WhatsApp de pedidos cargado en
+  // Condiciones comerciales para este proveedor.
+  //
+  // Por qué no queda 100% automático: wa.me solo puede pre-cargar texto,
+  // nunca adjuntar un archivo — es una limitación de WhatsApp, no de acá
+  // (confirmado antes de construir esto). El único paso manual que queda
+  // es arrastrar el PDF ya descargado a la conversación que se abre.
+  async function enviarWhatsApp(orden) {
+    setEnviandoWaId(orden.id)
+    setError(null)
+    try {
+      let lista = items
+      if (abierta?.id !== orden.id) {
+        const { data, error } = await supabase
+          .from('ordenes_propias_items')
+          .select('*')
+          .eq('orden_id', orden.id)
+          .order('id')
+        if (error) throw new Error(error.message)
+        lista = data ?? []
+      }
+
+      const [{ data: prov }, { data: provCond }, { data: plantilla }] = await Promise.all([
+        supabase.from('clientes_yiqi').select('clie_cuit, mail, telefono')
+          .eq('clie_nombre', orden.proveedor_nombre).limit(1).maybeSingle(),
+        supabase.from('proveedores').select('whatsapp_pedidos')
+          .eq('clie_nombre', orden.proveedor_nombre).limit(1).maybeSingle(),
+        supabase.from('templates_mensaje').select('cuerpo')
+          .eq('codigo', 'tpl_wa_oc').maybeSingle(),
+      ])
+
+      const whatsapp = provCond?.whatsapp_pedidos
+      if (!whatsapp) {
+        setError(
+          `${orden.proveedor_nombre} no tiene WhatsApp de pedidos cargado. ` +
+          'Cargalo en "Condiciones comerciales" y volvé a intentar.'
+        )
+        return
+      }
+
+      // El PDF se genera con los items reales recién traídos, no con los
+      // de otra orden que pudiera estar abierta en pantalla.
+      generarPdfOrdenDescargable({ orden, items: lista, empresa, proveedor: prov ?? null })
+
+      const totalReal = lista.reduce((acc, i) => {
+        const c = Number(i.costo_unitario)
+        return acc + (Number.isFinite(c) ? c * Number(i.cantidad || 0) : 0)
+      }, 0)
+      const datos = {
+        empresa: empresa?.nombre || 'Dentalab',
+        proveedor: orden.proveedor_nombre,
+        nro_orden: String(orden.id),
+        fecha: formatoFecha(orden.creada_en),
+        total: formatoMoneda(totalReal),
+        cant_items: String(lista.length),
+        items: lista
+          .map((i) => `• ${i.mate_codigo} — ${i.mate_nombre ?? ''} — ${formatoNumero(i.cantidad)} un.`)
+          .join('\n'),
+        notas: orden.notas || '',
+        contacto: '',
+      }
+      const texto = renderTemplate(plantilla?.cuerpo ?? '', datos)
+      const numero = String(whatsapp).replace(/\D/g, '')
+      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, '_blank')
+
+      // Registro de auditoría, mismo patrón que archivada_en/archivada_por
+      // y marcado_en/marcado_por en el resto del sistema. Best-effort: si
+      // esto falla no hay que deshacer nada, el envío ya pasó.
+      const ahora = new Date().toISOString()
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        await supabase.from('ordenes_propias').update({
+          whatsapp_enviada_en: ahora,
+          whatsapp_enviada_por: user?.id ?? null,
+        }).eq('id', orden.id)
+      } catch (errRegistro) {
+        console.error('[whatsapp_enviada]', errRegistro)
+      }
+
+      setAviso(
+        `PDF descargado y WhatsApp abierto para ${orden.proveedor_nombre}. ` +
+        'Arrastrá el PDF (carpeta Descargas) a la conversación para adjuntarlo y enviar.'
+      )
+      if (abierta?.id === orden.id) {
+        setAbierta((prev) => (prev ? { ...prev, whatsapp_enviada_en: ahora } : prev))
+      }
+      await cargar()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setEnviandoWaId(null)
+    }
   }
   // Abre el modal de aprobar/rechazar (reemplaza al viejo window.prompt).
   function pedirDecision(orden, nuevoEstado) {
@@ -407,7 +508,9 @@ export default function OrdenesPropias({ onCambio }) {
             )}
           </div>
           <div className="text-[12px] text-[var(--sub)]">
-            Todavía no se envían al ERP ni al proveedor — esa etapa es la siguiente del desarrollo.
+            Al aprobarse se vinculan solas a YiQi. El envío al proveedor por WhatsApp (💬) es
+            semi-automático: descarga el PDF y abre WhatsApp con el texto listo — el único paso manual
+            es arrastrar el PDF a la conversación, WhatsApp no permite adjuntarlo solo.
           </div>
         </div>
         <div className="flex gap-2">
@@ -489,6 +592,16 @@ export default function OrdenesPropias({ onCambio }) {
                       <button onClick={() => imprimir(o)} className="text-sm text-gray-500 hover:text-[var(--ind,#4338ca)] hover:underline mr-3">
                         PDF
                       </button>
+                      {filtro === 'activas' && o.estado === 'aprobada' && (
+                        <button
+                          disabled={enviandoWaId === o.id}
+                          onClick={() => enviarWhatsApp(o)}
+                          title={o.whatsapp_enviada_en ? `Ya se envió el ${formatoFecha(o.whatsapp_enviada_en)} — volver a enviar` : 'Descargar PDF y abrir WhatsApp'}
+                          className="text-sm text-green-600 hover:text-green-700 hover:underline mr-3 disabled:opacity-40"
+                        >
+                          {enviandoWaId === o.id ? 'Enviando…' : o.whatsapp_enviada_en ? '💬 Reenviar' : '💬 WhatsApp'}
+                        </button>
+                      )}
                       {filtro === 'activas' && permisos.esAdmin && o.estado === 'pendiente' && (
                         <>
                           <button
@@ -592,6 +705,17 @@ export default function OrdenesPropias({ onCambio }) {
               >
                 Descargar PDF
               </button>
+              {abierta.estado === 'aprobada' && (
+                <button
+                  disabled={enviandoWaId === abierta.id}
+                  onClick={() => enviarWhatsApp(abierta)}
+                  className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40"
+                >
+                  {enviandoWaId === abierta.id
+                    ? 'Enviando…'
+                    : abierta.whatsapp_enviada_en ? '💬 Reenviar por WhatsApp' : '💬 Enviar por WhatsApp'}
+                </button>
+              )}
               <button onClick={() => setAbierta(null)} className="text-sm text-gray-500 hover:underline">
                 Cerrar
               </button>
@@ -600,6 +724,11 @@ export default function OrdenesPropias({ onCambio }) {
           {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
             <Aviso tipo="filtro" className="mb-3">
               Vinculada a YiQi (OC #{abierta.yiqi_id_creado}) el {formatoFecha(abierta.yiqi_enviada_en)}.
+            </Aviso>
+          )}
+          {abierta.whatsapp_enviada_en && (
+            <Aviso tipo="filtro" className="mb-3">
+              💬 Enviada por WhatsApp el {formatoFecha(abierta.whatsapp_enviada_en)}.
             </Aviso>
           )}
           {abierta.estado === 'aprobada' && !abierta.yiqi_id_creado && (
