@@ -18,7 +18,14 @@
 // ============================================================
 
 import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+// Import de efecto (no default): jspdf-autotable v3 se registra solo como
+// jsPDF.API.autoTable al importarse. El import default (`import autoTable
+// from ...`) + llamarlo como función funcionaba en dev pero rompía en el
+// build de producción de Vite/Rollup con "(0 , UI.default) is not a
+// function" — problema de interop CJS/ESM de este paquete, no del código.
+// Encontrado probando en vivo tras el primer deploy; este es el patrón
+// documentado por la librería para máxima compatibilidad entre bundlers.
+import 'jspdf-autotable'
 
 function moneda(n) {
   const num = Number(n)
@@ -295,7 +302,7 @@ export function generarPdfOrdenDescargable({ orden, items, empresa, proveedor })
     i.costo_unitario ? moneda(Number(i.costo_unitario) * Number(i.cantidad || 0)) : '—',
   ])
 
-  autoTable(doc, {
+  doc.autoTable({
     startY: y,
     margin: { left: margenX, right: 14 },
     head: [['SKU', 'Artículo', 'Cantidad', 'Precio unit.', 'Subtotal']],
