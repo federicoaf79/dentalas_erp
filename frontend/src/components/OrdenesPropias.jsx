@@ -297,7 +297,21 @@ export default function OrdenesPropias({ onCambio }) {
     }
   }
   // Abre el modal de aprobar/rechazar (reemplaza al viejo window.prompt).
+  //
+  // Freno agregado el 20/8/2026: la OC #2 se aprobó con 2 artículos sin
+  // costo cargado y quedó en YiQi rechazando el POST con "El precio
+  // unitario y final no se corresponden" -- YiQi NUNCA acepta una OC con
+  // un ítem sin precio, no es un riesgo, es un rechazo seguro. Antes de
+  // esto no había ninguna advertencia acá (el semáforo de "sin costo" en
+  // Nueva OC ya frena a Ivana, pero Aris podía aprobar cualquier orden
+  // pendiente sin que nada la avisara). Ahora, si falta costo, no se abre
+  // el modal normal de aprobar -- se explica por qué y no hay forma de
+  // confirmar desde acá.
   function pedirDecision(orden, nuevoEstado) {
+    if (nuevoEstado === 'aprobada' && orden.items_sin_costo > 0) {
+      setModal({ tipo: 'sinCosto', orden })
+      return
+    }
     setModal({ tipo: nuevoEstado === 'aprobada' ? 'aprobar' : 'rechazar', orden, nuevoEstado })
     setComentarioModal('')
   }
@@ -845,6 +859,29 @@ export default function OrdenesPropias({ onCambio }) {
                     className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--red)] text-white hover:opacity-90 disabled:opacity-40"
                   >
                     {ocupado ? 'Eliminando…' : 'Eliminar'}
+                  </button>
+                </div>
+              </>
+            ) : modal.tipo === 'sinCosto' ? (
+              <>
+                <div className="text-[15px] font-bold mb-1.5 text-[#92400e]">
+                  No se puede aprobar la orden #{modal.orden.id}
+                </div>
+                <div className="text-[13px] text-[var(--sub)] mb-4">
+                  Tiene {modal.orden.items_sin_costo} artículo{modal.orden.items_sin_costo === 1 ? '' : 's'} sin costo
+                  cargado. YiQi rechaza cualquier OC con un ítem sin precio ("el precio unitario y final no se
+                  corresponden") -- si se aprueba igual, va a quedar marcada como "Error de vinculación a YiQi" sin
+                  forma de resolverla desde acá.
+                  <br /><br />
+                  Rechazá esta orden y volvé a cargarla desde Nueva OC con el costo completo de todos los artículos,
+                  o pedile el precio faltante a quien corresponda antes de reintentar.
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={cerrarModal}
+                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+                  >
+                    Entendido
                   </button>
                 </div>
               </>
