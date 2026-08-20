@@ -52,6 +52,60 @@ const TIUN_ID_TIUN_UNIDAD = 2;
 const ALIV_ID_ALIV_21 = 3;
 const ALICUOTA_IVA = 0.21;
 
+// Misma smartie que usa sync-yiqi para espejar REPORTE_DE_OC en
+// ordenes_yiqi (API_OC_Recientes NO BORRAR, ver sync-yiqi/index.ts).
+const SMARTIE_ID_REPORTE_OC = '2345';
+
+// ------------------------------------------------------------
+// Red de seguridad contra duplicados (20/8/2026):
+//
+// Se encontraron en producción varias OC de YiQi distintas con el
+// mismo proveedor, mismo total y mismo Asunto, todas correspondiendo
+// a una sola orden interna (#6/#7). Causa raíz: cuando YiQi creaba la
+// OC bien pero la respuesta no traía el id en el formato esperado
+// (mismo problema de casing ya documentado en mapearOrdenes de
+// sync-yiqi), este código guardaba yiqi_id_creado=null igual --la
+// orden quedaba "linkeada" en YiQi pero acá seguía mostrando "Error
+// de vinculación". Cada click de "Reintentar envío" (o cada corrida
+// del sweep de pg_cron) volvía a crear OTRA orden real en YiQi, sin
+// forma de saber que ya existía una.
+//
+// Antes de crear una OC nueva, se busca en vivo en YiQi (no en la
+// tabla espejo ordenes_yiqi, que puede estar desactualizada) si ya
+// existe alguna con el Asunto de esta orden ("Dentalab-Compras #N" es
+// único por orden interna, se arma siempre igual acá abajo). Si
+// existe, se adopta ese NRO_OC como yiqi_id_creado y no se manda nada
+// nuevo -- esto corta la duplicación pase lo que pase con el problema
+// de casing de la respuesta de creación.
+// ------------------------------------------------------------
+async function buscarOrdenExistenteEnYiqi(config: any, asuntoBuscado: string): Promise<string | null> {
+  let page = 1;
+  // Tope de 40 páginas, mismo criterio de seguridad que yiqi-connector
+  // (esto sí responde a un click del usuario, no es un cron en background).
+  while (page <= 40) {
+    const url = `${config.base_url}/api/public/REPORTE_DE_OC/smartie?smartieId=${SMARTIE_ID_REPORTE_OC}&schemaId=${config.schema_id}&page=${page}`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${config.bearer_token}`, 'Content-Type': 'application/json' },
+    });
+    if (!resp.ok) {
+      // Si la búsqueda de seguridad falla, NO seguimos como si no
+      // existiera -- mejor frenar acá (se ve como error en la orden,
+      // se puede reintentar) que arriesgar otro duplicado.
+      const body = await resp.text().catch(() => '');
+      throw new Error(`No se pudo verificar si la orden ya existía en YiQi (${resp.status}): ${body.slice(0, 300)}`);
+    }
+    const json = await resp.json();
+    const filas = json.data ?? [];
+    const match = filas.find((f: any) => (f.ASUNTO ?? '') === asuntoBuscado);
+    if (match) {
+      return match.NRO_OC != null ? String(match.NRO_OC) : String(match.id ?? match.ID ?? '');
+    }
+    if (filas.length === 0 || filas.length >= (json.total ?? 0)) break;
+    page++;
+  }
+  return null;
+}
+
 // ------------------------------------------------------------
 // Normaliza un nombre para comparar sin que importen mayúsculas,
 // acentos ni espacios de más. clie_nombre / proveedor_nombre son
@@ -202,12 +256,38 @@ Deno.serve(async (req: Request) => {
       // ---- Armar header + POST a YiQi ----
       const hoy = new Date().toISOString().slice(0, 10) + 'T00:00:00';
       const config = await getYiqiConfig(supabaseAdmin, 'enviar-oc-yiqi');
+      const asunto = `Dentalab-Compras #${orden.id}`;
+
+      // Red de seguridad contra duplicados: ver comentario de
+      // buscarOrdenExistenteEnYiqi más arriba. Se verifica EN VIVO
+      // contra YiQi (no contra la tabla espejo ordenes_yiqi) antes de
+      // crear nada -- esto es lo que protege tanto a un click manual
+      // de "Reintentar envío" como a cada corrida del sweep de pg_cron.
+      const yaExiste = await buscarOrdenExistenteEnYiqi(config, asunto);
+      if (yaExiste != null) {
+        const { error: errUpdateExistente } = await supabaseAdmin
+          .from('ordenes_propias')
+          .update({
+            yiqi_enviada_en: new Date().toISOString(),
+            yiqi_id_creado: yaExiste,
+            yiqi_error: null,
+          })
+          .eq('id', ordenId);
+        if (errUpdateExistente) {
+          throw new Error(`La orden ya existía en YiQi (OC ${yaExiste}) pero no se pudo guardar localmente: ${errUpdateExistente.message}`);
+        }
+        return new Response(
+          JSON.stringify({ ok: true, enviada: true, yiqi_id: yaExiste, yaExistia: true }),
+          { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Datos reales del registro a crear.
       const datosRegistro = {
         CLIE_ID_CLIE: clienteMatch.yiqi_id,
         MONE_ID_MONE: MONE_ID_MONE_ARS,
         ORDC_FECHA: hoy,
-        ORDC_ASUNTO: `Dentalab-Compras #${orden.id}`,
+        ORDC_ASUNTO: asunto,
         ORDC_OBSERVACIONES: orden.notas ?? null,
         DETALLE: detalle,
       };
@@ -242,12 +322,26 @@ Deno.serve(async (req: Request) => {
       // de REPORTE_DE_OC via sync-yiqi -- YiQi no es consistente entre
       // endpoints/smarties), y puede venir en la raiz o envuelta en
       // "data". Se prueban las 4 combinaciones antes de rendirse.
-      const yiqiIdCreado =
+      let yiqiIdCreado =
         dataYiqi?.id ?? dataYiqi?.ID ?? dataYiqi?.data?.id ?? dataYiqi?.data?.ID ?? null;
       if (yiqiIdCreado == null) {
         console.warn(
           `enviar-oc-yiqi: no se pudo extraer el id creado de la respuesta de YiQi para la orden #${ordenId}. Respuesta cruda: ${JSON.stringify(dataYiqi).slice(0, 500)}`
         );
+        // AUTO-RECUPERACION (20/8/2026): antes esto se guardaba como
+        // yiqi_id_creado=null y quedaba mostrando "Error de vinculación"
+        // para siempre -- el usuario, sin saber que la OC SI se había
+        // creado en YiQi, terminaba reintentando y generando duplicados
+        // reales. La orden se acaba de crear (respYiqi.ok=true), así que
+        // ya tiene que estar en REPORTE_DE_OC -- se la busca de una por
+        // el mismo Asunto en vez de dejarla en null hasta el próximo
+        // reintento.
+        yiqiIdCreado = await buscarOrdenExistenteEnYiqi(config, asunto);
+        if (yiqiIdCreado == null) {
+          console.warn(
+            `enviar-oc-yiqi: la orden #${ordenId} se creó en YiQi pero no se pudo confirmar su NRO_OC ni siquiera buscándola por Asunto. Puede tardar en aparecer en REPORTE_DE_OC -- un próximo reintento la va a encontrar y no va a duplicarla.`
+          );
+        }
       }
 
       const { error: errUpdate } = await supabaseAdmin
