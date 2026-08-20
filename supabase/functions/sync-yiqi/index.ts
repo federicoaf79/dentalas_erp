@@ -12,7 +12,8 @@
 //   GET .../sync-yiqi?entidad=clientes   -> sincroniza CLIENTE (~1.151 filas)
 //   GET .../sync-yiqi?entidad=ventas     -> sincroniza REPORTE_DE_VENTAS (pivoteado)
 //   GET .../sync-yiqi?entidad=stock      -> sincroniza STOCK por depósito (pivoteado)
-//   GET .../sync-yiqi?entidad=todos      -> las 5, en secuencia
+//   GET .../sync-yiqi?entidad=precios    -> sincroniza PRECIO_ARTICULO_COMP (~6.939 filas)
+//   GET .../sync-yiqi?entidad=todos      -> las 6, en secuencia
 //
 // OJO CON "ventas" Y "stock": ambas smarties (2353 y 2360) devuelven
 // una tabla PIVOT -- una fila por SKU(+proveedor en ventas), una
@@ -244,6 +245,51 @@ async function mapearClientes(filas: any[]) {
       ...camposNegocio,
       hash_datos: await hashDeObjeto(camposNegocio),
     });
+  }
+  return resultado;
+}
+
+// ------------------------------------------------------------
+// Mapeo PRECIO_ARTICULO_COMP -> filas para upsert_precios_proveedor_yiqi
+// ------------------------------------------------------------
+// Smartie Z.API_Precios_Comp_NO_BORRAR (id 2367), creada a mano el
+// 20/8/2026. Plana (SIN pivot), asi que es el mismo patron que
+// mapearMaterial/mapearClientes. OJO: PRAC_ART_NOMBRE, pese al
+// nombre del campo, es en realidad el SKU -- confirmado en vivo el
+// 20/8/2026 cruzando el SKU 31002-PIN contra material_yiqi.
+async function mapearPrecios(filas: any[]) {
+  const resultado = [];
+  let sinId = 0;
+  for (const f of filas) {
+    // Ver nota de casing en mapearOrdenes: se acepta "id" o "ID".
+    const yiqiId = f.id ?? f.ID ?? null;
+    if (yiqiId == null) {
+      sinId++;
+      continue;
+    }
+    // SKU como texto SIEMPRE (regla de Aris: nunca convertir a número).
+    const sku = f.PRAC_ART_NOMBRE != null ? String(f.PRAC_ART_NOMBRE).trim() : '';
+    if (!sku) continue;
+    const proveedor = f.LDPC_NOMBRE ?? null;
+    if (!proveedor) continue;
+    const camposNegocio = {
+      sku,
+      mate_nombre: f.MATE_NOMBRE ?? null,
+      proveedor,
+      precio_neto: f.PRAC_PRECIO_DE_LISTA ?? null,
+      precio_final: f.PRAC_PRECIO_FINAL ?? null,
+      precio_minimo: f.PRAC_PRECIO_MINIMO ?? null,
+      estado: f.DESC_ESTADO ?? null,
+      fecha_alta: f.AUDI_FECHA_ALTA ?? null,
+    };
+    resultado.push({
+      yiqi_id: yiqiId,
+      ...camposNegocio,
+      hash_datos: await hashDeObjeto(camposNegocio),
+    });
+  }
+  if (sinId > 0) {
+    console.warn(`mapearPrecios: se saltearon ${sinId} fila(s) de PRECIO_ARTICULO_COMP sin "id"/"ID".`);
   }
   return resultado;
 }
@@ -496,17 +542,19 @@ async function sincronizarVentas(
 async function sincronizarEntidad(
   supabaseAdmin: ReturnType<typeof createClient>,
   config: any,
-  entidad: 'material' | 'oc' | 'clientes',
+  entidad: 'material' | 'oc' | 'clientes' | 'precios',
 ) {
   const ENTIDAD_YIQI: Record<string, string> = {
     material: 'MATERIAL',
     oc: 'REPORTE_DE_OC',
     clientes: 'CLIENTE',
+    precios: 'PRECIO_ARTICULO_COMP',
   };
   const SMARTIE_ID: Record<string, string> = {
     material: '2344', // API_Articulos_Stock NO BORRAR
     oc: '2345',       // API_OC_Recientes NO BORRAR
     clientes: '2346', // API_Proveedores_Activos NO BORRAR
+    precios: '2367',  // Z.API_Precios_Comp_NO_BORRAR
   };
 
   const { filas } = await traerSmartieCompleta(
@@ -525,9 +573,12 @@ async function sincronizarEntidad(
   } else if (entidad === 'oc') {
     filasMapeadas = await mapearOrdenes(filas);
     rpcNombre = 'upsert_ordenes_yiqi';
-  } else {
+  } else if (entidad === 'clientes') {
     filasMapeadas = await mapearClientes(filas);
     rpcNombre = 'upsert_clientes_yiqi';
+  } else {
+    filasMapeadas = await mapearPrecios(filas);
+    rpcNombre = 'upsert_precios_proveedor_yiqi';
   }
 
   const { error } = await supabaseAdmin.rpc(rpcNombre, { p_rows: filasMapeadas });
@@ -560,11 +611,11 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const entidadParam = url.searchParams.get('entidad');
 
-    const ENTIDADES_VALIDAS = ['material', 'oc', 'clientes', 'ventas', 'stock', 'todos'];
+    const ENTIDADES_VALIDAS = ['material', 'oc', 'clientes', 'ventas', 'stock', 'precios', 'todos'];
     if (!entidadParam || !ENTIDADES_VALIDAS.includes(entidadParam)) {
       return new Response(
         JSON.stringify({
-          error: 'Parametro "entidad" invalido. Usar: material | oc | clientes | ventas | stock | todos',
+          error: 'Parametro "entidad" invalido. Usar: material | oc | clientes | ventas | stock | precios | todos',
         }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
@@ -575,7 +626,7 @@ Deno.serve(async (req: Request) => {
 
     const entidadesAProcesar =
       entidadParam === 'todos'
-        ? (['material', 'oc', 'clientes', 'ventas', 'stock'] as const)
+        ? (['material', 'oc', 'clientes', 'ventas', 'stock', 'precios'] as const)
         : ([entidadParam] as const);
 
     for (const entidad of entidadesAProcesar) {
@@ -587,7 +638,7 @@ Deno.serve(async (req: Request) => {
       } else if (entidad === 'stock') {
         resultado = await sincronizarStock(supabaseAdmin, config);
       } else {
-        resultado = await sincronizarEntidad(supabaseAdmin, config, entidad as 'material' | 'oc' | 'clientes');
+        resultado = await sincronizarEntidad(supabaseAdmin, config, entidad as 'material' | 'oc' | 'clientes' | 'precios');
       }
       resultados.push(resultado);
     }
