@@ -115,7 +115,17 @@ async function refrescarToken(baseUrl: string, refreshToken: string) {
 // invocación se cae a mitad de la renovación y nunca llega a liberarlo).
 const LOCK_DURACION_MS = 30 * 1000;
 
-export async function getYiqiConfig(supabaseAdmin: ReturnType<typeof createClient>): Promise<YiqiConfig> {
+// `origen` identifica qué función/acción llama (sync-yiqi,
+// yiqi-connector:estado, yiqi-connector:lectura, enviar-oc-yiqi) --
+// solo se usa para el registro en yiqi_token_eventos, no cambia el
+// comportamiento. Los 4 call sites existentes se actualizaron para
+// pasarlo (20/8/2026); si se agrega un 5to en el futuro, mandar un
+// string corto y descriptivo acá evita que el diagnóstico quede en
+// blanco para ese caso nuevo.
+export async function getYiqiConfig(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  origen: string = 'desconocido',
+): Promise<YiqiConfig> {
   const config = await leerConfig(supabaseAdmin);
 
   const expiraEn = config.token_expira_en ? new Date(config.token_expira_en) : null;
@@ -154,9 +164,40 @@ export async function getYiqiConfig(supabaseAdmin: ReturnType<typeof createClien
   }
 
   try {
-    return await renovarYGuardar(supabaseAdmin, config, expiraEn);
+    return await renovarYGuardar(supabaseAdmin, config, expiraEn, origen);
   } finally {
     await supabaseAdmin.from('yiqi_config').update({ refresh_lock_hasta: null }).eq('id', config.id);
+  }
+}
+
+// ------------------------------------------------------------
+// Registro persistente de cada intento de renovación (agregado
+// 20/8/2026, tabla yiqi_token_eventos). Nunca debe hacer caer la
+// renovación en sí -- si el INSERT falla, se loguea y se sigue.
+// ------------------------------------------------------------
+async function registrarEvento(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  datos: {
+    resultado: 'renovado' | 'fallo_recuperable' | 'fallo_critico';
+    origen: string;
+    mensaje: string;
+    tokenExpirabaEn: Date | null;
+    tokenExpiraEn: Date | null;
+  },
+) {
+  try {
+    const { error } = await supabaseAdmin.from('yiqi_token_eventos').insert({
+      resultado: datos.resultado,
+      origen: datos.origen,
+      mensaje: datos.mensaje,
+      token_expiraba_en: datos.tokenExpirabaEn ? datos.tokenExpirabaEn.toISOString() : null,
+      token_expira_en: datos.tokenExpiraEn ? datos.tokenExpiraEn.toISOString() : null,
+    });
+    if (error) {
+      console.error('No se pudo registrar el evento en yiqi_token_eventos:', error.message);
+    }
+  } catch (err) {
+    console.error('No se pudo registrar el evento en yiqi_token_eventos:', err);
   }
 }
 
@@ -168,6 +209,7 @@ async function renovarYGuardar(
   supabaseAdmin: ReturnType<typeof createClient>,
   config: YiqiConfig,
   expiraEn: Date | null,
+  origen: string,
 ): Promise<YiqiConfig> {
   if (!config.refresh_token) {
     // Config vieja (cargada antes de este cambio) sin refresh_token
@@ -204,6 +246,13 @@ async function renovarYGuardar(
       console.error(
         'Se renovo el token de YiQi pero no se pudo guardar en yiqi_config: ' + (error?.message ?? 'sin dato'),
       );
+      await registrarEvento(supabaseAdmin, {
+        resultado: 'renovado',
+        origen,
+        mensaje: 'Renovado en YiQi pero no se pudo guardar en yiqi_config: ' + (error?.message ?? 'sin dato'),
+        tokenExpirabaEn: expiraEn,
+        tokenExpiraEn: nuevo.expiraEn,
+      });
       return {
         ...config,
         bearer_token: nuevo.accessToken,
@@ -213,6 +262,13 @@ async function renovarYGuardar(
     }
 
     console.log(`Token de YiQi renovado. Vence: ${nuevo.expiraEn.toISOString()}`);
+    await registrarEvento(supabaseAdmin, {
+      resultado: 'renovado',
+      origen,
+      mensaje: `Renovado sin problemas.`,
+      tokenExpirabaEn: expiraEn,
+      tokenExpiraEn: nuevo.expiraEn,
+    });
     return data as YiqiConfig;
   } catch (err) {
     // Carrera con otro cron corriendo al mismo tiempo (rarisimo, pero
@@ -223,14 +279,36 @@ async function renovarYGuardar(
     // actual TODAVIA no vencio (solo estaba en la ventana de margen),
     // lo usamos tal cual en vez de fallar el sync por una renovacion
     // que no hacia falta todavia.
+    const mensajeError = err instanceof Error ? err.message : String(err);
+
     if (expiraEn && expiraEn.getTime() > Date.now()) {
       console.warn(
-        `No se pudo renovar el token de YiQi (el guardado seguia vigente, se sigue usando ese): ${err instanceof Error ? err.message : err}`,
+        `No se pudo renovar el token de YiQi (el guardado seguia vigente, se sigue usando ese): ${mensajeError}`,
       );
+      // "fallo_recuperable": no corta nada hoy, pero es la señal
+      // temprana de que algo invalidó el refresh_token -- si esto se
+      // repite en las próximas horas, va a terminar en fallo_critico
+      // apenas el token guardado también venza. Antes de esta tabla,
+      // este warning se perdía en los logs efímeros de la función.
+      await registrarEvento(supabaseAdmin, {
+        resultado: 'fallo_recuperable',
+        origen,
+        mensaje: mensajeError,
+        tokenExpirabaEn: expiraEn,
+        tokenExpiraEn: expiraEn,
+      });
       return config;
     }
+
+    await registrarEvento(supabaseAdmin, {
+      resultado: 'fallo_critico',
+      origen,
+      mensaje: mensajeError,
+      tokenExpirabaEn: expiraEn,
+      tokenExpiraEn: null,
+    });
     throw new Error(
-      `No se pudo renovar el token de YiQi y el guardado ya vencio: ${err instanceof Error ? err.message : err}`,
+      `No se pudo renovar el token de YiQi y el guardado ya vencio: ${mensajeError}`,
     );
   }
 }

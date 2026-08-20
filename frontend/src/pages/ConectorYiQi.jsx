@@ -27,8 +27,21 @@ async function traerEstado() {
   return data
 }
 
+// Diagnóstico histórico (agregado 20/8/2026, tabla yiqi_token_eventos):
+// a diferencia de traerEstado() de arriba, esto NO dispara un intento
+// de renovación en vivo -- solo lee lo que ya quedó guardado. Sirve
+// para ver la señal temprana (fallas silenciosas de renovación en las
+// últimas 24hs) incluso cuando "estado" de arriba dice que está todo
+// bien porque el token guardado todavía no venció.
+async function traerDiagnostico() {
+  const { data, error } = await supabase.rpc('yiqi_estado_actual')
+  if (error) throw new Error(error.message || 'Error llamando a yiqi_estado_actual')
+  return Array.isArray(data) ? data[0] : data
+}
+
 export default function ConectorYiQi() {
   const [estado, setEstado] = useState(null)
+  const [diagnostico, setDiagnostico] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -36,8 +49,15 @@ export default function ConectorYiQi() {
     setLoading(true)
     setError(null)
     try {
-      const data = await traerEstado()
+      const [data, diag] = await Promise.all([
+        traerEstado(),
+        traerDiagnostico().catch((err) => {
+          console.error('[yiqi_estado_actual]', err)
+          return null
+        }),
+      ])
       setEstado(data)
+      setDiagnostico(diag)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -93,6 +113,23 @@ export default function ConectorYiQi() {
               <p className="text-sm text-[var(--red)] mt-2">{estado.error}</p>
             )}
           </div>
+
+          {/* Señal temprana (agregado 20/8/2026): renovaciones que
+              fallaron en las últimas 24hs pero sin cortar el sync
+              todavía, porque el token guardado alcanzaba. Antes de
+              yiqi_token_eventos esto se perdía en logs efímeros --
+              ahora queda visible acá aunque arriba diga "Conectado". */}
+          {diagnostico && Number(diagnostico.fallos_recuperables_24h) > 0 && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm">
+              <p className="font-semibold">
+                ⚠ {diagnostico.fallos_recuperables_24h} renovación(es) de token fallaron en las últimas 24hs
+              </p>
+              <p className="mt-1">
+                No cortó el sync porque el token guardado todavía alcanzaba, pero es la misma falla que termina en
+                "Sin conexión" si se repite. Último intento fallido: {formatoFechaHora(diagnostico.ultimo_evento_en)}.
+              </p>
+            </div>
+          )}
 
           {estado.conectado && (
             <div className="grid grid-cols-3 gap-3">

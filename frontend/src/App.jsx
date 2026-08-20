@@ -89,6 +89,7 @@ function AppLogueada({ session, onLogout }) {
   const [currentPage, setCurrentPage] = useState('stock')
   const [contadores, setContadores] = useState({})
   const [ultimaSync, setUltimaSync] = useState(null)
+  const [yiqiEstado, setYiqiEstado] = useState(null)
 
   // El nombre sale de usuarios_config, no de partir el mail: con las
   // cuentas reales, el mail comprasdentalab@gmail.com mostraría
@@ -134,9 +135,27 @@ function AppLogueada({ session, onLogout }) {
     setUltimaSync(data?.ultimaSync ?? null)
   }, [claveFiltro])
 
+  // Estado de conexión con YiQi (agregado 20/8/2026, tras el 3er corte
+  // de sync en una semana pasar desapercibido hasta que alguien entraba
+  // por casualidad a "Conector YiQi"). A propósito NO llama a la Edge
+  // Function en vivo -- yiqi_estado_actual() solo lee lo que ya quedó
+  // guardado, así este poll no suma una superficie más de colisión de
+  // renovación del token. Mismo ciclo que cargarContadores: no hace
+  // falta un intervalo aparte.
+  const cargarYiqiEstado = useCallback(async () => {
+    const { data, error } = await supabase.rpc('yiqi_estado_actual')
+    if (!vivoRef.current) return
+    if (error) {
+      console.error('[yiqi_estado_actual]', error)
+      return
+    }
+    setYiqiEstado(Array.isArray(data) ? data[0] : data)
+  }, [])
+
   useEffect(() => {
     cargarContadores()
-  }, [cargarContadores])
+    cargarYiqiEstado()
+  }, [cargarContadores, cargarYiqiEstado])
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -145,6 +164,7 @@ function AppLogueada({ session, onLogout }) {
         onNavigate={setCurrentPage}
         contadores={contadores}
         ultimaSync={ultimaSync}
+        yiqiEstado={yiqiEstado}
         nombreUsuario={nombreUsuario}
         onLogout={onLogout}
       />

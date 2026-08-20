@@ -201,7 +201,7 @@ Deno.serve(async (req: Request) => {
 
       // ---- Armar header + POST a YiQi ----
       const hoy = new Date().toISOString().slice(0, 10) + 'T00:00:00';
-      const config = await getYiqiConfig(supabaseAdmin);
+      const config = await getYiqiConfig(supabaseAdmin, 'enviar-oc-yiqi');
       // Datos reales del registro a crear.
       const datosRegistro = {
         CLIE_ID_CLIE: clienteMatch.yiqi_id,

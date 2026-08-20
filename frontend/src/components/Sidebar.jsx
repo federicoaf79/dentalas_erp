@@ -107,6 +107,7 @@ export default function Sidebar({
   onNavigate,
   contadores = {},
   ultimaSync = null,
+  yiqiEstado = null,
   nombreUsuario = 'Usuario',
   onLogout,
 }) {
@@ -122,6 +123,17 @@ export default function Sidebar({
   } = contadores
 
   const syncTexto = formatoSyncCorto(ultimaSync)
+
+  // Aviso de conexión con YiQi (agregado 20/8/2026). Antes esto solo se
+  // veía entrando puntualmente a "Conector YiQi" -- se vio 3 veces en
+  // una semana que nadie se enteraba de un corte real hasta que alguien
+  // entraba ahí por casualidad. yiqiEstado.conectado en false es una
+  // caída ya confirmada (el token guardado venció y no se pudo renovar);
+  // fallosRecuperables24h > 0 con conectado=true es la señal temprana
+  // de que viene fallando en silencio, todavía sin cortar nada.
+  const yiqiConectado = yiqiEstado?.conectado ?? true // null/undefined = todavía no cargó, no mostrar alarma en falso
+  const yiqiFallosRecuperables = yiqiEstado?.fallos_recuperables_24h ?? 0
+  const yiqiHayAviso = yiqiEstado != null && (!yiqiConectado || yiqiFallosRecuperables > 0)
 
   // Badges por key, en vez de posición fija en el array — así agregar/
   // reordenar un item de un módulo no rompe qué badge le corresponde
@@ -158,10 +170,25 @@ export default function Sidebar({
     <aside className="w-[228px] bg-white border-r border-[var(--border)] flex flex-col flex-shrink-0 h-screen">
       <div className="px-3.5 pt-3.5 pb-3 border-b border-[var(--border)]">
         <div className="text-[15px] font-bold">🦷 Dentalab</div>
-        <div className="text-[10px] text-[var(--grn)] flex items-center gap-1 font-semibold mt-0.5">
-          <span>●</span>
-          {syncTexto ? `Sincronizado ${syncTexto}` : 'Sincronizando…'}
-        </div>
+        {yiqiHayAviso ? (
+          <div
+            onClick={() => onNavigate('yiqi')}
+            title="Ver detalle en Conector YiQi"
+            className={`text-[10px] flex items-center gap-1 font-semibold mt-0.5 cursor-pointer hover:underline ${
+              !yiqiConectado ? 'text-[var(--red)]' : 'text-amber-700'
+            }`}
+          >
+            <span>●</span>
+            {!yiqiConectado
+              ? 'Sin conexión con YiQi — ver detalle'
+              : `Renovación de YiQi con fallas (${yiqiFallosRecuperables} en 24h) — ver detalle`}
+          </div>
+        ) : (
+          <div className="text-[10px] text-[var(--grn)] flex items-center gap-1 font-semibold mt-0.5">
+            <span>●</span>
+            {syncTexto ? `Sincronizado ${syncTexto}` : 'Sincronizando…'}
+          </div>
+        )}
       </div>
 
       <nav className="px-1.5 py-1.5 flex-1 overflow-y-auto">

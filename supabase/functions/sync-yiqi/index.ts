@@ -570,7 +570,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const config = await getYiqiConfig(supabaseAdmin);
+    const config = await getYiqiConfig(supabaseAdmin, 'sync-yiqi');
     const resultados = [];
 
     const entidadesAProcesar =

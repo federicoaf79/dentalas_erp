@@ -264,7 +264,7 @@ Deno.serve(async (req: Request) => {
     // ------------------------------------------------------
     if (accion === 'estado') {
       try {
-        const config = await getYiqiConfig(supabaseAdmin);
+        const config = await getYiqiConfig(supabaseAdmin, 'yiqi-connector:estado');
         return new Response(
           JSON.stringify({
             ok: true,
@@ -311,7 +311,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const config = await getYiqiConfig(supabaseAdmin);
+    const config = await getYiqiConfig(supabaseAdmin, 'yiqi-connector:lectura');
 
     // ------------------------------------------------------
     // MODO SMARTIE: si vino smartieId, ignoramos /search y /{id}
