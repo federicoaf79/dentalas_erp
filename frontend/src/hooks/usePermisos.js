@@ -204,3 +204,17 @@ export function filtrarOrdenes(query, { esAdmin, nombres }) {
   if (esAdmin) return query
   return query.in('proveedor', nombres?.length ? nombres : ['__sin_asignaciones__'])
 }
+
+/**
+ * Aplica el filtro de proveedores a una query sobre precios_proveedor_yiqi.
+ * Igual que filtrarOrdenes: esta smartie tampoco trae código de
+ * proveedor (solo LDPC_NOMBRE), así que el filtro es por nombre.
+ * Esto es una segunda capa además del RLS de la tabla (que ya filtra
+ * por lo mismo) -- no es estrictamente necesario, pero se mantiene por
+ * consistencia con el resto de las pantallas y para poder mostrar el
+ * aviso de "vista filtrada" sin depender de inspeccionar el error de RLS.
+ */
+export function filtrarPrecios(query, { esAdmin, nombres }) {
+  if (esAdmin) return query
+  return query.in('proveedor', nombres?.length ? nombres : ['__sin_asignaciones__'])
+}

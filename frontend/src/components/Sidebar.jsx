@@ -25,6 +25,7 @@ const NAV_COMPRAS = [
   { key: 'ocs', label: 'Órdenes de compra', icon: '📋' },
   { key: 'seguimiento', label: 'Seguimiento de OC', icon: '🔄' },
   { key: 'historial', label: 'Historial de OC', icon: '🕐' },
+  { key: 'precios', label: 'Comparar precios', icon: '💲' },
   { key: 'nueva-oc', label: 'Nueva OC', icon: '📝' },
 ]
 

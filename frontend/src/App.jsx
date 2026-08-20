@@ -19,6 +19,7 @@ import Empresa from './pages/Empresa'
 import TemplatesMensajes from './pages/TemplatesMensajes'
 import CondicionesProveedor from './pages/CondicionesProveedor'
 import ReposicionInterna from './pages/ReposicionInterna'
+import ComparacionPrecios from './pages/ComparacionPrecios'
 
 // ------------------------------------------------------------
 // Páginas que YA tienen datos reales conectados para la demo.
@@ -42,6 +43,7 @@ const PAGINAS_CON_DATOS_REALES = [
   'templates',
   'condiciones',
   'reposicion',
+  'precios',
 ]
 
 function PaginaEnConstruccion({ nombre }) {
@@ -74,6 +76,7 @@ const TITULOS = {
   reglas: 'Reglas y alertas',
   templates: 'Templates de mensajes',
   yiqi: 'Conector YiQi',
+  precios: 'Comparación de precios',
 }
 
 // ============================================================
@@ -180,6 +183,7 @@ function AppLogueada({ session, onLogout }) {
       {currentPage === 'yiqi' && <ConectorYiQi />}
       {currentPage === 'predictor' && <PredictorDemanda />}
       {currentPage === 'nueva-oc' && <NuevaOC onCambioOrdenes={cargarContadores} />}
+      {currentPage === 'precios' && <ComparacionPrecios />}
       {currentPage === 'reglas' && <ReglasAlertas />}
       {currentPage === 'causas' && <CatalogoCausas />}
       {currentPage === 'empresa' && <Empresa />}
