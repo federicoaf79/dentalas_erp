@@ -1082,3 +1082,31 @@ Federico pidió evaluar el menú lateral pensando en que el desarrollo va a segu
 - Confirmar con Federico/Aris/Ivana el primer envío real (con un proveedor real que tenga WhatsApp cargado) — la validación de esta sesión usó un número de prueba, sin mandar nada de verdad.
 - El botón de WhatsApp de "Nueva OC" (`abrirWhatsApp()`, previo a esta sesión) queda sin tocar a propósito: sigue siendo un preview/envío liviano sin PDF, útil antes de guardar la orden — la vía "real" con PDF adjunto vive en Órdenes de compra, sobre una orden ya aprobada.
 - Aris/Ivana todavía no cargaron el WhatsApp de pedidos de ningún proveedor real en Condiciones comerciales (`0` de 103, confirmado en esta misma sesión) — sin eso, el botón 💬 en cualquier orden real hoy corta con el aviso de "no tiene WhatsApp cargado". Es el mismo pendiente de "ESPERA A OTRA PERSONA" de siempre (Aris carga las condiciones comerciales), ahora con una razón más concreta para pedírselo.
+
+# SESIÓN 20/8/2026 — Observabilidad de YiQi + bug crítico de duplicación de OC encontrado y corregido
+
+## 1. Contexto: 3 caídas en 3 días, reclamo directo de Federico
+
+Después de caídas el 17/8, el 18/8 y el 19/8 ("El punto 1, parece una burla a la paciencia y a la inteligencia. ¿No tiene solución el tema?", luego "Entendes que no podemos hacer un desarrollo si esto se cae todos los días"), se releyó el código real de `_shared/yiqiConfig.ts` en vez de asumir. El lock de renovación del 18/8 (`refresh_lock_hasta`) era estructuralmente sano — el problema no era el mecanismo en sí, sino que **nadie se enteraba de una caída hasta entrar por casualidad a "Conector YiQi"**, y que la migración del lock del 18/8 nunca había quedado commiteada en el repo (se hubiera perdido sola si algún día se reconstruía la base desde las migraciones).
+
+## 2. Construido: observabilidad persistente + alerta temprana
+
+- **Migration `20260820120000_yiqi_diagnostico.sql`** — rescata `refresh_lock_hasta` (idempotente), crea `yiqi_token_eventos` (registro persistente de cada intento de renovación: `renovado` / `fallo_recuperable` / `fallo_critico`, con `origen` para saber si el patrón es "siempre el cron" o "cualquiera que abre una pantalla"), y `yiqi_estado_actual()` (función `SECURITY DEFINER` liviana que el frontend puede consultar sin disparar una renovación en vivo).
+- **`_shared/yiqiConfig.ts`** — ahora registra cada resultado en `yiqi_token_eventos` (éxito y los 2 tipos de fallo), con el `origen` (`sync-yiqi`, `yiqi-connector:estado`, `yiqi-connector:lectura`, `enviar-oc-yiqi`) enganchado en los 4 puntos de llamada.
+- **Frontend** — banner global en el sidebar (piggybacking sobre el poll de `cargarContadores` ya existente, sin sumar un intervalo nuevo) y estado ampliado en "Conector YiQi", leyendo `yiqi_estado_actual()` — nunca la Edge Function en vivo, para no sumar más superficies que puedan disparar una renovación real.
+
+**Regenerado el token a mano** (mismo procedimiento que sesiones anteriores, vía script de PowerShell) — nuevo `refresh_token` con vencimiento `2026-08-21 15:04:17` (14 días desde ahí para el ciclo completo). **Deployado y verificado en vivo** (commit `f7945f3`): sidebar mostrando "● Sincronizado", Conector YiQi con "Conectado a YiQi" limpio. El primer registro en `yiqi_token_eventos` va a aparecer recién con la próxima renovación automática real (no con esta carga manual, que no pasa por la Edge Function).
+
+## 3. 🔴 Bug crítico encontrado: `enviar-oc-yiqi` podía crear OC duplicadas reales en YiQi
+
+Investigando el hallazgo #3 del análisis de UX del 20/8 ("Seguimiento de OC muestra muchos más números de OC de YiQi de los que se crearon, varios repitiendo mismo proveedor/total") se encontró la causa raíz real, leyendo el código:
+
+- Cuando YiQi creaba la OC bien pero la respuesta no traía el id en el formato esperado (mismo problema de casing de siempre entre endpoints de YiQi), el código guardaba `yiqi_id_creado = null` **igual**, y encima **borraba** cualquier `yiqi_error` anterior — la orden quedaba mostrando "⚠ Error de vinculación a YiQi" con mensaje genérico (sin error real guardado) aunque la OC ya existía en YiQi.
+- Con eso, **tanto un click manual de "Reintentar envío" como cada corrida del sweep de pg_cron (`reintentar_ordenes_pendientes_yiqi`, cada 10 min) podían crear OTRA orden real duplicada**, sin ninguna forma de saber que ya existía una — ninguna de las dos protecciones (idempotencia local por `yiqi_id_creado`, filtro de "más de 5 minutos" del sweep) alcanza a cubrir este caso, porque las dos asumen que "no hay `yiqi_id_creado`" significa "no se creó nada en YiQi", y en este caso concreto **la OC sí se había creado**.
+- Confirmado en vivo: las 5 órdenes con "Error de vinculación a YiQi" (#8, #7, #6, #5, #2) tienen `yiqi_error` vacío (mensaje genérico del frontend, no un error real guardado) — consistente con esta causa, no con un rechazo real de YiQi.
+
+**Fix construido y commiteado (`b5c3f30`), pendiente de deploy por Federico:**
+- Antes de crear cualquier OC nueva, `enviar-oc-yiqi` busca **en vivo en YiQi** (no en la tabla espejo `ordenes_yiqi`, que puede estar desactualizada) si ya existe una orden con el mismo Asunto (`Dentalab-Compras #N`, único por orden interna). Si existe, adopta ese `NRO_OC` en vez de crear una nueva.
+- Auto-recuperación: si la extracción del id de la respuesta de creación vuelve a fallar, busca la orden recién creada por Asunto en el mismo llamado, en vez de dejarla en `null` hasta el próximo reintento.
+
+**⚠️ Pendiente, no lo puede resolver el código:** este fix corta la duplicación hacia adelante, pero no deshace nada de lo que ya pueda haberse creado antes. **Queda pendiente que Aris confirme directamente en YiQi si hay OC reales duplicadas** para DENTAL MEDRANO alrededor del 7-8/8/2026 (~$1.006.824, órdenes internas #6/#7) y para las otras 4 órdenes con error — ver ESPERA A OTRA PERSONA.
