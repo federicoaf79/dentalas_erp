@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
 
 // ============================================================
 // MonitorStock.jsx — v4
@@ -85,6 +86,7 @@ export default function MonitorStock() {
   const permisos = usePermisos()
 
   const [articulos, setArticulos] = useState([])
+  const [stockPorSku, setStockPorSku] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [busqueda, setBusqueda] = useState('')
@@ -97,8 +99,18 @@ export default function MonitorStock() {
     setLoading(true)
     setError(null)
     try {
-      const data = await traerMaterialLocal(permisos)
+      // En paralelo: el desglose por deposito no bloquea el resto de
+      // la pantalla si por lo que sea tarda -- si falla, se loguea y
+      // sigue mostrando el stock combinado igual (no es critico).
+      const [data, stock] = await Promise.all([
+        traerMaterialLocal(permisos),
+        traerStockPorDeposito().catch((err) => {
+          console.warn('No se pudo cargar el desglose de stock por deposito:', err.message)
+          return {}
+        }),
+      ])
       setArticulos(data)
+      setStockPorSku(stock)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -330,7 +342,21 @@ export default function MonitorStock() {
                     <td className="px-3.5 py-2.5 font-mono text-xs">{a.mate_codigo}</td>
                     <td className="px-3.5 py-2.5 font-semibold">{a.mate_nombre}</td>
                     <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
-                    <td className="px-3.5 py-2.5 font-bold">{a.mate_stock_disponible ?? 0}</td>
+                    <td className="px-3.5 py-2.5">
+                      <div className="font-bold">{a.mate_stock_disponible ?? 0}</div>
+                      {(() => {
+                        const desglose = textoDesgloseStock(stockPorSku[a.mate_codigo])
+                        if (!desglose) return null
+                        return (
+                          <div
+                            className="text-[10px] text-gray-400 mt-0.5 whitespace-nowrap"
+                            title={desglose.tooltip}
+                          >
+                            {desglose.principal}
+                          </div>
+                        )
+                      })()}
+                    </td>
                     <td className="px-3.5 py-2.5 text-gray-400">
                       {a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : '— (sin config.)'}
                     </td>

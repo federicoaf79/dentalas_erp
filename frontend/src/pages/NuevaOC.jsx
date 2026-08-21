@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import { renderTemplate } from './TemplatesMensajes'
+import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
 
 // ============================================================
 // NuevaOC.jsx — v1
@@ -297,6 +298,20 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
       .eq('codigo', 'tpl_wa_oc')
       .maybeSingle()
       .then(({ data }) => setPlantillaWa(data))
+  }, [])
+
+  // Desglose de stock por deposito (21/8/2026) -- hasta ahora esta
+  // pantalla solo mostraba `s.stock` (Local+Central combinado, viene
+  // de sugerencias_compra()/buscar_articulos_proveedor()). Saber
+  // cuanto hay en Local vs Central ayuda a decidir si conviene primero
+  // una reposicion interna (Central -> Local, pantalla de Reposicion
+  // interna) en vez de salir a comprarle al proveedor. No bloquea el
+  // armado de la orden si falla -- es informativo, no critico.
+  const [stockPorSku, setStockPorSku] = useState({})
+  useEffect(() => {
+    traerStockPorDeposito()
+      .then(setStockPorSku)
+      .catch((err) => console.warn('No se pudo cargar el desglose de stock por deposito:', err.message))
   }, [])
 
   // Paginado y filtros: hay proveedores con 700+ articulos en alerta.
@@ -704,6 +719,18 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                     </td>
                     <td className={`px-3 py-2 font-bold text-sm ${Number(s.stock) <= 0 ? 'text-[var(--red)]' : ''}`}>
                       {formatoNumero(s.stock)}
+                      {(() => {
+                        const desglose = textoDesgloseStock(stockPorSku[s.mate_codigo])
+                        if (!desglose) return null
+                        return (
+                          <div
+                            className="text-[10px] font-normal text-gray-400 whitespace-nowrap"
+                            title={desglose.tooltip}
+                          >
+                            {desglose.principal}
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td className="px-3 py-2 text-gray-400 text-sm">{formatoNumero(s.umbral)}</td>
                     <td className="px-3 py-2 text-sm">

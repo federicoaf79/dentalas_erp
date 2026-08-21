@@ -13,7 +13,16 @@
 //   GET .../sync-yiqi?entidad=ventas     -> sincroniza REPORTE_DE_VENTAS (pivoteado)
 //   GET .../sync-yiqi?entidad=stock      -> sincroniza STOCK por depósito (pivoteado)
 //   GET .../sync-yiqi?entidad=precios    -> sincroniza PRECIO_ARTICULO_COMP (~6.939 filas)
-//   GET .../sync-yiqi?entidad=todos      -> las 6, en secuencia
+//   GET .../sync-yiqi?entidad=movimientos -> último movimiento de stock por SKU (ver más abajo)
+//   GET .../sync-yiqi?entidad=todos      -> las 7, en secuencia
+//
+// "movimientos" es un caso especial (21/8/2026): la smartie
+// MOVIMIENTO_STOCK tiene 1,38 millones de filas y creciendo -- NO se
+// sincroniza completa. Se guarda solo el último movimiento de cada
+// SKU, con un backfill ACOTADO por página (se retoma solo entre
+// corridas del cron) que se corta apenas cruza ~3 años de antigüedad
+// o llega al final real de los datos. Ver
+// sincronizarUltimoMovimientoStock() más abajo para el detalle.
 //
 // OJO CON "ventas" Y "stock": ambas smarties (2353 y 2360) devuelven
 // una tabla PIVOT -- una fila por SKU(+proveedor en ventas), una
@@ -58,6 +67,15 @@ const CORS_HEADERS = {
 // ------------------------------------------------------------
 // Helper: traer UNA pagina de una smartie
 // ------------------------------------------------------------
+// TIMEOUT_PAGINA_MS (21/8/2026): encontrado el mismo día haciendo el
+// backfill de movimientos -- si YiQi tarda mucho (o directamente no
+// responde) en UNA sola página, un fetch() sin límite se queda
+// esperando indefinidamente y se come TODA la invocación de la Edge
+// Function sin dejar rastro (ver también el fix de flush incremental
+// en sincronizarUltimoMovimientoStock). 20s es generoso -- en vivo las
+// páginas normales tardan 200-500ms.
+const TIMEOUT_PAGINA_MS = 20000;
+
 async function traerPagina(
   baseUrl: string,
   entidad: string,
@@ -67,9 +85,22 @@ async function traerPagina(
   token: string,
 ) {
   const url = `${baseUrl}/api/public/${entidad}/smartie?smartieId=${smartieId}&schemaId=${schemaId}&page=${page}`;
-  const resp = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_PAGINA_MS);
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`YiQi no respondio en ${TIMEOUT_PAGINA_MS / 1000}s en ${entidad}/smartie page ${page} (timeout).`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!resp.ok) {
     const body = await resp.text().catch(() => '');
     throw new Error(`YiQi respondio ${resp.status} en ${entidad}/smartie page ${page}: ${body.slice(0, 300)}`);
@@ -537,6 +568,246 @@ async function sincronizarVentas(
 }
 
 // ------------------------------------------------------------
+// Mapeo MOVIMIENTO_STOCK -> filas para
+// upsert_ultimo_movimiento_stock_yiqi. Ver nota grande al inicio del
+// archivo: solo interesa el movimiento MÁS RECIENTE de cada SKU, no
+// el historial completo.
+// ------------------------------------------------------------
+async function mapearMovimientos(filas: any[]) {
+  const resultado = [];
+  let sinSku = 0;
+  let sinFecha = 0;
+  for (const f of filas) {
+    // SKU como texto SIEMPRE (regla de Aris: nunca convertir a número).
+    const sku = f.MATE_CODIGO != null ? String(f.MATE_CODIGO).trim() : '';
+    if (!sku) {
+      sinSku++;
+      continue;
+    }
+    const fecha = f.AUDI_FECHA_ALTA ?? null;
+    if (!fecha) {
+      // Sin fecha no podemos saber si es "el más reciente" -- se descarta.
+      sinFecha++;
+      continue;
+    }
+    const camposNegocio = {
+      sku,
+      mate_nombre: f.MATE_NOMBRE ?? null,
+      cantidad: f.MOST_CANTIDAD ?? null,
+      ubicacion_origen: f.CEDI_NOMBRE ?? null,
+      ubicacion_destino: f.CED1_NOMBRE ?? null,
+      observaciones: f.MOST_OBSERVACIONES ?? null,
+      entidad_origen: f.MOST_ENTIDAD_ORIGEN ?? null,
+      fecha_movimiento: fecha,
+      yiqi_movimiento_id: f.id ?? f.ID ?? null,
+    };
+    resultado.push({ ...camposNegocio, hash_datos: await hashDeObjeto(camposNegocio) });
+  }
+  if (sinSku > 0 || sinFecha > 0) {
+    console.warn(`mapearMovimientos: se saltearon ${sinSku} fila(s) sin SKU y ${sinFecha} sin fecha.`);
+  }
+  return resultado;
+}
+
+// ------------------------------------------------------------
+// Dedupe por sku, en JS -- ver nota grande en sincronizarUltimoMovimientoStock.
+// Se agregó el 21/8/2026 porque el dedupe hecho en SQL (DISTINCT ON en
+// upsert_ultimo_movimiento_stock_yiqi) NO alcanzó: el mismo error de
+// Postgres ("ON CONFLICT DO UPDATE command cannot affect row a second
+// time") volvió a pasar con datos reales incluso con el DISTINCT ON ya
+// aplicado (un test manual con 2 filas duplicadas SÍ funcionó, así que
+// hay algo puntual de los datos reales -- probablemente algo de
+// colación/comparación de texto -- que no se llegó a reproducir a
+// mano). En vez de seguir cazando la causa exacta en SQL, se garantiza
+// acá, en JS, con comparación de string exacta y sin depender de
+// ningún detalle de Postgres: nunca puede llegar a la RPC más de una
+// fila con el mismo sku. El DISTINCT ON en SQL queda como resguardo
+// extra, no hace falta sacarlo.
+// ------------------------------------------------------------
+function dedupePorUltimoPorSku(filas: Array<{ sku: string }>) {
+  // "filas" viene en orden descendente por fecha (más reciente primero
+  // -- así arma el buffer sincronizarUltimoMovimientoStock, concatenando
+  // páginas en el mismo orden en que las devuelve YiQi). Nos quedamos
+  // con la PRIMERA aparición de cada sku, que es la más reciente.
+  const vistos = new Set<string>();
+  const resultado = [];
+  let duplicados = 0;
+  for (const f of filas) {
+    if (vistos.has(f.sku)) {
+      duplicados++;
+      continue;
+    }
+    vistos.add(f.sku);
+    resultado.push(f);
+  }
+  if (duplicados > 0) {
+    console.warn(`dedupePorUltimoPorSku: se descartaron ${duplicados} fila(s) duplicada(s) por sku dentro del mismo lote.`);
+  }
+  return resultado;
+}
+
+// ------------------------------------------------------------
+// Sincroniza el último movimiento de stock por SKU (caso especial,
+// backfill acotado + modo incremental -- ver nota grande al inicio
+// del archivo).
+// ------------------------------------------------------------
+const ENTIDAD_MOVIMIENTOS = 'MOVIMIENTO_STOCK';
+const SMARTIE_MOVIMIENTOS = '2359'; // Z.API_Movimientos_Stock_NO_BORRAR
+
+// No hace falta escanear más atrás que esto durante el backfill: la
+// regla de negocio que este dato va a alimentar más adelante ("3 años
+// sin movimiento" en Alertas) no necesita el detalle exacto de algo
+// más viejo que su propia ventana -- una vez cruzado, ya sabemos que
+// el SKU está "sin movimiento reciente".
+const CORTE_ANTIGUEDAD_DIAS_BACKFILL = 3 * 365;
+
+// Páginas por invocación durante el backfill (50 filas/página en esta
+// smartie -- confirmado en vivo el 21/8/2026, distinto a las smarties
+// core que están en 100). Acotado para no arriesgar el timeout de la
+// Edge Function; se retoma solo en la próxima corrida del cron (cada
+// 15 min) vía el cursor guardado en yiqi_config.
+//
+// Bajado de 300 a 150 el 21/8/2026: las primeras 2 corridas reales
+// (300 páginas c/u) NUNCA terminaron -- pg_net cortó a los 120s (su
+// timeout configurado) las dos veces y quedó 0 filas guardadas y el
+// cursor en 0. No se pudo confirmar si la Edge Function realmente
+// tardaba de más o se colgó esperando alguna página (por eso también
+// se agregó TIMEOUT_PAGINA_MS arriba). 150 páginas es más conservador
+// mientras se confirma en vivo cuánto tarda de verdad cada página; en
+// cualquier caso, con el fix de flush incremental de más abajo, el
+// número exacto ya no es crítico -- lo que se llega a procesar queda
+// guardado aunque la invocación se corte antes de completar el lote.
+const PAGINAS_POR_INVOCACION_BACKFILL = 150;
+
+// En modo incremental (backfill ya completo) alcanza con repasar las
+// páginas más recientes en cada corrida -- el volumen de movimientos
+// nuevos en 15 minutos está muy lejos de esto.
+const PAGINAS_POR_INVOCACION_INCREMENTAL = 40;
+
+const TAMANIO_TANDA_MOVIMIENTOS = 5000;
+
+// FIX 21/8/2026: antes, TODAS las páginas se acumulaban en memoria y
+// recién se escribían (upsert + cursor) al final del loop completo.
+// En vivo, las primeras 2 corridas (300 páginas c/u) nunca llegaron a
+// ese final -- pg_net cortó a los 120s las dos veces y quedó
+// `count(*) = 0` en la tabla y el cursor sin moverse de 0, sin ninguna
+// pista de cuánto se había alcanzado a procesar. Ahora se escribe (y
+// se persiste el cursor) cada TAMANIO_TANDA_MOVIMIENTOS filas
+// acumuladas, y también en un `finally` que corre pase lo que pase
+// (corte normal, corte de antigüedad, o cualquier error incluyendo un
+// timeout de traerPagina) -- así una invocación que se corta a mitad
+// de camino deja guardado el progreso real en vez de perderlo todo.
+async function sincronizarUltimoMovimientoStock(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  config: any,
+) {
+  const backfillCompleto = config.movimientos_stock_backfill_completo === true;
+  const cursorActual = config.movimientos_stock_pagina_cursor ?? 0;
+
+  // En modo incremental siempre arrancamos de página 1 (lo más
+  // reciente); en backfill retomamos donde quedó la corrida anterior.
+  const paginaDesde = backfillCompleto ? 1 : cursorActual + 1;
+  const maxPaginas = backfillCompleto ? PAGINAS_POR_INVOCACION_INCREMENTAL : PAGINAS_POR_INVOCACION_BACKFILL;
+  const paginaHasta = paginaDesde + maxPaginas - 1;
+
+  const corteFecha = new Date();
+  corteFecha.setDate(corteFecha.getDate() - CORTE_ANTIGUEDAD_DIAS_BACKFILL);
+
+  let buffer: any[] = [];
+  let ultimaPaginaProcesada = paginaDesde - 1;
+  let ultimoCursorGuardado = cursorActual;
+  let seCruzoElCorte = false;
+  let seLlegoAlFinal = false;
+  let totalReportado = 0;
+  let filasEscritas = 0;
+
+  async function flush() {
+    if (buffer.length > 0) {
+      const filasMapeadas = dedupePorUltimoPorSku(await mapearMovimientos(buffer));
+      buffer = [];
+      for (let i = 0; i < filasMapeadas.length; i += TAMANIO_TANDA_MOVIMIENTOS) {
+        const tanda = filasMapeadas.slice(i, i + TAMANIO_TANDA_MOVIMIENTOS);
+        const { error } = await supabaseAdmin.rpc('upsert_ultimo_movimiento_stock_yiqi', { p_rows: tanda });
+        if (error) {
+          throw new Error(`Error en upsert_ultimo_movimiento_stock_yiqi: ${error.message}`);
+        }
+        filasEscritas += tanda.length;
+      }
+    }
+    // En modo incremental no hay cursor que avanzar (siempre se relee
+    // desde la página 1) -- solo se persiste durante el backfill.
+    if (!backfillCompleto && ultimaPaginaProcesada !== ultimoCursorGuardado) {
+      await supabaseAdmin
+        .from('yiqi_config')
+        .update({ movimientos_stock_pagina_cursor: ultimaPaginaProcesada })
+        .eq('id', config.id);
+      ultimoCursorGuardado = ultimaPaginaProcesada;
+    }
+  }
+
+  try {
+    for (let page = paginaDesde; page <= paginaHasta; page++) {
+      const resultado = await traerPagina(
+        config.base_url, ENTIDAD_MOVIMIENTOS, SMARTIE_MOVIMIENTOS, page, config.schema_id, config.bearer_token,
+      );
+      const datosPagina = resultado.data ?? [];
+      totalReportado = typeof resultado.total === 'number' ? resultado.total : totalReportado;
+
+      if (datosPagina.length === 0) {
+        seLlegoAlFinal = true;
+        ultimaPaginaProcesada = page - 1;
+        break;
+      }
+
+      buffer = buffer.concat(datosPagina);
+      ultimaPaginaProcesada = page;
+
+      // El corte de antigüedad solo importa durante el backfill -- en
+      // modo incremental siempre estamos mirando lo más reciente, nunca
+      // lo vamos a cruzar.
+      if (!backfillCompleto) {
+        const fechaMasVieja = datosPagina[datosPagina.length - 1]?.AUDI_FECHA_ALTA;
+        if (fechaMasVieja && new Date(fechaMasVieja) < corteFecha) {
+          seCruzoElCorte = true;
+          break;
+        }
+      }
+
+      if (buffer.length >= TAMANIO_TANDA_MOVIMIENTOS) {
+        await flush();
+      }
+    }
+  } finally {
+    // Guarda lo acumulado + el cursor sin importar cómo se salió del
+    // loop de arriba (incluida una excepción -- ver comentario grande
+    // antes de la función).
+    await flush();
+  }
+
+  // Actualizar el estado del backfill -- en modo incremental no aplica.
+  let backfillAhoraCompleto = backfillCompleto;
+  if (!backfillCompleto) {
+    backfillAhoraCompleto = seCruzoElCorte || seLlegoAlFinal;
+    if (backfillAhoraCompleto) {
+      await supabaseAdmin
+        .from('yiqi_config')
+        .update({ movimientos_stock_backfill_completo: true })
+        .eq('id', config.id);
+    }
+  }
+
+  return {
+    entidad: 'movimientos',
+    modo: backfillCompleto ? 'incremental' : 'backfill',
+    filasSincronizadas: filasEscritas,
+    paginaDesde,
+    ultimaPaginaProcesada,
+    backfillCompleto: backfillAhoraCompleto,
+    totalReportadoPorYiqi: totalReportado,
+  };
+}
+
+// ------------------------------------------------------------
 // Sincroniza una entidad puntual
 // ------------------------------------------------------------
 async function sincronizarEntidad(
@@ -611,11 +882,11 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const entidadParam = url.searchParams.get('entidad');
 
-    const ENTIDADES_VALIDAS = ['material', 'oc', 'clientes', 'ventas', 'stock', 'precios', 'todos'];
+    const ENTIDADES_VALIDAS = ['material', 'oc', 'clientes', 'ventas', 'stock', 'precios', 'movimientos', 'todos'];
     if (!entidadParam || !ENTIDADES_VALIDAS.includes(entidadParam)) {
       return new Response(
         JSON.stringify({
-          error: 'Parametro "entidad" invalido. Usar: material | oc | clientes | ventas | stock | precios | todos',
+          error: 'Parametro "entidad" invalido. Usar: material | oc | clientes | ventas | stock | precios | movimientos | todos',
         }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
@@ -626,17 +897,21 @@ Deno.serve(async (req: Request) => {
 
     const entidadesAProcesar =
       entidadParam === 'todos'
-        ? (['material', 'oc', 'clientes', 'ventas', 'stock', 'precios'] as const)
+        ? (['material', 'oc', 'clientes', 'ventas', 'stock', 'precios', 'movimientos'] as const)
         : ([entidadParam] as const);
 
     for (const entidad of entidadesAProcesar) {
       // ventas y stock van por su propio camino: pivot (piden "columns"
       // además de "data"), a diferencia del resto que es plano.
+      // movimientos también va aparte: backfill acotado + modo
+      // incremental, en vez de traer la smartie completa.
       let resultado;
       if (entidad === 'ventas') {
         resultado = await sincronizarVentas(supabaseAdmin, config);
       } else if (entidad === 'stock') {
         resultado = await sincronizarStock(supabaseAdmin, config);
+      } else if (entidad === 'movimientos') {
+        resultado = await sincronizarUltimoMovimientoStock(supabaseAdmin, config);
       } else {
         resultado = await sincronizarEntidad(supabaseAdmin, config, entidad as 'material' | 'oc' | 'clientes' | 'precios');
       }
