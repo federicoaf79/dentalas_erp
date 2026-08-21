@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import { exportarRemitoExcel, exportarTodosLosRemitosExcel } from '../lib/exportarExcel'
 
 // ============================================================
-// ReposicionInterna.jsx — Módulo de Stock, Fase 2b (19/8/2026)
+// ReposicionInterna.jsx — Módulo de Stock, Fase 2b (19/8/2026) +
+// Fase 2c: remitos/tandas de hasta 30 artículos (21/8/2026)
 //
 // Combina dos fuentes:
 //   - reposiciones_sugeridas: prioridades 1 a 5 (mover Central->Local),
@@ -23,6 +25,13 @@ import Aviso from '../components/Aviso'
 // La tabla reposiciones_sugeridas se actualiza sola una vez por día
 // (cron generar-reposicion-interna-diario) y también con el botón
 // "↻ Actualizar" de esta pantalla.
+//
+// Remitos (Fase 2c, sección 4.5 de Aris): vista separada ("Remitos")
+// que agrupa las filas accionables (prioridades 1-5, pendientes) en
+// tandas de hasta 30, ya numeradas por generar_remitos_reposicion()
+// (columna `remito`). Solo lectura + exportar a Excel -- marcar
+// movido/descartado se sigue haciendo desde la vista "Lista", para no
+// duplicar esa lógica en dos lugares.
 // ============================================================
 
 const TAMANIO_LOTE = 1000
@@ -204,6 +213,9 @@ export default function ReposicionInterna() {
   const [modal, setModal] = useState(null) // { fila, variante }
   const [guardandoAccion, setGuardandoAccion] = useState(false)
 
+  const [vista, setVista] = useState('lista') // 'lista' | 'remitos'
+  const [generandoRemitos, setGenerandoRemitos] = useState(false)
+
   async function cargarDatos() {
     if (permisos.cargando || permisos.error) return
     setLoading(true)
@@ -244,6 +256,22 @@ export default function ReposicionInterna() {
       setError(err.message)
     } finally {
       setActualizando(false)
+    }
+  }
+
+  async function generarRemitos() {
+    setGenerandoRemitos(true)
+    setError(null)
+    try {
+      const { error: errRpc } = await supabase.rpc('generar_remitos_reposicion')
+      if (errRpc) throw errRpc
+      await cargarDatos()
+      setAviso('Remitos generados a partir de las sugerencias pendientes.')
+      setTimeout(() => setAviso(null), 4000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setGenerandoRemitos(false)
     }
   }
 
@@ -353,6 +381,39 @@ export default function ReposicionInterna() {
     [accionables]
   )
 
+  // ------------------------------------------------------------
+  // Remitos (Fase 2c): agrupar por el campo `remito` que ya viene
+  // asignado en `accionables` (ver generar_remitos_reposicion()).
+  // Se calcula client-side a partir de los datos ya cargados -- no
+  // hace falta una consulta aparte.
+  // ------------------------------------------------------------
+  const remitos = useMemo(() => {
+    const mapa = new Map()
+    for (const f of accionables) {
+      if (!f.remito) continue
+      if (!mapa.has(f.remito)) mapa.set(f.remito, [])
+      mapa.get(f.remito).push(f)
+    }
+    return Array.from(mapa.entries())
+      .map(([nombre, filas]) => ({
+        nombre,
+        filas,
+        prioridad_orden: filas[0]?.prioridad_orden,
+        prioridad_label: filas[0]?.prioridad_label,
+        totalUnidades: filas.reduce((acc, f) => acc + (Number(f.cantidad) || 0), 0),
+      }))
+      .sort((a, b) => {
+        const na = parseInt(a.nombre.match(/\d+/)?.[0] ?? '0', 10)
+        const nb = parseInt(b.nombre.match(/\d+/)?.[0] ?? '0', 10)
+        return na - nb
+      })
+  }, [accionables])
+
+  const sinRemitoCount = useMemo(
+    () => accionables.filter((f) => !f.remito).length,
+    [accionables]
+  )
+
   async function confirmarAccion({ cantidad_movida, observacion }) {
     if (!modal) return
     setGuardandoAccion(true)
@@ -394,6 +455,24 @@ export default function ReposicionInterna() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-[var(--border)] overflow-hidden">
+            <button
+              onClick={() => setVista('lista')}
+              className={`px-3 py-1.5 text-[13px] font-semibold ${
+                vista === 'lista' ? 'bg-[var(--indigo,#4338ca)] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Lista
+            </button>
+            <button
+              onClick={() => setVista('remitos')}
+              className={`px-3 py-1.5 text-[13px] font-semibold border-l border-[var(--border)] ${
+                vista === 'remitos' ? 'bg-[var(--indigo,#4338ca)] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Remitos {remitos.length > 0 ? `(${remitos.length})` : ''}
+            </button>
+          </div>
           <button
             onClick={actualizarSugerencias}
             disabled={actualizando || cargandoAlgo}
@@ -441,6 +520,8 @@ export default function ReposicionInterna() {
         </Aviso>
       )}
 
+      {vista === 'lista' && (
+      <>
       {/* Filtros por prioridad */}
       <div className="px-4 pt-4 flex items-center gap-2 flex-wrap">
         <button
@@ -600,6 +681,117 @@ export default function ReposicionInterna() {
               Siguiente ›
             </button>
           </div>
+        </div>
+      )}
+      </>
+      )}
+
+      {vista === 'remitos' && (
+        <div className="px-4 pt-4 pb-6">
+          <Aviso tipo="info" id="remitos-criterio" className="mb-3">
+            Cada remito agrupa hasta 30 artículos de una misma prioridad, para facilitar el picking y el control —
+            no es por capacidad de camioneta: si hace falta, se hacen varios viajes. "↻ Generar remitos" reparte de
+            nuevo TODAS las sugerencias pendientes en tandas (los ítems ya marcados como movidos/descartados no
+            vuelven a aparecer).
+          </Aviso>
+
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <div className="text-[12px] text-[var(--sub)]">
+              {cargandoAlgo
+                ? 'Cargando…'
+                : remitos.length === 0
+                ? 'Todavía no se generaron remitos.'
+                : `${remitos.length} remito${remitos.length === 1 ? '' : 's'} · ${num(
+                    remitos.reduce((acc, r) => acc + r.filas.length, 0),
+                    0
+                  )} artículos`}
+              {!cargandoAlgo && sinRemitoCount > 0 && (
+                <span className="text-[var(--red)]">
+                  {' '}
+                  · {num(sinRemitoCount, 0)} sugerencia{sinRemitoCount === 1 ? '' : 's'} pendiente
+                  {sinRemitoCount === 1 ? '' : 's'} sin remito todavía
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={generarRemitos}
+                disabled={generandoRemitos || cargandoAlgo}
+                className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
+                {generandoRemitos ? 'Generando…' : '↻ Generar remitos'}
+              </button>
+              {remitos.length > 0 && (
+                <button
+                  onClick={() => exportarTodosLosRemitosExcel(remitos)}
+                  className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--grn,#059669)] hover:opacity-90"
+                >
+                  ⬇ Descargar todos (Excel)
+                </button>
+              )}
+            </div>
+          </div>
+
+          {cargandoAlgo && remitos.length === 0 ? (
+            <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center text-[var(--sub)] text-sm">
+              Cargando…
+            </div>
+          ) : remitos.length === 0 ? (
+            <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center text-[var(--sub)] text-sm">
+              {totalAccionables === 0
+                ? 'No hay sugerencias pendientes para agrupar en remitos.'
+                : 'Hay sugerencias pendientes pero todavía no se generaron remitos — usá "↻ Generar remitos".'}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {remitos.map((r) => (
+                <div key={r.nombre} className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
+                  <div className="px-3.5 py-2.5 bg-gray-50 border-b border-[var(--border)] flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm">{r.nombre}</span>
+                      <span
+                        className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                          PRIORIDAD_COLOR[r.prioridad_orden] ?? 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {r.filas.length} artículo{r.filas.length === 1 ? '' : 's'}
+                      </span>
+                      <span className="text-[11px] text-[var(--sub)]">{num(r.totalUnidades, 2)} unidades</span>
+                    </div>
+                    <button
+                      onClick={() => exportarRemitoExcel(r.nombre, r.filas)}
+                      className="px-2.5 py-1 rounded text-[11px] font-semibold bg-green-50 text-green-700 hover:bg-green-100"
+                    >
+                      ⬇ Excel
+                    </button>
+                  </div>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        {['SKU', 'Descripción', 'Cantidad'].map((h) => (
+                          <th
+                            key={h}
+                            className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.filas.map((f) => (
+                        <tr key={f.id} className="border-b border-gray-50 last:border-0">
+                          <td className="px-3.5 py-1.5 font-mono text-xs">{f.sku}</td>
+                          <td className="px-3.5 py-1.5 text-sm">{f.mate_nombre}</td>
+                          <td className="px-3.5 py-1.5 text-sm font-semibold">{num(f.cantidad, 2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
