@@ -75,7 +75,24 @@ export default function ReglasAlertas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permisos.cargando, permisos.error])
 
+  // N-10 del documento de continuidad (5/8/2026, seguía abierto): un
+  // input vacío pasaba por Number('') → 0 y se guardaba en silencio como
+  // límite de aprobación (o como tope de bultos / meses de cobertura).
+  // Nadie lo pedía así, era un descuido de tipeo — pero el sistema lo
+  // guardaba como si fuera una decisión real. Se valida acá, antes de
+  // guardar nada, para que el usuario tenga que corregir el campo en
+  // vez de que el sistema adivine 0.
+  function campoInvalido(v) {
+    return v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) || Number(v) < 0
+  }
+  const hayCampoInvalido =
+    campoInvalido(form.limite) || campoInvalido(form.cajas) || campoInvalido(form.meses)
+
   async function guardar() {
+    if (hayCampoInvalido) {
+      setError('Completá los tres campos con un número válido (0 o más) antes de guardar.')
+      return
+    }
     setGuardando(true)
     setError(null)
     setAviso(null)
@@ -120,7 +137,8 @@ export default function ReglasAlertas() {
         {esAdmin && (
           <button
             onClick={guardar}
-            disabled={guardando || !huboCambios}
+            disabled={guardando || !huboCambios || hayCampoInvalido}
+            title={hayCampoInvalido ? 'Completá los tres campos con un número válido antes de guardar' : undefined}
             className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
           >
             {guardando ? 'Guardando…' : 'Guardar cambios'}

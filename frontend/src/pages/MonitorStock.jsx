@@ -59,6 +59,28 @@ async function traerMaterialLocal(permisos) {
   return acumulado
 }
 
+// Mismo criterio que Alertas.jsx (ítem 19, 21/8/2026): un artículo no
+// entra en el conteo de "Alertas activas" si es un SKU administrativo
+// (889/890/99999), una publicación de Mercado Libre, un discontinuado o
+// producción propia (proveedor Dentalab). Antes de este fix, Monitor de
+// stock calculaba sus propias alertas sin ningún filtro — mostraba un
+// número más alto todavía que el badge viejo del sidebar (2595/443 vs.
+// 2401/440 reales), justo en la primera pantalla que ve el usuario al
+// entrar. Se copia la función tal cual en vez de importarla porque
+// Alertas.jsx no expone nada compartido todavía — si se vuelve a tocar
+// este criterio, hay que actualizar los dos lugares (o extraer un
+// helper común más adelante).
+function esExcluidoDeAlertas(articulo) {
+  const sku = articulo.mate_codigo ?? ''
+  const nombre = articulo.mate_nombre ?? ''
+  const proveedor = articulo.clie_nombre ?? ''
+  if (['889', '890', '99999'].includes(sku)) return true
+  if (nombre.startsWith('###')) return true
+  if (nombre.toLowerCase().includes('discontinuad')) return true
+  if (proveedor === 'Dentalab') return true
+  return false
+}
+
 function calcularAlerta(articulo) {
   const stock = articulo.mate_stock_disponible ?? 0
   const puntoPedidoManual = articulo.mate_punto_de_pedido
@@ -157,6 +179,7 @@ export default function MonitorStock() {
 
   const conAlerta = useMemo(() => {
     return articulosFiltrados.filter((a) => {
+      if (esExcluidoDeAlertas(a)) return false
       const { nivel } = calcularAlerta(a)
       return nivel === 'critica' || nivel === 'preventiva'
     })

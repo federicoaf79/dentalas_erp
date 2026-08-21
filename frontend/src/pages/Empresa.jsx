@@ -134,6 +134,21 @@ export default function Empresa() {
         </Aviso>
       )}
 
+      {/* Los campos de abajo son solo el placeholder gris del input (ejemplos
+          como "Av. Siempreviva 742") -- no hay ningún dato real cargado
+          todavía (última vez que se guardó, se guardó vacío, el 2/8/2026).
+          El PDF/WhatsApp de la OC no imprime esos ejemplos: si el campo
+          está vacío, esa línea directamente no aparece (ver pdfOrden.js).
+          El riesgo real no es que salga un dato falso, es que la orden
+          salga sin membrete -- sin CUIT, sin dirección, sin teléfono. */}
+      {!cargando && esAdmin && !datos?.razon_social && !datos?.cuit && !datos?.direccion && (
+        <Aviso tipo="filtro" autoCerrarEn={null} className="mx-4 mt-4">
+          Todavía no se cargó ningún dato real acá — lo que ves en los campos es solo el ejemplo gris del
+          placeholder. Las órdenes de compra que se generen van a salir sin razón social, CUIT ni dirección
+          hasta que se completen y se guarden.
+        </Aviso>
+      )}
+
       {cargando ? (
         <div className="p-10 text-center text-[var(--sub)] text-sm">Cargando…</div>
       ) : (
