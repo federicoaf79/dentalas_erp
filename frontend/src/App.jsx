@@ -97,6 +97,16 @@ function AppLogueada({ session, onLogout }) {
   const [ultimaSync, setUltimaSync] = useState(null)
   const [yiqiEstado, setYiqiEstado] = useState(null)
 
+  // Puente Reposición interna -> Nueva OC (21/8/2026, ítem 5): "Artículos
+  // a pedir" (prioridad 6 de reposicion_interna(), Central no alcanza)
+  // ahora tiene un botón que salta directo a Nueva OC con el proveedor y
+  // el SKU ya cargados, en vez de que Aris/Ivana tengan que acordarse y
+  // volver a escribirlo. Vive acá (no en cada pantalla) porque las dos
+  // pantallas se turnan por `currentPage`, sin router -- es el único
+  // lugar donde ambas coexisten. Mismo patrón que `onIrARevisar` de
+  // Comparación de precios -> Revisar equivalencias, unas líneas abajo.
+  const [preseleccionOC, setPreseleccionOC] = useState(null)
+
   // El nombre sale de usuarios_config, no de partir el mail: con las
   // cuentas reales, el mail comprasdentalab@gmail.com mostraría
   // "comprasdentalab" en el sidebar. Si por algún motivo no hay nombre
@@ -176,7 +186,14 @@ function AppLogueada({ session, onLogout }) {
       />
 
       {currentPage === 'stock' && <MonitorStock />}
-      {currentPage === 'reposicion' && <ReposicionInterna />}
+      {currentPage === 'reposicion' && (
+        <ReposicionInterna
+          onPedirAProveedor={(proveedor, sku) => {
+            setPreseleccionOC({ proveedor, sku })
+            setCurrentPage('nueva-oc')
+          }}
+        />
+      )}
       {currentPage === 'seguimiento' && <SeguimientoOC />}
       {currentPage === 'proveedores' && <Proveedores />}
       {currentPage === 'historial' && <HistorialOC />}
@@ -185,7 +202,13 @@ function AppLogueada({ session, onLogout }) {
       {currentPage === 'ocs' && <OrdenesCompra onCambioOrdenes={cargarContadores} />}
       {currentPage === 'yiqi' && <ConectorYiQi />}
       {currentPage === 'predictor' && <PredictorDemanda />}
-      {currentPage === 'nueva-oc' && <NuevaOC onCambioOrdenes={cargarContadores} />}
+      {currentPage === 'nueva-oc' && (
+        <NuevaOC
+          onCambioOrdenes={cargarContadores}
+          preseleccion={preseleccionOC}
+          onConsumirPreseleccion={() => setPreseleccionOC(null)}
+        />
+      )}
       {currentPage === 'precios' && <ComparacionPrecios onIrARevisar={() => setCurrentPage('equivalencias')} />}
       {currentPage === 'equivalencias' && <RevisarEquivalencias />}
       {currentPage === 'reglas' && <ReglasAlertas />}

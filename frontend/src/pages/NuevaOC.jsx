@@ -224,7 +224,7 @@ function formatoMoneda(n) {
   }).format(num)
 }
 
-function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones, esAdmin }) {
+function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones, esAdmin, preseleccionSku }) {
   const [seleccion, setSeleccion] = useState(() => new Set())
   const [cantidades, setCantidades] = useState({})
   const [notas, setNotas] = useState('')
@@ -239,6 +239,22 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   const [buscarResultados, setBuscarResultados] = useState([])
   const [buscarCargando, setBuscarCargando] = useState(false)
   const [buscarAbierto, setBuscarAbierto] = useState(false)
+
+  // Viene desde "🛒 Pedir a proveedor" en Reposición interna (21/8/2026,
+  // ítem 5): precarga el buscador con el SKU que ya sabíamos que hacía
+  // falta, para no obligar a Aris/Ivana a volver a escribirlo. A
+  // propósito NO lo agrega solo a la orden -- mismo criterio que el
+  // resto de esta pantalla ("el sistema sugiere, la persona decide", ver
+  // más abajo): la persona ve el resultado y hace click en "+ Agregar"
+  // si quiere. `key={proveedorElegido}` en el padre remonta este
+  // componente al cambiar de proveedor, así que este efecto corre una
+  // sola vez por viaje desde Reposición interna, no en cada render.
+  useEffect(() => {
+    if (!preseleccionSku) return
+    setBuscarTexto(preseleccionSku)
+    setBuscarAbierto(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Buscar en el catalogo completo del proveedor (no solo lo que
   // esta en alerta) con un poco de debounce: no tiene sentido pegarle
@@ -571,6 +587,14 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
         </div>
       </div>
 
+      {preseleccionSku && (
+        <Aviso tipo="filtro" autoCerrarEn={20} className="mb-3">
+          Viniste desde Reposición interna: Depósito Central no tiene stock suficiente de <b>{preseleccionSku}</b>{' '}
+          para cubrir el faltante del local, por eso te sugerimos pedirlo directo a {proveedor}. Lo dejamos
+          buscado más abajo — hacé click en "+ Agregar" si querés incluirlo en esta orden.
+        </Aviso>
+      )}
+
       <Aviso tipo="info" id="nuevaoc-sugerencia" className="mb-3">
         La cantidad sugerida busca cubrir el consumo de los próximos meses según el promedio de venta y se
         redondea hacia arriba al múltiplo de compra, con un tope máximo por producto. Esos parámetros y el
@@ -835,7 +859,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
 // ============================================================
 // Componente principal
 // ============================================================
-export default function NuevaOC({ onCambioOrdenes }) {
+export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPreseleccion }) {
   const permisos = usePermisos()
 
   const [vista, setVista] = useState('lista') // lista | armar
@@ -844,6 +868,9 @@ export default function NuevaOC({ onCambioOrdenes }) {
   const [sugerencias, setSugerencias] = useState([])
   const [condicionesProveedor, setCondicionesProveedor] = useState(null)
   const [proveedorElegido, setProveedorElegido] = useState(null)
+  // SKU que trajo el botón "🛒 Pedir a proveedor" de Reposición interna
+  // (21/8/2026, ítem 5) -- ver elegirProveedor() y el efecto de abajo.
+  const [skuPreseleccionado, setSkuPreseleccionado] = useState(null)
 
   const [cargando, setCargando] = useState(true)
   const [cargandoSub, setCargandoSub] = useState(false)
@@ -885,6 +912,11 @@ export default function NuevaOC({ onCambioOrdenes }) {
   }, [claveFiltro])
 
   async function elegirProveedor(nombre) {
+    // Limpia cualquier preselección de un viaje anterior desde Reposición
+    // interna: si no se limpia acá, elegir OTRO proveedor a mano después
+    // de volver de una preselección dejaría el buscador de la pantalla
+    // nueva precargado con un SKU que no tiene nada que ver.
+    setSkuPreseleccionado(null)
     setProveedorElegido(nombre)
     setVista('armar')
     setCargandoSub(true)
@@ -907,6 +939,23 @@ export default function NuevaOC({ onCambioOrdenes }) {
       setCargandoSub(false)
     }
   }
+
+  // Puente desde Reposición interna (21/8/2026, ítem 5): si llega una
+  // preselección, salta directo a "armar" con ese proveedor -- sin pasar
+  // por SelectorProveedor, y sin importar si ese proveedor aparece o no
+  // en proveedores_con_alertas() (es una lista distinta, calculada con
+  // otro criterio -- sugerencias_compra() vs reposicion_interna()).
+  // elegirProveedor() ya funciona con cualquier nombre de proveedor, así
+  // que no hace falta duplicar su lógica acá. Se consume una sola vez
+  // (avisa al padre para que limpie su estado) para no repetir el salto
+  // si el usuario vuelve a esta pantalla por su cuenta después.
+  useEffect(() => {
+    if (!preseleccion) return
+    elegirProveedor(preseleccion.proveedor)
+    setSkuPreseleccionado(preseleccion.sku)
+    if (typeof onConsumirPreseleccion === 'function') onConsumirPreseleccion()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preseleccion])
 
   async function guardarOrden({ items, notas, estado, valorizacion }) {
     setOcupado(true)
@@ -1057,6 +1106,7 @@ export default function NuevaOC({ onCambioOrdenes }) {
           ocupado={ocupado}
           condiciones={condicionesProveedor}
           esAdmin={permisos.esAdmin}
+          preseleccionSku={skuPreseleccionado}
         />
       ) : null}
     </div>

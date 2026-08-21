@@ -295,6 +295,7 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 16. `[11/8/2026]` **Etapa 2 (futura, no urgente) — sincronizar `MOVIMIENTO_STOCK` desde YiQi** para automatizar la regla de "3 años sin compra/ingreso" de la limpieza de alertas, hoy resuelta con exclusión manual (ítem 14 de decisiones de negocio). Ligado al ítem 11 de esta lista. **`[21/8/2026]` Backend construido y validado en vivo** — `ultimo_movimiento_stock_yiqi` (1 fila por SKU, el movimiento más reciente) se sincroniza sola vía cron cada 15 min, con backfill acotado a ~3 años. **La automatización de la regla en sí (usar este dato para excluir alertas automáticamente) todavía no está construida** — sigue siendo solo el dato de base. Ver SESIÓN 21/8/2026.
 17. ~~Pedido de Aris — en "Nueva OC", poder agregar cualquier artículo del proveedor a mano.~~ **✅ HECHO 15/8/2026, deployado y validado en vivo** — commit `f1e416f`, migration `20260815160000_buscar_articulos_proveedor.sql` aplicada por Federico vía SQL Editor. Ver SESIÓN 15/8/2026, sección 6.
 18. `[21/8/2026]` **NUEVO — Remitos de reposición interna (Excel)** — Stock, vista "Remitos" en `ReposicionInterna.jsx`: agrupa las sugerencias pendientes en tandas de hasta 30 artículos por prioridad, exporta a Excel (por remito y "todos juntos"). **✅ HECHO y validado en vivo.** Ver SESIÓN 21/8/2026.
+19. `[21/8/2026]` **NUEVO — Reglas de exclusión de la especificación de Aris** (PARA FRACCIONAR, SKU administrativos 889/890/99999, verificación de que 978/40156/"31110 T" no se filtran por error). **✅ HECHO y validado en vivo.** `es_administrativo()`/`es_para_fraccionar()` nuevas, usadas en `sugerencias_compra()` y `reposicion_interna()`; de paso, `Alertas.jsx` (que no tenía NINGÚN filtro de exclusión hasta hoy) ahora también excluye ML/discontinuados/producción propia/administrativos — bajó de 3053 a 2835 alertas en producción. Ver SESIÓN 21/8/2026, sección 4.
 
 ---
 
@@ -1166,3 +1167,27 @@ Se retomó el análisis de UX del 20/8 (contestado: nada de la auditoría se toc
 - **`NuevaOC.jsx` (`ArmarOrden`)** — mismo desglose debajo del stock en la tabla de artículos al armar una orden, tanto para las sugerencias por alerta como para los artículos agregados a mano desde el buscador.
 
 **Validado en vivo con Chrome, en las dos pantallas, con los mismos SKU (coincidencia exacta entre pantallas):** SKU `10000` (Forceps Adultos x 10 Unidades PS) — Stock 53 = Local 26 + Central 27, en Monitor de Stock y en Nueva OC. SKU `10000-F` — Stock 1 = Local 1 + Central 0. SKU `31337` — Stock 15 = Local 0 + Central 15. Sin backend nuevo — solo mostrar un dato que ya estaba sincronizado.
+
+## 4. Reglas de exclusión de la especificación de Aris (ítem 19)
+
+**Origen:** `claude/ARIS_Especificacion_Reposicion_Interna_y_Produccion.md` (secciones 6.1/6.3/6.4) y `claude/Dentalab_sistema_Aris_ORIGINAL.txt` (secciones 9.3/9.4/9.5/10.2/10.5) — releídos con cuidado antes de tocar código, no asumidos de memoria.
+
+**Estado real encontrado antes de construir** (confirmado con `pg_get_functiondef`, pedido a Federico por SQL Editor, no asumido): `es_comprable(nombre, proveedor)` ya excluía ML "###", "discontinuad" en el nombre y producción propia (proveedor = Dentalab) — la usan `sugerencias_compra()` y `reposicion_interna()`. `reposicion_interna()` ya excluía los SKU administrativos 889/890/99999, pero con la lista pegada directo en el `CASE` (sin fuente única). **`sugerencias_compra()` NO excluía los SKU administrativos.** **Ninguna función excluía "PARA FRACCIONAR" en ningún lado.** Y — el hallazgo más grande — **`Alertas.jsx` no aplicaba NINGÚN filtro de exclusión**, ni siquiera el `es_comprable()` que ya existe hace rato para compras: SKU administrativos, publicaciones de ML, discontinuados y producción propia podían estar generando alertas de Crítica/Preventiva sin sentido.
+
+**Decisiones de alcance tomadas sin frenar a preguntarle a Federico cada una** (consistentes con el patrón ya usado en el resto del sistema, explicadas en el momento):
+- "PARA FRACCIONAR" es una regla de "no enviar al local" (Aris: *"pueden aparecer en planificación de compras si son necesarios como materia prima"*), **no** una regla de "no comprar" — por eso NO se sumó a `es_comprable()` (eso hubiera roto `sugerencias_compra()` y Alertas para esos artículos) — se sumó como categoría propia solo dentro de `reposicion_interna()`.
+- Los SKU administrativos sí debían excluirse de **todo** análisis operativo (Aris, sección 9.4/6.3, explícito) — se centralizó en una función nueva (`es_administrativo`) para no repetir la lista en 3 lugares.
+- De paso, se aplicó `es_comprable()` (más `es_administrativo()`) a Alertas — no era parte literal del pedido de Aris sobre estas 3 reglas nuevas, pero la propia especificación dice "análisis operativo de stock comercial", y Alertas es exactamente eso. Se avisó a Federico del impacto en el conteo antes de que lo viera en producción.
+
+**Construido — migration `20260821140000_exclusiones_aris.sql`:**
+- `es_administrativo(sku)` — fuente única de verdad para 889/890/99999.
+- `es_para_fraccionar(nombre)` — `ilike '%PARA FRACCIONAR%'`, separada a propósito de `es_comprable()`.
+- `sugerencias_compra()` — sumado `and not es_administrativo(m.mate_codigo)` al `WHERE` (resto de la función idéntico a la versión vigente).
+- `reposicion_interna()` — mismo shape de salida (no hizo falta `DROP`): `es_administrativo(f.sku)` reemplaza la lista pegada en el `CASE`, y se agregó `es_para_fraccionar(f.mate_nombre)` a la rama que ya usaba `not comprable` (misma categoría "No enviar al local", ahora con dos motivos posibles).
+- `Alertas.jsx` — nueva `esExcluidoDeAlertas()` (espejo en JS de `es_comprable()`+`es_administrativo()`, porque esta pantalla calcula todo client-side sobre `material_yiqi` crudo) filtrando antes de `calcularAlerta()`; banner de criterio actualizado para decir explícitamente qué se excluye.
+
+**✅ Validado en vivo, de punta a punta:**
+- SQL, con `reposicion_interna()` en producción (Federico, SQL Editor): `889`/`890`/`99999` → `No considerados`; `978` (Vaso Dappen de Vidrio, real) → `Artículos a pedir`, categoría normal, no excluido; 20 artículos con "PARA FRACCIONAR" en el nombre → todos `No enviar al local`. `40156` y `"31110 T"` no aparecieron — no es la exclusión tapándolos, es que hoy no tienen fila en `material_yiqi` (no bloqueante, nota dejada para si hace falta investigar más adelante).
+- Frontend, con Chrome logueado como Aris en `https://dentalab-compras.vercel.app/` → Alertas: total bajó de **3053 a 2835** (2400 críticas / 435 preventivas); búsqueda por `99999` → "No hay artículos en alerta que coincidan con los filtros" (antes aparecía); banner de criterio mostrando el texto nuevo. Commit `7607c4a`, deploy automático vía Vercel+Git confirmado.
+
+**Pendiente, no bloqueante:** el badge de alertas en el sidebar (`contadores_sidebar()`, función SQL separada, no tocada en esta sesión) todavía no refleja el nuevo filtro — sigue en 2584/440 mientras la pantalla de Alertas ya muestra 2400/435. Si hace falta que coincidan, es un cambio aparte sobre `contadores_sidebar()` (mismo criterio que se aplicó acá), no decidido todavía con Federico.

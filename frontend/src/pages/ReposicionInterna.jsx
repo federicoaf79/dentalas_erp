@@ -194,7 +194,7 @@ function ModalAccion({ fila, variante, onCerrar, onConfirmar, guardando }) {
   )
 }
 
-export default function ReposicionInterna() {
+export default function ReposicionInterna({ onPedirAProveedor }) {
   const permisos = usePermisos()
 
   const [accionables, setAccionables] = useState([]) // reposiciones_sugeridas, prioridades 1-5, pendiente
@@ -506,11 +506,14 @@ export default function ReposicionInterna() {
         </div>
       )}
 
-      <Aviso tipo="info" id="reposicion-criterio" className="mx-4 mt-4">
+      <Aviso tipo="info" id="reposicion-criterio-v2" className="mx-4 mt-4">
         Objetivo local: cobertura de 1 mes de venta promedio (últimos 12 meses). "Mover desde Central" nunca
-        supera el stock disponible en Depósito Central. Prioridades 1 a 5 tienen acción — "Artículos a pedir" (6)
-        y "No enviar al local" (7) son informativas: ya se gestionan por otros flujos del sistema. La lista de
-        acción se actualiza sola una vez por día, o al instante con "Actualizar".
+        supera el stock disponible en Depósito Central. Prioridades 1 a 5 tienen acción acá mismo (✓ Movido /
+        ✗ Descartar). "Artículos a pedir" (6) — Central tampoco alcanza — tiene el botón "🛒 Pedir a proveedor",
+        que abre Nueva OC con el proveedor y el artículo ya buscados; no crea ni envía nada solo, vos elegís si
+        lo agregás a la orden. "No enviar al local" (7) es solo informativo: ya se excluye por otra regla
+        (Mercado Libre, discontinuado, producción propia o PARA FRACCIONAR). La lista de acción se actualiza
+        sola una vez por día, o al instante con "Actualizar".
       </Aviso>
 
       {!permisos.cargando && !permisos.error && !permisos.esAdmin && (
@@ -634,19 +637,43 @@ export default function ReposicionInterna() {
                       <div className="flex gap-1.5">
                         <button
                           onClick={() => setModal({ fila: f, variante: 'movido' })}
+                          title="Registrar que ya se movió esta cantidad de Depósito Central al local"
                           className="px-2 py-1 rounded text-[11px] font-semibold bg-green-50 text-green-700 hover:bg-green-100"
                         >
                           ✓ Movido
                         </button>
                         <button
                           onClick={() => setModal({ fila: f, variante: 'descartado' })}
+                          title="Sacar esta sugerencia de la lista sin moverla, dejando el motivo"
                           className="px-2 py-1 rounded text-[11px] font-semibold bg-red-50 text-[var(--red)] hover:bg-red-100"
                         >
                           ✗ Descartar
                         </button>
                       </div>
+                    ) : f.prioridad_orden === 6 && typeof onPedirAProveedor === 'function' ? (
+                      f.proveedor ? (
+                        <button
+                          onClick={() => onPedirAProveedor(f.proveedor, f.sku)}
+                          title={`No hay stock en Depósito Central para cubrir el faltante — te lleva a Nueva OC con ${f.proveedor} y ${f.sku} ya buscados, para que decidas si lo pedís`}
+                          className="px-2 py-1 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100"
+                        >
+                          🛒 Pedir a proveedor
+                        </button>
+                      ) : (
+                        <span
+                          className="text-[11px] text-gray-400 cursor-help"
+                          title="Este artículo no tiene proveedor cargado en YiQi — no se puede armar una OC hasta que se cargue"
+                        >
+                          Sin proveedor
+                        </span>
+                      )
                     ) : (
-                      <span className="text-[11px] text-gray-400">Informativo</span>
+                      <span
+                        className="text-[11px] text-gray-400 cursor-help"
+                        title="Informativo: no requiere acción en esta pantalla. Se excluye del envío al local por otra regla del sistema (Mercado Libre, discontinuado, producción propia, o PARA FRACCIONAR)."
+                      >
+                        Informativo
+                      </span>
                     )}
                   </td>
                 </tr>
