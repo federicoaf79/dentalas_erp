@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import DeclararCausaModal from '../components/DeclararCausaModal'
+import { ultimasCausasPorReferencia } from '../lib/causas'
 
 // ============================================================
 // Alertas.jsx — v3
@@ -115,6 +117,13 @@ export default function Alertas() {
   const [paginaActual, setPaginaActual] = useState(1)
   const [filasPorPagina, setFilasPorPagina] = useState(50)
 
+  // Ítem 7 (22/8/2026) — causa vigente declarada por SKU. Se carga solo
+  // para la página visible (no las ~2400 en alerta enteras) para no
+  // mandar un IN() gigante; se re-carga cada vez que cambia la página o
+  // el filtro. Ver frontend/src/lib/causas.js.
+  const [causasPorSku, setCausasPorSku] = useState({})
+  const [modalCausa, setModalCausa] = useState(null) // { referenciaId, referenciaTexto } | null
+
   async function cargarDatos() {
     if (permisos.cargando || permisos.error) return
     setLoading(true)
@@ -194,6 +203,19 @@ export default function Alertas() {
   const paginaSegura = Math.min(paginaActual, totalPaginasTabla)
   const inicioSlice = (paginaSegura - 1) * filasPorPagina
   const filasPaginadas = ordenadas.slice(inicioSlice, inicioSlice + filasPorPagina)
+
+  // Clave de dependencia por VALOR (no por referencia de array, que
+  // cambia en cada render) — evita recargar en un loop innecesario.
+  const claveIdsCausas = filasPaginadas.map((a) => a.mate_codigo).join('|')
+  useEffect(() => {
+    const ids = claveIdsCausas ? claveIdsCausas.split('|') : []
+    if (ids.length === 0) return
+    let cancelado = false
+    ultimasCausasPorReferencia('stock', ids).then((res) => {
+      if (!cancelado) setCausasPorSku((prev) => ({ ...prev, ...res }))
+    })
+    return () => { cancelado = true }
+  }, [claveIdsCausas])
 
   const cargandoAlgo = loading || permisos.cargando
 
@@ -312,7 +334,7 @@ export default function Alertas() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['SKU', 'Producto', 'Proveedor', 'Stock', 'Mín.', 'Máx.', 'Stock Seguridad', 'Notas', 'Estado'].map(
+                {['SKU', 'Producto', 'Proveedor', 'Stock', 'Mín.', 'Máx.', 'Stock Seguridad', 'Notas', 'Estado', 'Causa'].map(
                   (h) => (
                     <th
                       key={h}
@@ -351,6 +373,27 @@ export default function Alertas() {
                       {a._alerta.label}
                     </span>
                   </td>
+                  <td className="px-3.5 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span
+                        className={causasPorSku[a.mate_codigo] ? 'text-gray-600 text-xs' : 'text-gray-300 text-xs'}
+                        title={causasPorSku[a.mate_codigo]?.nota ?? ''}
+                      >
+                        {causasPorSku[a.mate_codigo]?.causa_rotulo ?? '—'}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setModalCausa({
+                            referenciaId: a.mate_codigo,
+                            referenciaTexto: `${a.mate_codigo} — ${a.mate_nombre}`,
+                          })
+                        }
+                        className="text-[11px] text-[var(--indigo,#4338ca)] hover:underline text-left"
+                      >
+                        {causasPorSku[a.mate_codigo] ? 'Ver / declarar' : 'Declarar causa'}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -384,6 +427,22 @@ export default function Alertas() {
             </button>
           </div>
         </div>
+      )}
+
+      {modalCausa && (
+        <DeclararCausaModal
+          ambito="stock"
+          referenciaId={modalCausa.referenciaId}
+          referenciaTexto={modalCausa.referenciaTexto}
+          onCerrar={() => setModalCausa(null)}
+          onGuardado={() => {
+            // Refresca solo la causa de este SKU, sin recargar toda la
+            // pantalla (que dispararía una relectura de ~7000 artículos).
+            ultimasCausasPorReferencia('stock', [modalCausa.referenciaId]).then((res) => {
+              setCausasPorSku((prev) => ({ ...prev, ...res }))
+            })
+          }}
+        />
       )}
     </div>
   )

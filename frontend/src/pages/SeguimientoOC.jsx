@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import DeclararCausaModal from '../components/DeclararCausaModal'
+import { ultimasCausasPorReferencia } from '../lib/causas'
 
 // ============================================================
 // SeguimientoOC.jsx — v4
@@ -166,6 +168,11 @@ export default function SeguimientoOC() {
   const [filaExpandida, setFilaExpandida] = useState(null)
   const [carpetasAbiertas, setCarpetasAbiertas] = useState({})
 
+  // Ítem 7 (22/8/2026) — causa vigente declarada por OC (ámbito
+  // 'entrega', referencia = nro_oc). Ver frontend/src/lib/causas.js.
+  const [causasPorOC, setCausasPorOC] = useState({})
+  const [modalCausa, setModalCausa] = useState(null) // { referenciaId, referenciaTexto } | null
+
   async function cargar() {
     if (permisos.cargando || permisos.error) return
     setLoading(true)
@@ -231,6 +238,18 @@ export default function SeguimientoOC() {
     () => ordenesFiltradas.filter((o) => o._estado.key !== 'completada'),
     [ordenesFiltradas]
   )
+
+  // Clave por VALOR (no por referencia de array) para no recargar en loop.
+  const claveIdsCausas = ordenesFiltradas.map((o) => o.nroOC).join('|')
+  useEffect(() => {
+    const ids = claveIdsCausas ? claveIdsCausas.split('|') : []
+    if (ids.length === 0) return
+    let cancelado = false
+    ultimasCausasPorReferencia('entrega', ids).then((res) => {
+      if (!cancelado) setCausasPorOC((prev) => ({ ...prev, ...res }))
+    })
+    return () => { cancelado = true }
+  }, [claveIdsCausas])
 
   function toggleCarpeta(clave) {
     setCarpetasAbiertas((prev) => ({ ...prev, [clave]: !prev[clave] }))
@@ -350,6 +369,20 @@ export default function SeguimientoOC() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
+                {causasPorOC[o.nroOC] && (
+                  <span className="text-[11px] text-gray-500 max-w-[160px] truncate" title={causasPorOC[o.nroOC].nota ?? ''}>
+                    {causasPorOC[o.nroOC].causa_rotulo}
+                  </span>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setModalCausa({ referenciaId: o.nroOC, referenciaTexto: `OC #${o.nroOC} — ${o.proveedor}` })
+                  }}
+                  className="text-[11px] text-[var(--indigo)] hover:underline"
+                >
+                  {causasPorOC[o.nroOC] ? 'Ver / declarar' : 'Declarar causa'}
+                </button>
                 <span className="font-semibold text-gray-700">{formatoMoneda(o.total)}</span>
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${o._estado.clase}`}>
                   {o._estado.label}
@@ -392,9 +425,25 @@ export default function SeguimientoOC() {
                             </p>
                             <p className="text-xs text-gray-400">{o.asunto}</p>
                           </div>
-                          <span className="text-sm font-semibold text-gray-600">
-                            {formatoMoneda(o.total)}
-                          </span>
+                          <div className="flex items-center gap-3">
+                            {causasPorOC[o.nroOC] && (
+                              <span className="text-[11px] text-gray-500 max-w-[140px] truncate" title={causasPorOC[o.nroOC].nota ?? ''}>
+                                {causasPorOC[o.nroOC].causa_rotulo}
+                              </span>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setModalCausa({ referenciaId: o.nroOC, referenciaTexto: `OC #${o.nroOC} — ${o.proveedor}` })
+                              }}
+                              className="text-[11px] text-[var(--indigo)] hover:underline"
+                            >
+                              {causasPorOC[o.nroOC] ? 'Ver / declarar' : 'Declarar causa'}
+                            </button>
+                            <span className="text-sm font-semibold text-gray-600">
+                              {formatoMoneda(o.total)}
+                            </span>
+                          </div>
                         </div>
                         {filaExpandida === o.nroOC && <DetalleOrden orden={o} />}
                       </div>
@@ -404,6 +453,20 @@ export default function SeguimientoOC() {
             </div>
           ))}
         </div>
+      )}
+
+      {modalCausa && (
+        <DeclararCausaModal
+          ambito="entrega"
+          referenciaId={modalCausa.referenciaId}
+          referenciaTexto={modalCausa.referenciaTexto}
+          onCerrar={() => setModalCausa(null)}
+          onGuardado={() => {
+            ultimasCausasPorReferencia('entrega', [modalCausa.referenciaId]).then((res) => {
+              setCausasPorOC((prev) => ({ ...prev, ...res }))
+            })
+          }}
+        />
       )}
     </div>
   )

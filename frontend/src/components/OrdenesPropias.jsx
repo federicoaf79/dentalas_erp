@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from './Aviso'
+import DeclararCausaModal from './DeclararCausaModal'
+import { ultimasCausasPorReferencia } from '../lib/causas'
 import { generarPdfOrden, generarPdfOrdenDescargable } from '../lib/pdfOrden'
 import { renderTemplate } from '../pages/TemplatesMensajes'
 // ============================================================
@@ -75,6 +77,10 @@ export default function OrdenesPropias({ onCambio }) {
   // propio, separado de `ocupado`, para no deshabilitar Aprobar/Rechazar
   // de otras filas mientras se arma el PDF y se abre WhatsApp de esta.
   const [enviandoWaId, setEnviandoWaId] = useState(null)
+  // Ítem 7 (22/8/2026) — causa vigente declarada por orden (ámbito
+  // 'compra', referencia = id de ordenes_propias). Ver frontend/src/lib/causas.js.
+  const [causasPorOrden, setCausasPorOrden] = useState({})
+  const [modalCausa, setModalCausa] = useState(null) // { referenciaId, referenciaTexto } | null
 
   useEffect(() => {
     if (!modal) return
@@ -170,6 +176,19 @@ export default function OrdenesPropias({ onCambio }) {
     })
   }, [activas])
   const visibles = filtro === 'papelera' ? archivadas : activasOrdenadas
+
+  // Clave por VALOR (no por referencia de array) para no recargar en loop.
+  const claveIdsCausas = visibles.map((o) => o.id).join('|')
+  useEffect(() => {
+    const ids = claveIdsCausas ? claveIdsCausas.split('|') : []
+    if (ids.length === 0) return
+    let cancelado = false
+    ultimasCausasPorReferencia('compra', ids).then((res) => {
+      if (!cancelado) setCausasPorOrden((prev) => ({ ...prev, ...res }))
+    })
+    return () => { cancelado = true }
+  }, [claveIdsCausas])
+
   async function abrir(orden) {
     setAbierta(orden)
     setItems([])
@@ -588,6 +607,14 @@ export default function OrdenesPropias({ onCambio }) {
                           ⚠ Error de vinculación a YiQi
                         </span>
                       )}
+                      {causasPorOrden[String(o.id)] && (
+                        <span
+                          className="block mt-1 text-[10px] text-gray-400"
+                          title={causasPorOrden[String(o.id)].nota ?? ''}
+                        >
+                          {causasPorOrden[String(o.id)].causa_rotulo}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3.5 py-2.5 font-semibold tabular-nums text-[13px]">
                       {o.total_estimado != null ? formatoMoneda(o.total_estimado) : '—'}
@@ -605,6 +632,14 @@ export default function OrdenesPropias({ onCambio }) {
                       </button>
                       <button onClick={() => imprimir(o)} className="text-sm text-gray-500 hover:text-[var(--ind,#4338ca)] hover:underline mr-3">
                         PDF
+                      </button>
+                      <button
+                        onClick={() =>
+                          setModalCausa({ referenciaId: o.id, referenciaTexto: `Orden #${o.id} — ${o.proveedor_nombre}` })
+                        }
+                        className="text-sm text-gray-500 hover:text-[var(--ind,#4338ca)] hover:underline mr-3"
+                      >
+                        {causasPorOrden[String(o.id)] ? 'Causa' : 'Declarar causa'}
                       </button>
                       {filtro === 'activas' && o.estado === 'aprobada' && (
                         <button
@@ -959,6 +994,20 @@ export default function OrdenesPropias({ onCambio }) {
             )}
           </div>
         </div>
+      )}
+
+      {modalCausa && (
+        <DeclararCausaModal
+          ambito="compra"
+          referenciaId={modalCausa.referenciaId}
+          referenciaTexto={modalCausa.referenciaTexto}
+          onCerrar={() => setModalCausa(null)}
+          onGuardado={() => {
+            ultimasCausasPorReferencia('compra', [modalCausa.referenciaId]).then((res) => {
+              setCausasPorOrden((prev) => ({ ...prev, ...res }))
+            })
+          }}
+        />
       )}
     </div>
   )
