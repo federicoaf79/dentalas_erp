@@ -73,6 +73,12 @@ export default function OrdenesPropias({ onCambio }) {
   //   { tipo: 'aprobar' | 'rechazar' | 'borrar', orden, nuevoEstado? }
   const [modal, setModal] = useState(null)
   const [comentarioModal, setComentarioModal] = useState('')
+  // "+ Agregar mercadería" (23/8/2026) — sumar ítems a una OC que ya
+  // está aprobada Y vinculada a YiQi (yiqi_id_creado). Ver
+  // supabase/functions/editar-oc-yiqi. Filas en edición, separado de
+  // `modal` porque el usuario tipea en varios inputs a la vez.
+  const [lineasNuevas, setLineasNuevas] = useState([{ mate_codigo: '', mate_nombre: '', cantidad: '', costo_unitario: '' }])
+  const [errorMercaderia, setErrorMercaderia] = useState(null)
   // Id de la orden que se está mandando por WhatsApp ahora mismo — estado
   // propio, separado de `ocupado`, para no deshabilitar Aprobar/Rechazar
   // de otras filas mientras se arma el PDF y se abre WhatsApp de esta.
@@ -416,6 +422,69 @@ export default function OrdenesPropias({ onCambio }) {
       setOcupado(false)
     }
   }
+  // ---- "+ Agregar mercadería" (23/8/2026) ----
+  function abrirAgregarMercaderia(orden) {
+    setLineasNuevas([{ mate_codigo: '', mate_nombre: '', cantidad: '', costo_unitario: '' }])
+    setErrorMercaderia(null)
+    setModal({ tipo: 'agregarMercaderia', orden })
+  }
+  function actualizarLineaNueva(idx, campo, valor) {
+    setLineasNuevas((prev) => prev.map((l, i) => (i === idx ? { ...l, [campo]: valor } : l)))
+  }
+  function agregarLineaNueva() {
+    setLineasNuevas((prev) => [...prev, { mate_codigo: '', mate_nombre: '', cantidad: '', costo_unitario: '' }])
+  }
+  function quitarLineaNueva(idx) {
+    setLineasNuevas((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)))
+  }
+  async function confirmarAgregarMercaderia() {
+    if (!modal || modal.tipo !== 'agregarMercaderia') return
+    const { orden } = modal
+    setErrorMercaderia(null)
+
+    const items = lineasNuevas
+      .map((l) => ({
+        mate_codigo: l.mate_codigo.trim(),
+        mate_nombre: l.mate_nombre.trim() || null,
+        cantidad: Number(l.cantidad),
+        costo_unitario: Number(l.costo_unitario),
+      }))
+      .filter((l) => l.mate_codigo)
+
+    if (items.length === 0) {
+      setErrorMercaderia('Cargá al menos un SKU.')
+      return
+    }
+    for (const it of items) {
+      if (!(it.cantidad > 0)) {
+        setErrorMercaderia(`Cantidad inválida para ${it.mate_codigo}.`)
+        return
+      }
+      if (!(it.costo_unitario > 0)) {
+        setErrorMercaderia(`Falta el costo unitario de ${it.mate_codigo}.`)
+        return
+      }
+    }
+
+    setOcupado(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('editar-oc-yiqi', {
+        body: { orden_id: orden.id, items },
+      })
+      if (error) throw new Error(error.message)
+      if (!data?.ok) throw new Error(data?.error || 'No se pudo agregar la mercadería.')
+
+      setAviso(`Se agregaron ${data.itemsAgregados} ítem(s) a la orden #${orden.id} y a YiQi.`)
+      setModal(null)
+      await cargar()
+      await abrir(orden) // refresca el detalle e ítems abiertos
+      avisarCambio()
+    } catch (e) {
+      setErrorMercaderia(e.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
   async function enviarAAprobacion(orden) {
     setOcupado(true)
     try {
@@ -754,6 +823,14 @@ export default function OrdenesPropias({ onCambio }) {
               >
                 Descargar PDF
               </button>
+              {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
+                <button
+                  onClick={() => abrirAgregarMercaderia(abierta)}
+                  className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--ind,#4338ca)] text-[var(--ind,#4338ca)] bg-white hover:bg-indigo-50"
+                >
+                  + Agregar mercadería
+                </button>
+              )}
               {abierta.estado === 'aprobada' && (
                 <button
                   disabled={enviandoWaId === abierta.id}
@@ -869,7 +946,9 @@ export default function OrdenesPropias({ onCambio }) {
           onClick={cerrarModal}
         >
           <div
-            className="bg-white rounded-xl border border-[var(--border)] shadow-xl w-full max-w-md p-5"
+            className={`bg-white rounded-xl border border-[var(--border)] shadow-xl w-full p-5 ${
+              modal.tipo === 'agregarMercaderia' ? 'max-w-2xl' : 'max-w-md'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             {modal.tipo === 'borrar' ? (
@@ -917,6 +996,89 @@ export default function OrdenesPropias({ onCambio }) {
                     className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
                   >
                     Entendido
+                  </button>
+                </div>
+              </>
+            ) : modal.tipo === 'agregarMercaderia' ? (
+              <>
+                <div className="text-[15px] font-bold mb-1.5">
+                  Agregar mercadería — orden #{modal.orden.id}
+                </div>
+                <div className="text-[13px] text-[var(--sub)] mb-4">
+                  Suma ítems a una orden que ya está aprobada y vinculada a YiQi (OC #{modal.orden.yiqi_id_creado}).
+                  Se manda a YiQi al toque — si YiQi lo rechaza, no queda nada guardado acá tampoco.
+                </div>
+                <div className="space-y-2 mb-3 max-h-[45vh] overflow-y-auto">
+                  {lineasNuevas.map((linea, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_1fr_90px_120px_28px] gap-2 items-center">
+                      <input
+                        placeholder="SKU (mate_codigo)"
+                        value={linea.mate_codigo}
+                        onChange={(e) => actualizarLineaNueva(idx, 'mate_codigo', e.target.value)}
+                        className="border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[13px]"
+                      />
+                      <input
+                        placeholder="Nombre (opcional)"
+                        value={linea.mate_nombre}
+                        onChange={(e) => actualizarLineaNueva(idx, 'mate_nombre', e.target.value)}
+                        className="border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[13px]"
+                      />
+                      <input
+                        placeholder="Cant."
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={linea.cantidad}
+                        onChange={(e) => actualizarLineaNueva(idx, 'cantidad', e.target.value)}
+                        className="border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[13px]"
+                      />
+                      <input
+                        placeholder="Costo unit. neto"
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={linea.costo_unitario}
+                        onChange={(e) => actualizarLineaNueva(idx, 'costo_unitario', e.target.value)}
+                        className="border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[13px]"
+                      />
+                      <button
+                        type="button"
+                        disabled={lineasNuevas.length <= 1}
+                        onClick={() => quitarLineaNueva(idx)}
+                        className="text-gray-400 hover:text-[var(--red)] disabled:opacity-30 text-lg leading-none"
+                        title="Quitar línea"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={agregarLineaNueva}
+                  className="text-[13px] font-semibold text-[var(--ind,#4338ca)] hover:underline mb-4"
+                >
+                  + otra línea
+                </button>
+                {errorMercaderia && (
+                  <div className="border border-[#fecaca] bg-[#fef2f2] text-[var(--red)] rounded-lg px-3 py-2 text-[13px] mb-3">
+                    {errorMercaderia}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button
+                    disabled={ocupado}
+                    onClick={cerrarModal}
+                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    disabled={ocupado}
+                    onClick={confirmarAgregarMercaderia}
+                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+                  >
+                    {ocupado ? 'Agregando…' : 'Agregar a la orden'}
                   </button>
                 </div>
               </>
