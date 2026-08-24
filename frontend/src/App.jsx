@@ -21,6 +21,7 @@ import CondicionesProveedor from './pages/CondicionesProveedor'
 import ReposicionInterna from './pages/ReposicionInterna'
 import ComparacionPrecios from './pages/ComparacionPrecios'
 import RevisarEquivalencias from './pages/RevisarEquivalencias'
+import Ayuda from './pages/Ayuda'
 
 // ------------------------------------------------------------
 // Páginas que YA tienen datos reales conectados para la demo.
@@ -46,6 +47,7 @@ const PAGINAS_CON_DATOS_REALES = [
   'reposicion',
   'precios',
   'equivalencias',
+  'ayuda',
 ]
 
 function PaginaEnConstruccion({ nombre }) {
@@ -80,6 +82,7 @@ const TITULOS = {
   yiqi: 'Conector YiQi',
   precios: 'Comparación de precios',
   equivalencias: 'Revisar equivalencias',
+  ayuda: 'Ayuda',
 }
 
 // ============================================================
@@ -211,6 +214,7 @@ function AppLogueada({ session, onLogout }) {
       )}
       {currentPage === 'precios' && <ComparacionPrecios onIrARevisar={() => setCurrentPage('equivalencias')} />}
       {currentPage === 'equivalencias' && <RevisarEquivalencias />}
+      {currentPage === 'ayuda' && <Ayuda />}
       {currentPage === 'reglas' && <ReglasAlertas />}
       {currentPage === 'causas' && <CatalogoCausas />}
       {currentPage === 'empresa' && <Empresa />}

@@ -207,6 +207,14 @@ export default function Sidebar({
         {renderGrupo(NAV_CONFIG)}
       </nav>
 
+      {/* Ayuda: fuera del <nav> que scrollea, para que quede siempre a la
+          vista sin tener que bajar por los 4 módulos. Usa el mismo
+          NavItem/onNavigate que el resto — abre la pantalla Ayuda.jsx
+          como una página más, no un modal. */}
+      <div className="px-1.5 pt-1.5 pb-1 border-t border-[var(--border)]">
+        <NavItem item={{ key: 'ayuda', icon: '❓', label: 'Ayuda' }} active={currentPage === 'ayuda'} onClick={onNavigate} />
+      </div>
+
       <div className="p-3 border-t border-[var(--border)] flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-full bg-[var(--ind-bg)] flex items-center justify-center text-[11px] font-bold text-[var(--ind)] flex-shrink-0 uppercase">
           {nombreUsuario.slice(0, 2)}
