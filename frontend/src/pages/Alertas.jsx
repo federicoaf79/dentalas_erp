@@ -76,10 +76,19 @@ function esExcluidoDeAlertas(articulo) {
   const sku = articulo.mate_codigo ?? ''
   const nombre = articulo.mate_nombre ?? ''
   const proveedor = articulo.clie_nombre ?? ''
+  const nombreMin = nombre.toLowerCase()
   if (['889', '890', '99999'].includes(sku)) return true
   if (nombre.startsWith('###')) return true
-  if (nombre.toLowerCase().includes('discontinuad')) return true
+  if (nombreMin.includes('discontinuad')) return true
   if (proveedor === 'Dentalab') return true
+  // 26/8/2026 — Aris: "SON PRODUCTOS, NO PROVEEDORES. ESOS ARTÍCULOS NO LOS
+  // VAMOS A INCLUIR TODAVIA EN EL SISTEMA." Toda la línea ACRITONE/NewcryL
+  // (dientes, acrílicos, polímeros — ~97 SKU verificados en material_yiqi),
+  // no 1-2 productos puntuales. Mismo criterio "todo el sistema" aplicado
+  // también en es_comprable() (SQL) y en la copia de esta función en
+  // MonitorStock.jsx — si se saca de acá hay que sacarla de los 3 lugares.
+  if (nombreMin.includes('acritone')) return true
+  if (nombreMin.includes('newcryl')) return true
   return false
 }
 

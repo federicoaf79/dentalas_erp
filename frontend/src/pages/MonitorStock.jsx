@@ -74,10 +74,17 @@ function esExcluidoDeAlertas(articulo) {
   const sku = articulo.mate_codigo ?? ''
   const nombre = articulo.mate_nombre ?? ''
   const proveedor = articulo.clie_nombre ?? ''
+  const nombreMin = nombre.toLowerCase()
   if (['889', '890', '99999'].includes(sku)) return true
   if (nombre.startsWith('###')) return true
-  if (nombre.toLowerCase().includes('discontinuad')) return true
+  if (nombreMin.includes('discontinuad')) return true
   if (proveedor === 'Dentalab') return true
+  // 26/8/2026 — misma regla que Alertas.jsx: línea ACRITONE/NewcryL completa
+  // (Aris pidió excluirla, "todavía no la vamos a incluir en el sistema").
+  // Recordatorio del comentario de arriba: si se toca este criterio hay que
+  // actualizar los dos lugares (más es_comprable() en SQL).
+  if (nombreMin.includes('acritone')) return true
+  if (nombreMin.includes('newcryl')) return true
   return false
 }
 
