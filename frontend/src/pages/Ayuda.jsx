@@ -8,6 +8,11 @@ import { useMemo, useState } from 'react'
 // quedar desactualizado — no hay ninguna sincronización automática
 // entre el código de una pantalla y su texto acá.
 //
+// [27/8/2026] Actualizado: exclusión de la línea Acritone/NewcryL
+// (26/8/2026, a pedido de Aris — "SON PRODUCTOS, NO PROVEEDORES,
+// TODAVÍA NO LOS VAMOS A INCLUIR EN EL SISTEMA"). Afecta Alertas,
+// Monitor de stock y Reposición interna, ver sus secciones de reglas.
+//
 // Estructura: un array de MODULOS (mismo agrupamiento que el Sidebar),
 // cada uno con sus TABS (mismo orden que el menú). Cada tab tiene
 // bloques de contenido (párrafos, listas, tips, avisos) que se arman
@@ -123,6 +128,7 @@ const MODULOS = [
         reglas: [
           { warn: 'Es de solo lectura. No hay forma de cambiar Punto de Pedido ni Stock de Seguridad desde acá — eso se carga directamente en YiQi.' },
           'Una fila queda "sin config." (y no genera ninguna alerta) si el artículo no tiene ni Punto de Pedido ni Stock de Seguridad cargado en YiQi.',
+          'Igual que en Alertas: un artículo nunca cuenta para las alertas de esta pantalla si es código administrativo, publicación de Mercado Libre, está marcado discontinuado, es de producción propia (proveedor "Dentalab"), o es de la línea Acritone/NewcryL (excluida del sistema el 26/8/2026, a pedido de Aris).',
         ],
         noHace: ['No exporta a Excel ni PDF.', 'No permite editar nada — para eso están Reposición interna (mover stock) o Nueva OC (comprar).'],
       },
@@ -154,6 +160,7 @@ const MODULOS = [
           { warn: 'Marcar "Movido" o "Descartar" es definitivo desde esta pantalla — no hay botón para deshacerlo después. Si te equivocaste, avisale a Federico.' },
           'El objetivo de cobertura local es 1 mes de venta promedio de los últimos 12 meses, y nunca se sugiere mover más de lo que hay disponible en Central.',
           'La vista "Remitos" es de solo lectura: marcar algo como movido o descartado se hace siempre desde "Lista", nunca desde ahí.',
+          'Mismo filtro que en Alertas: los artículos administrativos, de Mercado Libre, discontinuados, de producción propia, o de la línea Acritone/NewcryL (excluida el 26/8/2026) nunca aparecen acá, en ninguna prioridad.',
         ],
         noHace: [
           'No permite editar la cantidad sugerida antes de moverla (solo se puede corregir la cantidad real al confirmar "Movido").',
@@ -183,7 +190,7 @@ const MODULOS = [
         ],
         reglas: [
           { tip: 'Declarar una causa es solo para dejar registro — no cambia el estado de la alerta ni la saca de la lista. Cada declaración se agrega al historial, nunca se edita ni se borra una anterior.' },
-          'Un artículo se excluye siempre de las alertas si es código administrativo, publicación de Mercado Libre, está marcado discontinuado, o el proveedor es "Dentalab" (producción propia).',
+          'Un artículo se excluye siempre de las alertas si es código administrativo, publicación de Mercado Libre, está marcado discontinuado, el proveedor es "Dentalab" (producción propia), o es de la línea Acritone/NewcryL (excluida del sistema el 26/8/2026, a pedido de Aris — son productos, no proveedores, y todavía no se van a incluir).',
         ],
         noHace: ['No tiene botón para "resolver" o cerrar una alerta a mano — desaparecen solas cuando el stock deja de estar bajo el umbral.', 'No exporta a Excel/PDF.'],
       },
