@@ -39,6 +39,10 @@ export async function ultimasCausasPorReferencia(ambito, referenciaIds) {
     .select(`id, ${columna}, causa_id, referencia_texto, nota, declarada_por, declarada_en, catalogo_causas(rotulo)`)
     .eq('ambito', ambito)
     .in(columna, ids)
+    // Ítem #47 (4/9/2026): una declaración archivada no cuenta como
+    // "vigente" -- si se archivó la última causa declarada, pasa a
+    // mostrarse la siguiente no archivada (o "—" si no queda ninguna).
+    .is('archivada_en', null)
     .order('declarada_en', { ascending: false })
 
   if (error) {
@@ -68,14 +72,18 @@ export async function ultimasCausasPorReferencia(ambito, referenciaIds) {
 
 // Historial completo (todas las declaraciones, no solo la última) de
 // una referencia puntual -- para el modal, cuando el usuario quiere
-// ver "cómo veníamos pensando esto antes".
+// ver "cómo veníamos pensando esto antes". Incluye las archivadas
+// (ítem #47): archivar nunca borra la fila, solo la saca de
+// "vigente" -- el historial la sigue mostrando, marcada.
 export async function historialCausas(ambito, referenciaId) {
   const columna = COLUMNA_REFERENCIA[ambito]
   if (!columna) throw new Error(`Ámbito desconocido: ${ambito}`)
 
   const { data, error } = await supabase
     .from('declaraciones_causa')
-    .select(`id, causa_id, referencia_texto, nota, declarada_por, declarada_en, catalogo_causas(rotulo)`)
+    .select(
+      `id, causa_id, referencia_texto, nota, declarada_por, declarada_en, archivada_en, archivada_por, catalogo_causas(rotulo)`
+    )
     .eq('ambito', ambito)
     .eq(columna, referenciaId)
     .order('declarada_en', { ascending: false })
@@ -87,7 +95,35 @@ export async function historialCausas(ambito, referenciaId) {
     ...fila,
     causa_rotulo: fila.catalogo_causas?.rotulo ?? '—',
     declarante_nombre: nombresPorId[fila.declarada_por] ?? null,
+    archivante_nombre: fila.archivada_por ? nombresPorId[fila.archivada_por] ?? null : null,
   }))
+}
+
+// Ítem #47 (4/9/2026), pedido de Federico: "que haya opción de borrar,
+// o archivar". Un DELETE real rompería el append-only (se perdería el
+// rastro de qué causa se declaró y cuándo) y ya existe el precedente
+// de "papelera" reversible en el proyecto (ver
+// 20260810150000_papelera_ordenes_propias.sql / OrdenesPropias.jsx) --
+// mismo patrón acá: UPDATE de archivada_en/archivada_por, nunca DELETE.
+// La RLS ("cada uno edita lo suyo" OR es_admin()) ya limita quién
+// puede archivar/restaurar -- no hace falta repetir esa lógica acá.
+export async function archivarCausa(id) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('No se pudo identificar al usuario logueado. Volvé a iniciar sesión e intentá de nuevo.')
+
+  const { error } = await supabase
+    .from('declaraciones_causa')
+    .update({ archivada_en: new Date().toISOString(), archivada_por: user.id })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function restaurarCausa(id) {
+  const { error } = await supabase
+    .from('declaraciones_causa')
+    .update({ archivada_en: null, archivada_por: null })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 // catalogo_causas activas de un ámbito, para el <select> del modal.
@@ -131,7 +167,11 @@ export async function declararCausa({ ambito, causaId, referenciaId, referenciaT
 // fila: sin esto, Aris no vería el nombre de las declaraciones de
 // Ivana ni viceversa.
 async function nombresDeclarantes(filas) {
-  const ids = [...new Set(filas.map((f) => f.declarada_por).filter(Boolean))]
+  const ids = [
+    ...new Set(
+      filas.flatMap((f) => [f.declarada_por, f.archivada_por]).filter(Boolean)
+    ),
+  ]
   if (ids.length === 0) return {}
   const { data, error } = await supabase.rpc('nombres_usuarios', { p_ids: ids })
   if (error) {

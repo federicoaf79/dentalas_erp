@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { causasDelAmbito, historialCausas, declararCausa } from '../lib/causas'
+import { causasDelAmbito, historialCausas, declararCausa, archivarCausa, restaurarCausa } from '../lib/causas'
 
 // ============================================================
-// DeclararCausaModal.jsx — ítem 7, 22/8/2026.
+// DeclararCausaModal.jsx — ítem 7 (22/8/2026), archivar ítem #47 (4/9/2026).
 //
 // Modal reutilizable para declarar POR QUÉ un artículo/orden está en
 // tal estado (ej. "sin stock por demora del proveedor"). Un solo
@@ -13,8 +13,14 @@ import { causasDelAmbito, historialCausas, declararCausa } from '../lib/causas'
 // Append-only: "Guardar declaración" siempre INSERTA una fila nueva,
 // nunca edita ni borra las anteriores (ver diseño en la migration
 // 20260822000000_declaraciones_causa.sql). El historial completo se
-// muestra abajo del formulario, más reciente primero con "Vigente",
-// para que quede visualmente claro que se agrega, no se reemplaza.
+// muestra abajo del formulario, más reciente primero.
+//
+// Ítem #47 (4/9/2026), pedido de Federico: "que haya opción de
+// borrar, o archivar". Se resolvió con archivar (reversible, mismo
+// patrón que la papelera de Órdenes propias) en vez de un DELETE real
+// -- eso hubiera roto el append-only, borrando el rastro de qué causa
+// se declaró y cuándo. "Vigente" ahora es la declaración más reciente
+// que NO está archivada, no simplemente la primera del historial.
 // ============================================================
 
 function formatoFecha(f) {
@@ -35,6 +41,8 @@ export default function DeclararCausaModal({ ambito, referenciaId, referenciaTex
   const [causaId, setCausaId] = useState('')
   const [nota, setNota] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [ocupadoId, setOcupadoId] = useState(null) // id de la declaración que se está archivando/restaurando
+  const [aviso, setAviso] = useState(null)
 
   useEffect(() => {
     let cancelado = false
@@ -75,6 +83,7 @@ export default function DeclararCausaModal({ ambito, referenciaId, referenciaTex
     }
     setGuardando(true)
     setError(null)
+    setAviso(null)
     try {
       await declararCausa({ ambito, causaId: Number(causaId), referenciaId, referenciaTexto, nota })
       setCausaId('')
@@ -86,6 +95,40 @@ export default function DeclararCausaModal({ ambito, referenciaId, referenciaTex
       setError(e.message)
     } finally {
       setGuardando(false)
+    }
+  }
+
+  async function archivar(h) {
+    setOcupadoId(h.id)
+    setError(null)
+    setAviso(null)
+    try {
+      await archivarCausa(h.id)
+      setAviso(`"${h.causa_rotulo}" archivada. Se puede restaurar desde acá mismo.`)
+      const listaHistorial = await historialCausas(ambito, referenciaId)
+      setHistorial(listaHistorial)
+      if (typeof onGuardado === 'function') onGuardado()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setOcupadoId(null)
+    }
+  }
+
+  async function restaurar(h) {
+    setOcupadoId(h.id)
+    setError(null)
+    setAviso(null)
+    try {
+      await restaurarCausa(h.id)
+      setAviso(`"${h.causa_rotulo}" restaurada.`)
+      const listaHistorial = await historialCausas(ambito, referenciaId)
+      setHistorial(listaHistorial)
+      if (typeof onGuardado === 'function') onGuardado()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setOcupadoId(null)
     }
   }
 
@@ -104,6 +147,11 @@ export default function DeclararCausaModal({ ambito, referenciaId, referenciaTex
         {error && (
           <div className="bg-red-50 border border-red-200 text-[var(--red)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
             {error}
+          </div>
+        )}
+        {aviso && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
+            {aviso}
           </div>
         )}
 
@@ -158,25 +206,75 @@ export default function DeclararCausaModal({ ambito, referenciaId, referenciaTex
               <div className="text-[13px] text-gray-400">Todavía no se declaró ninguna causa acá.</div>
             ) : (
               <div className="space-y-2">
-                {historial.map((h, i) => (
-                  <div
-                    key={h.id}
-                    className={`border rounded-lg px-3 py-2 text-[13px] ${
-                      i === 0 ? 'border-[var(--ind,#4338ca)] bg-indigo-50/40' : 'border-[var(--border)]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold">{h.causa_rotulo}</span>
-                      {i === 0 && (
-                        <span className="text-[10px] font-bold uppercase text-[var(--ind,#4338ca)]">Vigente</span>
-                      )}
-                    </div>
-                    {h.nota && <div className="text-gray-600 mt-0.5">{h.nota}</div>}
-                    <div className="text-[11px] text-gray-400 mt-1">
-                      {h.declarante_nombre ?? 'Alguien'} · {formatoFecha(h.declarado_en)}
-                    </div>
-                  </div>
-                ))}
+                {(() => {
+                  // "Vigente" es la más reciente que no está archivada,
+                  // no necesariamente la primera del historial -- si se
+                  // archivó la última, la vigente pasa a ser la
+                  // siguiente que siga activa (o ninguna).
+                  const idVigente = historial.find((h) => !h.archivada_en)?.id
+                  return historial.map((h) => {
+                    const archivada = !!h.archivada_en
+                    const vigente = h.id === idVigente
+                    const ocupada = ocupadoId === h.id
+                    return (
+                      <div
+                        key={h.id}
+                        className={`border rounded-lg px-3 py-2 text-[13px] ${
+                          vigente
+                            ? 'border-[var(--ind,#4338ca)] bg-indigo-50/40'
+                            : archivada
+                              ? 'border-[var(--border)] bg-gray-50 opacity-70'
+                              : 'border-[var(--border)]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`font-semibold ${archivada ? 'line-through text-gray-500' : ''}`}>
+                            {h.causa_rotulo}
+                          </span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {vigente && (
+                              <span className="text-[10px] font-bold uppercase text-[var(--ind,#4338ca)]">Vigente</span>
+                            )}
+                            {archivada && (
+                              <span className="text-[10px] font-bold uppercase text-gray-400">Archivada</span>
+                            )}
+                            {archivada ? (
+                              <button
+                                disabled={ocupada}
+                                onClick={() => restaurar(h)}
+                                className="text-[11px] font-semibold text-[var(--ind,#4338ca)] hover:underline disabled:opacity-40"
+                              >
+                                {ocupada ? 'Restaurando…' : 'Restaurar'}
+                              </button>
+                            ) : (
+                              <button
+                                disabled={ocupada}
+                                onClick={() => archivar(h)}
+                                className="text-[11px] font-semibold text-gray-400 hover:text-[var(--red)] disabled:opacity-40"
+                              >
+                                {ocupada ? 'Archivando…' : 'Archivar'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {h.nota && (
+                          <div className={`mt-0.5 ${archivada ? 'text-gray-400 line-through' : 'text-gray-600'}`}>
+                            {h.nota}
+                          </div>
+                        )}
+                        <div className="text-[11px] text-gray-400 mt-1">
+                          {h.declarante_nombre ?? 'Alguien'} · {formatoFecha(h.declarada_en)}
+                          {archivada && (
+                            <>
+                              {' '}
+                              · archivada por {h.archivante_nombre ?? 'alguien'} · {formatoFecha(h.archivada_en)}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             )}
           </>
