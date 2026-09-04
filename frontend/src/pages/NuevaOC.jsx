@@ -47,6 +47,22 @@ function formatoNumero(n) {
   return num % 1 === 0 ? String(num) : num.toFixed(1)
 }
 
+// Bloqueo de "cantidad a pedir" que no es múltiplo del bulto (sprint
+// 5/9/2026, ítem de la reunión con Dentalab: Farmadental/SKU1007,
+// regla de Pescio). sugerencias_compra() ya redondea la cantidad
+// SUGERIDA al múltiplo de bulto -- esto cubre lo que la sugerencia no
+// controla: una cantidad tipeada a mano, tanto sobre una fila sugerida
+// como sobre un artículo agregado a mano por el buscador. Tolerancia
+// chica para no romper por errores de punto flotante (24 / 8 puede no
+// dar exactamente 3 en JS). Sin bulto cargado (proveedor sin ese dato
+// en YiQi) no hay nada que validar -- se deja pasar, igual que hoy.
+function esMultiploDeBulto(cantidad, bulto) {
+  const b = Number(bulto) || 0
+  if (b <= 0) return true
+  const cociente = Number(cantidad) / b
+  return Math.abs(cociente - Math.round(cociente)) < 1e-6
+}
+
 function formatoFecha(f) {
   if (!f) return '—'
   try {
@@ -794,6 +810,19 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                           topeado por regla
                         </div>
                       )}
+                      {(() => {
+                        const cant = Number(cantidades[s.mate_codigo]) || 0
+                        const bulto = Number(s.unidades_por_bulto) || 0
+                        if (cant <= 0 || bulto <= 0 || esMultiploDeBulto(cant, bulto)) return null
+                        return (
+                          <div
+                            className="text-[10px] text-[var(--red)] mt-0.5"
+                            title={`Este proveedor vende en bultos de ${formatoNumero(bulto)}. La cantidad tiene que ser 0 o un múltiplo de ${formatoNumero(bulto)} para poder confirmar la orden.`}
+                          >
+                            no es múltiplo del bulto (x{formatoNumero(bulto)})
+                          </div>
+                        )
+                      })()}
                     </td>
                   </tr>
                 )
@@ -958,6 +987,30 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
   }, [preseleccion])
 
   async function guardarOrden({ items, notas, estado, valorizacion }) {
+    // El borrador puede quedar con cantidades a medio ajustar -- el
+    // bloqueo por múltiplo de bulto es solo para lo que se manda de
+    // verdad (aprobada/pendiente). Se repite el chequeo acá (además
+    // del aviso visual en la tabla, en ArmarOrden) porque no hay
+    // garantía de que la persona haya visto ese aviso antes de tocar
+    // "Confirmar orden" / "Enviar a aprobación".
+    if (estado !== 'borrador') {
+      const conError = items.filter((i) => !esMultiploDeBulto(i.cantidad, i.unidades_por_bulto))
+      if (conError.length > 0) {
+        setError(
+          (conError.length === 1
+            ? 'No se puede confirmar: 1 artículo no respeta el múltiplo de bulto del proveedor — '
+            : `No se puede confirmar: ${conError.length} artículos no respetan el múltiplo de bulto del proveedor — `) +
+            conError
+              .map(
+                (i) =>
+                  `${i.mate_codigo} (pediste ${formatoNumero(i.cantidad)}, bulto de ${formatoNumero(i.unidades_por_bulto)})`
+              )
+              .join('; ') +
+            '. Ajustá la cantidad a un múltiplo del bulto (o dejala en 0 para sacarlo de la orden) y volvé a confirmar.'
+        )
+        return
+      }
+    }
     setOcupado(true)
     setError(null)
     try {
