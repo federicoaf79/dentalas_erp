@@ -57,18 +57,21 @@ export async function traerStockPorDeposito() {
 }
 
 // Texto chico "Local: X · Central: Y" para usar debajo del stock
-// combinado, con Jorge/ML Full (si tienen algo) en el title (tooltip
-// nativo del navegador) para no ensuciar la fila.
+// combinado. Jorge/ML Full (cuando tienen algo) se devuelven en
+// `extras` para pintarse como badges chicos al lado -- antes vivían
+// solo en el `title` (tooltip nativo del navegador), que no se ve
+// hasta pasar el mouse y además no se dibuja nunca si en algún
+// momento el valor es 0 -- fácil de no ver que existen. Con "0" en
+// vez de vacío no se agrega nada a `extras` a propósito: no tiene
+// sentido resaltar un depósito que no tiene stock.
 export function textoDesgloseStock(fila) {
   if (!fila) return null
-  const otros = [
-    fila.stock_jorge ? `Jorge: ${fila.stock_jorge}` : null,
-    fila.stock_ml_full ? `ML Full: ${fila.stock_ml_full}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const extras = [
+    fila.stock_jorge ? { label: 'Jorge', valor: fila.stock_jorge } : null,
+    fila.stock_ml_full ? { label: 'ML Full', valor: fila.stock_ml_full } : null,
+  ].filter(Boolean)
   return {
     principal: `Local: ${fila.stock_local ?? 0} · Central: ${fila.stock_central ?? 0}`,
-    tooltip: otros ? `Otros depósitos — ${otros}` : undefined,
+    extras,
   }
 }

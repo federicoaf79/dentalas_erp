@@ -779,11 +779,20 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         const desglose = textoDesgloseStock(stockPorSku[s.mate_codigo])
                         if (!desglose) return null
                         return (
-                          <div
-                            className="text-[10px] font-normal text-gray-400 whitespace-nowrap"
-                            title={desglose.tooltip}
-                          >
-                            {desglose.principal}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1 font-normal">
+                            <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                              {desglose.principal}
+                            </span>
+                            {desglose.extras.map((e) => (
+                              <span
+                                key={e.label}
+                                className={`inline-flex px-1.5 py-0.5 rounded-full text-[9px] font-semibold whitespace-nowrap ${
+                                  e.label === 'Jorge' ? 'bg-amber-50 text-[#92400e]' : 'bg-violet-50 text-[#5b21b6]'
+                                }`}
+                              >
+                                {e.label}: {e.valor}
+                              </span>
+                            ))}
                           </div>
                         )
                       })()}
