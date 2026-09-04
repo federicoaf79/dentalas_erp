@@ -795,9 +795,24 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         step="any"
                         value={cantidades[s.mate_codigo] ?? ''}
                         placeholder={sinBase ? 'A definir' : ''}
-                        onChange={(e) =>
-                          setCantidades((prev) => ({ ...prev, [s.mate_codigo]: e.target.value }))
-                        }
+                        onChange={(e) => {
+                          const valor = e.target.value
+                          setCantidades((prev) => ({ ...prev, [s.mate_codigo]: valor }))
+                          // Escribir una cantidad ES la decisión de sumar el
+                          // artículo a la orden -- no debería hacer falta un
+                          // segundo click en el tilde para que cuente (pedido
+                          // de Federico, sprint 4/9/2026). Solo tilda: no
+                          // destilda si se borra o se pone en 0 mientras se
+                          // está corrigiendo un número a mano -- para sacar
+                          // un artículo de la orden, el tilde sigue siendo
+                          // la acción explícita.
+                          const num = Number(valor)
+                          if (valor !== '' && Number.isFinite(num) && num > 0) {
+                            setSeleccion((prev) =>
+                              prev.has(s.mate_codigo) ? prev : new Set(prev).add(s.mate_codigo)
+                            )
+                          }
+                        }}
                         className={`w-24 border rounded-lg px-2 py-1 text-sm text-right ${
                           sinBase ? 'border-dashed border-gray-300 placeholder:text-[11px]' : 'border-[var(--border)]'
                         }`}
