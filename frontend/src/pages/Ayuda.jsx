@@ -317,6 +317,9 @@ const MODULOS = [
           { warn: 'Quién arma la orden importa mucho: si la arma Aris, queda confirmada directo, sin pasar por ningún control. Si la arma Ivana, la orden queda pendiente de que Aris la apruebe cuando pasa cualquiera de estas tres cosas: el total supera el límite de aprobación (propio del proveedor o el general), algún artículo quedó sin costo cargado, o el proveedor está marcado "siempre requiere mi aprobación".' },
           'El checkbox "Seleccionar todo" de la cabecera solo tilda lo que se ve en la página actual, no todo lo filtrado — importante con proveedores de catálogo grande.',
           'El aviso de "no llega al mínimo de compra" es solo informativo: no bloquea guardar ni enviar la orden.',
+          { warn: 'Desde el 4/9/2026: si la "Cantidad a pedir" de un artículo no es 0 ni un múltiplo del "Bulto" de ese proveedor, aparece un aviso en rojo bajo el campo y no deja "Confirmar orden" / "Enviar a aprobación" hasta corregirla (sí deja "Guardar borrador" con la cantidad como esté). "Guardar borrador" nunca bloquea por esto.' },
+          'La columna "Mín." es el punto de pedido (o el stock de seguridad si no hay punto de pedido cargado) tal cual está en YiQi para ese artículo — no es un cálculo del sistema. Si aparece con decimales, es porque así está cargado en YiQi.',
+          'Desde el 4/9/2026, "Prom./mes" siempre redondea para arriba (por ejemplo, 2.3 se muestra como 3): es una referencia de consumo, y subestimarla es peor que sobrestimarla. La cantidad sugerida para comprar ya usaba el promedio real (sin redondear) para calcularse — este cambio es solo en cómo se muestra el número, no afecta la cantidad sugerida.',
         ],
         noHace: [
           'No permite editar una orden ya guardada desde esta misma pantalla (para eso está "Órdenes de compra").',
