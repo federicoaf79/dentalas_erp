@@ -32,7 +32,7 @@ const VACIO = {
   siempre_requiere_aprobacion: false, notas: '',
 }
 
-export default function CondicionesProveedor() {
+export default function CondicionesProveedor({ preseleccion, onConsumirPreseleccion } = {}) {
   const permisos = usePermisos()
   const esAdmin = permisos.esAdmin
 
@@ -71,6 +71,19 @@ export default function CondicionesProveedor() {
     cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permisos.cargando, permisos.error])
+
+  // Si venimos desde otra pantalla (ej. "Proveedores") con un nombre
+  // preseleccionado, precargamos la búsqueda y abrimos ese proveedor
+  // si ya tiene una fila cargada. Si no tiene fila, igual queda
+  // filtrado por nombre en la búsqueda.
+  useEffect(() => {
+    if (!preseleccion || cargando) return
+    setBusqueda(preseleccion)
+    const match = filas.find((p) => p.clie_nombre === preseleccion)
+    if (match) abrir(match)
+    onConsumirPreseleccion?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preseleccion, cargando, filas])
 
   // "Completo" = tiene al menos el mínimo de compra o un contacto de
   // pedidos. Es lo mínimo para que el sistema pueda hacer algo con él.

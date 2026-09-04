@@ -110,6 +110,12 @@ function AppLogueada({ session, onLogout }) {
   // Comparación de precios -> Revisar equivalencias, unas líneas abajo.
   const [preseleccionOC, setPreseleccionOC] = useState(null)
 
+  // Puente Proveedores -> Condiciones comerciales (4/9/2026, ítem 41):
+  // el botón "Condiciones →" de cada fila salta a esta pantalla con el
+  // nombre del proveedor ya cargado en la búsqueda (y abierto para editar,
+  // si ya tiene una fila). Mismo patrón que preseleccionOC de arriba.
+  const [preseleccionProveedor, setPreseleccionProveedor] = useState(null)
+
   // El nombre sale de usuarios_config, no de partir el mail: con las
   // cuentas reales, el mail comprasdentalab@gmail.com mostraría
   // "comprasdentalab" en el sidebar. Si por algún motivo no hay nombre
@@ -198,7 +204,14 @@ function AppLogueada({ session, onLogout }) {
         />
       )}
       {currentPage === 'seguimiento' && <SeguimientoOC />}
-      {currentPage === 'proveedores' && <Proveedores />}
+      {currentPage === 'proveedores' && (
+        <Proveedores
+          onIrACondiciones={(nombre) => {
+            setPreseleccionProveedor(nombre)
+            setCurrentPage('condiciones')
+          }}
+        />
+      )}
       {currentPage === 'historial' && <HistorialOC />}
       {currentPage === 'usuarios' && <UsuariosAccesos />}
       {currentPage === 'alertas' && <Alertas />}
@@ -219,7 +232,12 @@ function AppLogueada({ session, onLogout }) {
       {currentPage === 'causas' && <CatalogoCausas />}
       {currentPage === 'empresa' && <Empresa />}
       {currentPage === 'templates' && <TemplatesMensajes />}
-      {currentPage === 'condiciones' && <CondicionesProveedor />}
+      {currentPage === 'condiciones' && (
+        <CondicionesProveedor
+          preseleccion={preseleccionProveedor}
+          onConsumirPreseleccion={() => setPreseleccionProveedor(null)}
+        />
+      )}
       {!PAGINAS_CON_DATOS_REALES.includes(currentPage) && (
         <PaginaEnConstruccion nombre={TITULOS[currentPage] ?? currentPage} />
       )}

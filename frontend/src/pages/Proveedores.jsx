@@ -113,6 +113,40 @@ function enriquecerConDatosDeContacto(proveedores, filasCliente) {
   })
 }
 
+// Ítem #41 (sprint 4/9/2026): esta pantalla mostraba CUIT/teléfono/
+// Condición IVA (todo sincronizado de YiQi vía clientes_yiqi) pero
+// nunca había leído la tabla `proveedores` -- donde vive lo que Aris
+// carga a mano en "Condiciones comerciales" (WhatsApp de pedidos,
+// límite de aprobación, mínimo de compra). No era un bug: la pantalla
+// nunca se conectó con esos datos. `proveedores` se relaciona por
+// `clie_nombre` (texto), no por código -- es la misma clave que usa
+// CondicionesProveedor.jsx y enviar-oc-yiqi.
+function enriquecerConCondicionesComerciales(proveedores, filasCondiciones) {
+  const porNombre = new Map()
+  for (const c of filasCondiciones) {
+    if (c.clie_nombre) porNombre.set(c.clie_nombre, c)
+  }
+
+  return proveedores.map((p) => {
+    const cond = porNombre.get(p.nombre)
+    return {
+      ...p,
+      whatsappPedidos: cond?.whatsapp_pedidos ?? null,
+      limiteAprobacion: cond?.limite_aprobacion ?? null,
+      minimoCompra: cond?.minimo_compra ?? null,
+      minimoEsUnidades: !!cond?.minimo_es_unidades,
+    }
+  })
+}
+
+function moneda(n) {
+  const num = Number(n)
+  if (!Number.isFinite(num)) return '—'
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency', currency: 'ARS', maximumFractionDigits: 0,
+  }).format(num)
+}
+
 function calcularAlertaArticulo(art) {
   const stock = art.mate_stock_disponible ?? 0
   const puntoPedidoManual = art.mate_punto_de_pedido
@@ -169,7 +203,7 @@ function DetalleProveedor({ articulosDelProveedor }) {
   )
 }
 
-export default function Proveedores() {
+export default function Proveedores({ onIrACondiciones }) {
   const permisos = usePermisos()
 
   const [proveedores, setProveedores] = useState([])
@@ -186,15 +220,17 @@ export default function Proveedores() {
     setLoading(true)
     setError(null)
     try {
-      const [articulosTraidos, filasCliente] = await Promise.all([
+      const [articulosTraidos, filasCliente, filasCondiciones] = await Promise.all([
         traerTablaCompleta('material_yiqi', (q) => filtrarMaterial(q, permisos)),
         traerTablaCompleta('clientes_yiqi'),
+        traerTablaCompleta('proveedores'),
       ])
 
       const provDerivados = derivarProveedoresDeMaterial(articulosTraidos)
       setArticulos(articulosTraidos)
 
-      const provCompletos = enriquecerConDatosDeContacto(provDerivados, filasCliente)
+      const provConContacto = enriquecerConDatosDeContacto(provDerivados, filasCliente)
+      const provCompletos = enriquecerConCondicionesComerciales(provConContacto, filasCondiciones)
       provCompletos.sort((a, b) => b.totalArticulos - a.totalArticulos)
 
       setProveedores(provCompletos)
@@ -343,7 +379,7 @@ export default function Proveedores() {
       </div>
 
       {/* Tabla */}
-      <div className="mx-4 mb-2 bg-white rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="mx-4 mb-2 bg-white rounded-xl border border-[var(--border)] overflow-x-auto">
         {cargandoAlgo && proveedores.length === 0 ? (
           <div className="p-8 text-center text-[var(--sub)] text-sm">Cargando proveedores reales…</div>
         ) : filasPaginadas.length === 0 ? (
@@ -354,7 +390,7 @@ export default function Proveedores() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['Código', 'Proveedor', 'CUIT', 'Condición IVA', 'Teléfono', 'Artículos', 'Alertas'].map((h) => (
+                {['Código', 'Proveedor', 'CUIT', 'Condición IVA', 'Teléfono', 'Artículos', 'Alertas', 'WhatsApp pedidos', 'Límite aprob.', 'Mínimo compra', ''].map((h) => (
                   <th
                     key={h}
                     className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"
@@ -397,10 +433,37 @@ export default function Proveedores() {
                         </span>
                       )}
                     </td>
+                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">
+                      {p.whatsappPedidos || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">
+                      {p.limiteAprobacion != null
+                        ? moneda(p.limiteAprobacion)
+                        : <span className="text-gray-400 text-[11px] italic">general</span>}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">
+                      {p.minimoCompra != null
+                        ? (p.minimoEsUnidades ? `${p.minimoCompra} un.` : moneda(p.minimoCompra))
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3.5 py-2.5">
+                      {typeof onIrACondiciones === 'function' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onIrACondiciones(p.nombre)
+                          }}
+                          className="text-[11px] font-semibold text-[var(--ind,#4338ca)] hover:underline whitespace-nowrap"
+                        >
+                          Condiciones →
+                        </button>
+                      )}
+                    </td>
                   </tr>
                   {proveedorExpandido === p.clave && (
                     <tr>
-                      <td colSpan={7} className="p-0">
+                      <td colSpan={11} className="p-0">
                         <DetalleProveedor articulosDelProveedor={articulosDelExpandido} />
                       </td>
                     </tr>
