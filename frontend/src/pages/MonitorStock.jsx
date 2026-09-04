@@ -379,7 +379,7 @@ export default function MonitorStock() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['SKU', 'Producto', 'Proveedor', 'Stock', 'Punto de pedido', 'Stock Seguridad', 'Estado'].map(
+                {['SKU', 'Producto', 'Proveedor', 'Stock', 'Punto de pedido', 'Stock Seguridad', 'Notas', 'Estado'].map(
                   (h) => (
                     <th
                       key={h}
@@ -418,6 +418,12 @@ export default function MonitorStock() {
                       {a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : '— (sin config.)'}
                     </td>
                     <td className="px-3.5 py-2.5 text-gray-400">{a.mate_stock_seguridad ?? '—'}</td>
+                    <td
+                      className="px-3.5 py-2.5 text-gray-400 text-xs max-w-[180px] truncate"
+                      title={a.mate_notas_sobre_punto_de ?? ''}
+                    >
+                      {a.mate_notas_sobre_punto_de ?? '—'}
+                    </td>
                     <td className="px-3.5 py-2.5">
                       <span
                         className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${COLOR_CLASSES[alerta.color]}`}

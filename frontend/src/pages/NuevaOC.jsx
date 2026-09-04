@@ -240,7 +240,7 @@ function formatoMoneda(n) {
   }).format(num)
 }
 
-function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones, esAdmin, preseleccionSku }) {
+function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones, esAdmin, preseleccionSku, nombreUsuario }) {
   const [seleccion, setSeleccion] = useState(() => new Set())
   const [cantidades, setCantidades] = useState({})
   const [notas, setNotas] = useState('')
@@ -484,6 +484,14 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   // Templates de mensajes, reemplazando las variables con los datos de
   // esta orden. No envia nada solo: abre WhatsApp con el texto ya
   // escrito y la persona aprieta enviar.
+  // Sprint 4/9/2026, feedback del cliente: el mensaje de WhatsApp al
+  // proveedor no debe mostrar el SKU interno de YiQi (es una referencia
+  // nuestra, no del proveedor) ni ningún valor/precio de la orden -- y
+  // sí debe decir quién generó el pedido. "total" se deja vacío a
+  // propósito (no se saca del objeto: si la plantilla en "Templates de
+  // mensajes" todavía tiene {{total}} escrito, así se renderiza en
+  // blanco en vez de mostrar el precio o dejar el "{{total}}" literal
+  // sin reemplazar).
   function abrirWhatsApp() {
     if (!whatsapp) return
     const datos = {
@@ -491,13 +499,13 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
       proveedor,
       nro_orden: '(se asigna al guardar)',
       fecha: new Date().toLocaleDateString('es-AR'),
-      total: formatoMoneda(valorizacion.total),
+      total: '',
       cant_items: String(items.length),
       items: items
-        .map((i) => `• ${i.mate_codigo} — ${i.mate_nombre ?? ''} — ${formatoNumero(i.cantidad)} un.`)
+        .map((i) => `• ${i.mate_nombre ?? i.mate_codigo} — ${formatoNumero(i.cantidad)} un.`)
         .join('\n'),
       notas: notas || '',
-      contacto: '',
+      contacto: nombreUsuario || '',
     }
     const texto = renderTemplate(plantillaWa?.cuerpo ?? '', datos)
     const numero = String(whatsapp).replace(/\D/g, '')
@@ -756,6 +764,14 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                     <td className="px-3 py-2 font-mono text-xs">{s.mate_codigo}</td>
                     <td className="px-3 py-2 text-[13px] font-medium max-w-[280px] truncate" title={s.mate_nombre ?? ''}>
                       {s.mate_nombre ?? '—'}
+                      {s.notas && (
+                        <span
+                          title={`Nota de YiQi sobre el punto de pedido: ${s.notas}`}
+                          className="ml-1 text-[11px] text-[var(--ind,#4338ca)] cursor-help"
+                        >
+                          📝
+                        </span>
+                      )}
                     </td>
                     <td className={`px-3 py-2 font-bold text-sm ${Number(s.stock) <= 0 ? 'text-[var(--red)]' : ''}`}>
                       {formatoNumero(s.stock)}
@@ -1175,6 +1191,7 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
           condiciones={condicionesProveedor}
           esAdmin={permisos.esAdmin}
           preseleccionSku={skuPreseleccionado}
+          nombreUsuario={permisos.nombreUsuario}
         />
       ) : null}
     </div>
