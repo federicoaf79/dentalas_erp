@@ -207,7 +207,7 @@ export default function CatalogoCausas() {
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
                 {['Código', 'Causa', 'Descripción', 'Estado', ''].map((h) => (
-                  <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
+                  <th key={h} className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                     {h}
                   </th>
                 ))}
@@ -218,8 +218,8 @@ export default function CatalogoCausas() {
                 const enEdicion = editando === c.id
                 return (
                   <tr key={c.id} className={`border-b border-gray-100 last:border-0 ${!c.activa ? 'opacity-50' : ''}`}>
-                    <td className="px-3.5 py-2.5 font-mono text-xs text-gray-400">{c.codigo}</td>
-                    <td className="px-3.5 py-2.5">
+                    <td className="px-3.5 py-1.5 font-mono text-xs text-gray-400">{c.codigo}</td>
+                    <td className="px-3.5 py-1.5">
                       {enEdicion ? (
                         <input
                           value={borrador.rotulo}
@@ -230,7 +230,7 @@ export default function CatalogoCausas() {
                         <span className="font-semibold text-[13px]">{c.rotulo}</span>
                       )}
                     </td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">
                       {enEdicion ? (
                         <input
                           value={borrador.descripcion}
@@ -241,14 +241,14 @@ export default function CatalogoCausas() {
                         c.descripcion ?? '—'
                       )}
                     </td>
-                    <td className="px-3.5 py-2.5">
+                    <td className="px-3.5 py-1.5">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                         c.activa ? 'bg-[var(--grn-bg)] text-[var(--grn)]' : 'bg-gray-100 text-gray-500'
                       }`}>
                         {c.activa ? 'Activa' : 'Inactiva'}
                       </span>
                     </td>
-                    <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                    <td className="px-3.5 py-1.5 text-right whitespace-nowrap">
                       {esAdmin && (enEdicion ? (
                         <>
                           <button

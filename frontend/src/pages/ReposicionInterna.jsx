@@ -611,7 +611,7 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
             <tbody>
               {filasPaginadas.map((f) => (
                 <tr key={f.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="px-3.5 py-2.5">
+                  <td className="px-3.5 py-1.5">
                     <span
                       className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                         PRIORIDAD_COLOR[f.prioridad_orden] ?? 'bg-gray-100 text-gray-500'
@@ -620,19 +620,19 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
                       {f.prioridad_label}
                     </span>
                   </td>
-                  <td className="px-3.5 py-2.5 font-mono text-xs">{f.sku}</td>
-                  <td className="px-3.5 py-2.5 font-semibold">{f.mate_nombre}</td>
-                  <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{f.proveedor ?? '—'}</td>
-                  <td className="px-3.5 py-2.5">{num(f.stock_local)}</td>
-                  <td className="px-3.5 py-2.5">{num(f.stock_central)}</td>
-                  <td className="px-3.5 py-2.5 text-gray-400">{f.clase_abc ?? '—'}</td>
-                  <td className="px-3.5 py-2.5 font-bold">
+                  <td className="px-3.5 py-1.5 font-mono text-xs">{f.sku}</td>
+                  <td className="px-3.5 py-1.5 font-semibold">{f.mate_nombre}</td>
+                  <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{f.proveedor ?? '—'}</td>
+                  <td className="px-3.5 py-1.5">{num(f.stock_local)}</td>
+                  <td className="px-3.5 py-1.5">{num(f.stock_central)}</td>
+                  <td className="px-3.5 py-1.5 text-gray-400">{f.clase_abc ?? '—'}</td>
+                  <td className="px-3.5 py-1.5 font-bold">
                     {f.cantidad > 0 ? num(f.cantidad, 2) : f.faltante_a_pedir > 0 ? `falta ${num(f.faltante_a_pedir, 2)}` : '—'}
                   </td>
-                  <td className="px-3.5 py-2.5 text-gray-400">
+                  <td className="px-3.5 py-1.5 text-gray-400">
                     {f.cobertura_dias_local != null ? `${num(f.cobertura_dias_local, 0)} d` : '—'}
                   </td>
-                  <td className="px-3.5 py-2.5">
+                  <td className="px-3.5 py-1.5">
                     {f._accionable ? (
                       <div className="flex gap-1.5">
                         <button

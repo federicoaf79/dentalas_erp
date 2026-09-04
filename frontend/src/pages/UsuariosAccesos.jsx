@@ -398,17 +398,17 @@ export default function UsuariosAccesos() {
               {usuarios.map((u) => (
                 <Fragment key={u.id}>
                   <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td className="px-3.5 py-2.5 font-semibold">{u.email}</td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{formatoFecha(u.creadoEl)}</td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{formatoFecha(u.ultimoLogin)}</td>
-                    <td className="px-3.5 py-2.5">
+                    <td className="px-3.5 py-1.5 font-semibold">{u.email}</td>
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(u.creadoEl)}</td>
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(u.ultimoLogin)}</td>
+                    <td className="px-3.5 py-1.5">
                       {u.proveedores.length === 0 ? (
                         <span className="text-gray-300 text-xs">Ninguno (ve el catálogo completo)</span>
                       ) : (
                         <span className="text-xs text-gray-600">{u.proveedores.length} asignado(s)</span>
                       )}
                     </td>
-                    <td className="px-3.5 py-2.5">
+                    <td className="px-3.5 py-1.5">
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => toggleUsuario(u.id)}

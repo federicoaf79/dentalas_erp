@@ -238,7 +238,7 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
                 {['Proveedor', 'Mínimo de compra', 'Plazo de pago', 'Contacto de pedidos', 'Límite propio', ''].map((h) => (
-                  <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
+                  <th key={h} className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                     {h}
                   </th>
                 ))}
@@ -250,7 +250,7 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
                 return (
                   <Fragment key={p.id}>
                     <tr className={`border-b border-gray-100 ${abierto ? 'bg-indigo-50/40' : ''}`}>
-                      <td className="px-3.5 py-2.5">
+                      <td className="px-3.5 py-1.5">
                         <div className="font-semibold text-[13px]">{p.clie_nombre}</div>
                         {p.siempre_requiere_aprobacion && (
                           <span className="inline-flex mt-0.5 mr-1 px-2 py-0.5 rounded-full bg-blue-50 text-[#1d4ed8] text-[10px] font-semibold">
@@ -263,21 +263,21 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
                           </span>
                         )}
                       </td>
-                      <td className="px-3.5 py-2.5 text-[13px]">
+                      <td className="px-3.5 py-1.5 text-[13px]">
                         {p.minimo_compra != null
                           ? (p.minimo_es_unidades ? `${p.minimo_compra} un.` : moneda(p.minimo_compra))
                           : <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-3.5 py-2.5 text-[13px] text-[var(--sub)]">{p.plazo_pago ?? <span className="text-gray-300">—</span>}</td>
-                      <td className="px-3.5 py-2.5 text-[12px] text-[var(--sub)]">
+                      <td className="px-3.5 py-1.5 text-[13px] text-[var(--sub)]">{p.plazo_pago ?? <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3.5 py-1.5 text-[12px] text-[var(--sub)]">
                         {p.whatsapp_pedidos || p.mail_pedidos || <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-3.5 py-2.5 text-[13px]">
+                      <td className="px-3.5 py-1.5 text-[13px]">
                         {p.limite_aprobacion != null
                           ? moneda(p.limite_aprobacion)
                           : <span className="text-gray-400 text-[11px] italic">general</span>}
                       </td>
-                      <td className="px-3.5 py-2.5 text-right">
+                      <td className="px-3.5 py-1.5 text-right">
                         {esAdmin && (
                           <button
                             onClick={() => (abierto ? setEditando(null) : abrir(p))}

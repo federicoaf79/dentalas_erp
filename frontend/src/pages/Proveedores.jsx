@@ -409,13 +409,13 @@ export default function Proveedores({ onIrACondiciones }) {
                       proveedorExpandido === p.clave ? 'bg-indigo-50/50' : ''
                     }`}
                   >
-                    <td className="px-3.5 py-2.5 font-mono text-xs">{p.codigo ?? '—'}</td>
-                    <td className="px-3.5 py-2.5 font-semibold">{p.nombre}</td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{p.cuit ?? '—'}</td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{p.condicionIva ?? '—'}</td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{p.telefono ?? '—'}</td>
-                    <td className="px-3.5 py-2.5 font-bold">{p.totalArticulos}</td>
-                    <td className="px-3.5 py-2.5">
+                    <td className="px-3.5 py-1.5 font-mono text-xs">{p.codigo ?? '—'}</td>
+                    <td className="px-3.5 py-1.5 font-semibold">{p.nombre}</td>
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{p.cuit ?? '—'}</td>
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{p.condicionIva ?? '—'}</td>
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{p.telefono ?? '—'}</td>
+                    <td className="px-3.5 py-1.5 font-bold">{p.totalArticulos}</td>
+                    <td className="px-3.5 py-1.5">
                       {p.criticas === 0 && p.preventivas === 0 ? (
                         <span className="text-gray-300 text-xs">—</span>
                       ) : (
@@ -433,20 +433,20 @@ export default function Proveedores({ onIrACondiciones }) {
                         </span>
                       )}
                     </td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">
                       {p.whatsappPedidos || <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">
                       {p.limiteAprobacion != null
                         ? moneda(p.limiteAprobacion)
                         : <span className="text-gray-400 text-[11px] italic">general</span>}
                     </td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">
                       {p.minimoCompra != null
                         ? (p.minimoEsUnidades ? `${p.minimoCompra} un.` : moneda(p.minimoCompra))
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3.5 py-2.5">
+                    <td className="px-3.5 py-1.5">
                       {typeof onIrACondiciones === 'function' && (
                         <button
                           type="button"

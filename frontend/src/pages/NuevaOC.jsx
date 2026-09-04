@@ -162,23 +162,23 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">#</th>
-                <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Proveedor</th>
-                <th className="text-right px-3 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap">
+                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">#</th>
+                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Proveedor</th>
+                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap">
                   Demanda en riesgo
                 </th>
-                <th className="text-right px-3 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Sin stock</th>
-                <th className="text-right px-3 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Bajo mín.</th>
-                <th className="text-right px-3 py-2.5 text-[10px] font-bold text-gray-400 tracking-wide whitespace-nowrap">Sin historial</th>
-                <th className="px-3.5 py-2.5"></th>
+                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Sin stock</th>
+                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Bajo mín.</th>
+                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-gray-400 tracking-wide whitespace-nowrap">Sin historial</th>
+                <th className="px-3.5 py-1.5"></th>
               </tr>
             </thead>
             <tbody>
               {filtrados.map((p, i) => (
                 <tr key={p.proveedor} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="px-3.5 py-2.5 text-xs text-gray-400 tabular-nums">{i + 1}</td>
-                  <td className="px-3.5 py-2.5 font-semibold text-[13px]">{p.proveedor}</td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3.5 py-1.5 text-xs text-gray-400 tabular-nums">{i + 1}</td>
+                  <td className="px-3.5 py-1.5 font-semibold text-[13px]">{p.proveedor}</td>
+                  <td className="px-3 py-1.5 text-right">
                     {Number(p.demanda_riesgo) > 0 ? (
                       <span className="font-bold tabular-nums">
                         {formatoNumero(p.demanda_riesgo)}
@@ -188,7 +188,7 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
                       <span className="text-[11px] text-gray-400 italic">sin historial</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3 py-1.5 text-right">
                     {Number(p.criticas) > 0 ? (
                       <span className="inline-flex px-2 py-0.5 rounded-full bg-[var(--red-bg)] text-[var(--red)] text-[11px] font-semibold">
                         {p.criticas}
@@ -197,7 +197,7 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3 py-1.5 text-right">
                     {Number(p.preventivas) > 0 ? (
                       <span className="inline-flex px-2 py-0.5 rounded-full bg-[var(--yel-bg)] text-[#92400e] text-[11px] font-semibold">
                         {p.preventivas}
@@ -206,10 +206,10 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-right text-xs text-gray-400 tabular-nums">
+                  <td className="px-3 py-1.5 text-right text-xs text-gray-400 tabular-nums">
                     {Number(p.sin_historial) > 0 ? p.sin_historial : '—'}
                   </td>
-                  <td className="px-3.5 py-2.5 text-right">
+                  <td className="px-3.5 py-1.5 text-right">
                     <button
                       onClick={() => onElegir(p.proveedor)}
                       className="px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[var(--border)] bg-white hover:border-[var(--ind,#4338ca)] hover:text-[var(--ind,#4338ca)] whitespace-nowrap"
@@ -732,7 +732,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                <th className="px-3 py-2.5 w-10">
+                <th className="px-3 py-1.5 w-10">
                   <input
                     type="checkbox"
                     title="Seleccionar todo lo visible en esta página"
@@ -743,7 +743,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                   />
                 </th>
                 {['SKU', 'Producto', 'Stock', 'Mín.', 'Prom./mes', 'Bulto', 'Costo unit.', 'Cantidad a pedir'].map((h) => (
-                  <th key={h} className="text-left px-3 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
+                  <th key={h} className="text-left px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                     {h}
                   </th>
                 ))}

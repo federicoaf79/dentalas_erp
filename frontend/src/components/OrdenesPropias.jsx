@@ -272,22 +272,24 @@ export default function OrdenesPropias({ onCambio }) {
       // de otra orden que pudiera estar abierta en pantalla.
       generarPdfOrdenDescargable({ orden, items: lista, empresa, proveedor: prov ?? null })
 
-      const totalReal = lista.reduce((acc, i) => {
-        const c = Number(i.costo_unitario)
-        return acc + (Number.isFinite(c) ? c * Number(i.cantidad || 0) : 0)
-      }, 0)
+      // Sprint 4/9/2026, feedback del cliente: sin SKU interno de YiQi
+      // (no le sirve al proveedor), sin ningún valor/precio de la orden
+      // (total vacío a propósito, no sacado del objeto -- ver el mismo
+      // comentario en NuevaOC.jsx/abrirWhatsApp), y con quién generó el
+      // pedido (creador_nombre ya viene resuelto desde cargar(), vía
+      // nombres_usuarios()).
       const datos = {
         empresa: empresa?.nombre || 'Dentalab',
         proveedor: orden.proveedor_nombre,
         nro_orden: String(orden.id),
         fecha: formatoFecha(orden.creada_en),
-        total: formatoMoneda(totalReal),
+        total: '',
         cant_items: String(lista.length),
         items: lista
-          .map((i) => `• ${i.mate_codigo} — ${i.mate_nombre ?? ''} — ${formatoNumero(i.cantidad)} un.`)
+          .map((i) => `• ${i.mate_nombre ?? i.mate_codigo} — ${formatoNumero(i.cantidad)} un.`)
           .join('\n'),
         notas: orden.notas || '',
-        contacto: '',
+        contacto: orden.creador_nombre || '',
       }
       const texto = renderTemplate(plantilla?.cuerpo ?? '', datos)
       const numero = String(whatsapp).replace(/\D/g, '')
@@ -648,7 +650,7 @@ export default function OrdenesPropias({ onCambio }) {
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
                 {['#', 'Proveedor', 'Creada por', 'Estado', 'Total', 'Creada', 'Ítems', ''].map((h) => (
-                  <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
+                  <th key={h} className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                     {h}
                   </th>
                 ))}
@@ -659,12 +661,12 @@ export default function OrdenesPropias({ onCambio }) {
                 const est = ESTADOS[o.estado] ?? ESTADOS.borrador
                 return (
                   <tr key={o.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td className="px-3.5 py-2.5 font-mono text-xs">#{o.id}</td>
-                    <td className="px-3.5 py-2.5 font-semibold">{o.proveedor_nombre}</td>
-                    <td className="px-3.5 py-2.5 text-[13px] text-[var(--sub)]">
+                    <td className="px-3.5 py-1.5 font-mono text-xs">#{o.id}</td>
+                    <td className="px-3.5 py-1.5 font-semibold">{o.proveedor_nombre}</td>
+                    <td className="px-3.5 py-1.5 text-[13px] text-[var(--sub)]">
                       {o.creador_nombre ?? '—'}
                     </td>
-                    <td className="px-3.5 py-2.5">
+                    <td className="px-3.5 py-1.5">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${est.clase}`}>
                         {est.label}
                       </span>
@@ -685,7 +687,7 @@ export default function OrdenesPropias({ onCambio }) {
                         </span>
                       )}
                     </td>
-                    <td className="px-3.5 py-2.5 font-semibold tabular-nums text-[13px]">
+                    <td className="px-3.5 py-1.5 font-semibold tabular-nums text-[13px]">
                       {o.total_estimado != null ? formatoMoneda(o.total_estimado) : '—'}
                       {o.items_sin_costo > 0 && (
                         <span className="block text-[10px] text-[#92400e] font-normal">
@@ -693,9 +695,9 @@ export default function OrdenesPropias({ onCambio }) {
                         </span>
                       )}
                     </td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{formatoFecha(o.creada_en)}</td>
-                    <td className="px-3.5 py-2.5 text-xs">{o.cant_items ?? 0}</td>
-                    <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(o.creada_en)}</td>
+                    <td className="px-3.5 py-1.5 text-xs">{o.cant_items ?? 0}</td>
+                    <td className="px-3.5 py-1.5 text-right whitespace-nowrap">
                       <button onClick={() => abrir(o)} className="text-sm text-[var(--ind,#4338ca)] hover:underline mr-3">
                         Ver detalle
                       </button>

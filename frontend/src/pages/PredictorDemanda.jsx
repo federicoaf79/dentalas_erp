@@ -254,20 +254,20 @@ export default function PredictorDemanda() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide sticky left-0 bg-gray-50">SKU</th>
-                <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Producto</th>
-                <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Proveedor</th>
+                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide sticky left-0 bg-gray-50">SKU</th>
+                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Producto</th>
+                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Proveedor</th>
                 {/* Lo accionable va ANTES del detalle mensual: en una pantalla
                     normal se ve sin scrollear, y los meses quedan de respaldo. */}
-                <th className="text-right px-3 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Stock</th>
-                <th className="text-right px-3 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap">Prom./mes</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Cobertura</th>
+                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Stock</th>
+                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap">Prom./mes</th>
+                <th className="text-left px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Cobertura</th>
                 {meses.map((m) => (
-                  <th key={m.clave} className="text-right px-2 py-2.5 text-[10px] font-bold text-gray-400 tracking-wide whitespace-nowrap">
+                  <th key={m.clave} className="text-right px-2 py-1.5 text-[10px] font-bold text-gray-400 tracking-wide whitespace-nowrap">
                     {m.label}
                   </th>
                 ))}
-                <th className="text-right px-3 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Total</th>
+                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -275,16 +275,16 @@ export default function PredictorDemanda() {
                 const cobertura = calcularCobertura(f.stock_actual, f.promedio)
                 return (
                   <tr key={f.mate_codigo} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td className="px-3.5 py-2.5 font-mono text-xs sticky left-0 bg-white">{f.mate_codigo}</td>
-                    <td className="px-3.5 py-2.5 font-semibold text-[13px] max-w-[280px] truncate" title={f.mate_nombre ?? ''}>
+                    <td className="px-3.5 py-1.5 font-mono text-xs sticky left-0 bg-white">{f.mate_codigo}</td>
+                    <td className="px-3.5 py-1.5 font-semibold text-[13px] max-w-[280px] truncate" title={f.mate_nombre ?? ''}>
                       {f.mate_nombre ?? '—'}
                     </td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs whitespace-nowrap">{f.proveedor ?? '—'}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{formatoNumero(f.stock_actual)}</td>
-                    <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-[var(--ind,#4338ca)]">
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs whitespace-nowrap">{f.proveedor ?? '—'}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatoNumero(f.stock_actual)}</td>
+                    <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-[var(--ind,#4338ca)]">
                       {formatoNumero(f.promedio)}
                     </td>
-                    <td className="px-3 py-2.5"><ColorCobertura meses={cobertura} /></td>
+                    <td className="px-3 py-1.5"><ColorCobertura meses={cobertura} /></td>
                     {meses.map((m) => {
                       const valor = f.meses?.[m.clave]
                       return (
@@ -298,7 +298,7 @@ export default function PredictorDemanda() {
                         </td>
                       )
                     })}
-                    <td className="px-3 py-2.5 text-right font-bold tabular-nums">{formatoNumero(f.total)}</td>
+                    <td className="px-3 py-1.5 text-right font-bold tabular-nums">{formatoNumero(f.total)}</td>
                   </tr>
                 )
               })}

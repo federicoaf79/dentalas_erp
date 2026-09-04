@@ -358,31 +358,31 @@ export default function Alertas() {
             <tbody>
               {filasPaginadas.map((a) => (
                 <tr key={a.yiqi_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="px-3.5 py-2.5 font-mono text-xs">{a.mate_codigo}</td>
-                  <td className="px-3.5 py-2.5 font-semibold">{a.mate_nombre}</td>
-                  <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
-                  <td className="px-3.5 py-2.5 font-bold">{a.mate_stock_disponible ?? 0}</td>
-                  <td className="px-3.5 py-2.5 text-gray-400">
+                  <td className="px-3.5 py-1.5 font-mono text-xs">{a.mate_codigo}</td>
+                  <td className="px-3.5 py-1.5 font-semibold">{a.mate_nombre}</td>
+                  <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
+                  <td className="px-3.5 py-1.5 font-bold">{a.mate_stock_disponible ?? 0}</td>
+                  <td className="px-3.5 py-1.5 text-gray-400">
                     {a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : '—'}
                   </td>
-                  <td className="px-3.5 py-2.5 text-gray-400">
+                  <td className="px-3.5 py-1.5 text-gray-400">
                     {a.mate_punto_pedido_max > 0 ? a.mate_punto_pedido_max : '—'}
                   </td>
-                  <td className="px-3.5 py-2.5 text-gray-400">{a.mate_stock_seguridad ?? '—'}</td>
+                  <td className="px-3.5 py-1.5 text-gray-400">{a.mate_stock_seguridad ?? '—'}</td>
                   <td
                     className="px-3.5 py-2.5 text-gray-400 text-xs max-w-[180px] truncate"
                     title={a.mate_notas_sobre_punto_de ?? ''}
                   >
                     {a.mate_notas_sobre_punto_de ?? '—'}
                   </td>
-                  <td className="px-3.5 py-2.5">
+                  <td className="px-3.5 py-1.5">
                     <span
                       className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${COLOR_CLASSES[a._alerta.color]}`}
                     >
                       {a._alerta.label}
                     </span>
                   </td>
-                  <td className="px-3.5 py-2.5">
+                  <td className="px-3.5 py-1.5">
                     <div className="flex flex-col gap-0.5">
                       <span
                         className={causasPorSku[a.mate_codigo] ? 'text-gray-600 text-xs' : 'text-gray-300 text-xs'}

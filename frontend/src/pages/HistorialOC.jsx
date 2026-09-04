@@ -415,12 +415,12 @@ export default function HistorialOC() {
                       ordenExpandida === o.nroOC ? 'bg-indigo-50/50' : ''
                     }`}
                   >
-                    <td className="px-3.5 py-2.5 font-mono text-xs">#{o.nroOC}</td>
-                    <td className="px-3.5 py-2.5 font-semibold">{o.proveedor}</td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{formatoFecha(o.fecha)}</td>
-                    <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{o.asunto ?? '—'}</td>
-                    <td className="px-3.5 py-2.5 font-semibold">{formatoMoneda(o.total)}</td>
-                    <td className="px-3.5 py-2.5">
+                    <td className="px-3.5 py-1.5 font-mono text-xs">#{o.nroOC}</td>
+                    <td className="px-3.5 py-1.5 font-semibold">{o.proveedor}</td>
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(o.fecha)}</td>
+                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{o.asunto ?? '—'}</td>
+                    <td className="px-3.5 py-1.5 font-semibold">{formatoMoneda(o.total)}</td>
+                    <td className="px-3.5 py-1.5">
                       <span
                         className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${o._estado.clase}`}
                       >

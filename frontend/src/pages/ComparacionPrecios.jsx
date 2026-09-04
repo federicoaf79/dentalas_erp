@@ -459,8 +459,8 @@ export default function ComparacionPrecios({ onIrARevisar }) {
                                 idMasBarato === eq.yiqi_id ? 'bg-[var(--grn-bg)]' : 'hover:bg-gray-50'
                               }`}
                             >
-                              <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs w-32">{eq.proveedor}</td>
-                              <td className="px-3.5 py-2.5">
+                              <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs w-32">{eq.proveedor}</td>
+                              <td className="px-3.5 py-1.5">
                                 {eq.mate_nombre ?? '—'}
                                 {idMasBarato === eq.yiqi_id && (
                                   <span className="ml-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--grn)] text-white">
@@ -468,7 +468,7 @@ export default function ComparacionPrecios({ onIrARevisar }) {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-3.5 py-2.5 font-mono text-xs text-gray-400">{eq.sku}</td>
+                              <td className="px-3.5 py-1.5 font-mono text-xs text-gray-400">{eq.sku}</td>
                               <td
                                 className={`px-3.5 py-2.5 font-bold text-right ${
                                   idMasBarato === eq.yiqi_id ? 'text-[var(--grn)]' : ''
@@ -505,16 +505,16 @@ export default function ComparacionPrecios({ onIrARevisar }) {
                         <tbody>
                           {equivalentes.map((eq) => (
                             <tr key={eq.yiqi_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                              <td className="px-3.5 py-2.5">
+                              <td className="px-3.5 py-1.5">
                                 <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">
                                   {Math.round(eq._score * 100)}%
                                 </span>
                               </td>
-                              <td className="px-3.5 py-2.5 text-[var(--sub)] text-xs">{eq.proveedor}</td>
-                              <td className="px-3.5 py-2.5">{eq.mate_nombre ?? '—'}</td>
-                              <td className="px-3.5 py-2.5 font-mono text-xs text-gray-400">{eq.sku}</td>
-                              <td className="px-3.5 py-2.5 font-semibold">{formatoMoneda(eq.precio_final)}</td>
-                              <td className="px-3.5 py-2.5 text-gray-500">{formatoMoneda(eq.precio_neto)}</td>
+                              <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{eq.proveedor}</td>
+                              <td className="px-3.5 py-1.5">{eq.mate_nombre ?? '—'}</td>
+                              <td className="px-3.5 py-1.5 font-mono text-xs text-gray-400">{eq.sku}</td>
+                              <td className="px-3.5 py-1.5 font-semibold">{formatoMoneda(eq.precio_final)}</td>
+                              <td className="px-3.5 py-1.5 text-gray-500">{formatoMoneda(eq.precio_neto)}</td>
                             </tr>
                           ))}
                         </tbody>
