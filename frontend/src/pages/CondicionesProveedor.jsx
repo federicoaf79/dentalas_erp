@@ -29,7 +29,7 @@ const VACIO = {
   minimo_compra: '', minimo_es_unidades: false, plazo_pago: '',
   descuento_volumen: '', dias_entrega: '', mail_pedidos: '',
   whatsapp_pedidos: '', contacto: '', limite_aprobacion: '',
-  siempre_requiere_aprobacion: false, notas: '',
+  siempre_requiere_aprobacion: false, vende_en_cajas_cerradas: false, notas: '',
 }
 
 export default function CondicionesProveedor({ preseleccion, onConsumirPreseleccion } = {}) {
@@ -116,6 +116,7 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
       contacto: p.contacto ?? '',
       limite_aprobacion: p.limite_aprobacion ?? '',
       siempre_requiere_aprobacion: p.siempre_requiere_aprobacion ?? false,
+      vende_en_cajas_cerradas: p.vende_en_cajas_cerradas ?? false,
       notas: p.notas ?? '',
     })
   }
@@ -139,6 +140,7 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
         contacto: txt(form.contacto),
         limite_aprobacion: num(form.limite_aprobacion),
         siempre_requiere_aprobacion: !!form.siempre_requiere_aprobacion,
+        vende_en_cajas_cerradas: !!form.vende_en_cajas_cerradas,
         notas: txt(form.notas),
         actualizado_por: user?.id ?? null,
         actualizado_en: new Date().toISOString(),
@@ -251,8 +253,13 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
                       <td className="px-3.5 py-2.5">
                         <div className="font-semibold text-[13px]">{p.clie_nombre}</div>
                         {p.siempre_requiere_aprobacion && (
-                          <span className="inline-flex mt-0.5 px-2 py-0.5 rounded-full bg-blue-50 text-[#1d4ed8] text-[10px] font-semibold">
+                          <span className="inline-flex mt-0.5 mr-1 px-2 py-0.5 rounded-full bg-blue-50 text-[#1d4ed8] text-[10px] font-semibold">
                             siempre pasa por Aris
+                          </span>
+                        )}
+                        {p.vende_en_cajas_cerradas && (
+                          <span className="inline-flex mt-0.5 px-2 py-0.5 rounded-full bg-amber-50 text-[#92400e] text-[10px] font-semibold">
+                            cajas cerradas
                           </span>
                         )}
                       </td>
@@ -388,6 +395,17 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
                                   onChange={(e) => setForm((f) => ({ ...f, siempre_requiere_aprobacion: e.target.checked }))}
                                 />
                                 Siempre requiere mi aprobación
+                              </span>
+                            </label>
+
+                            <label className="flex items-end pb-2">
+                              <span className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={form.vende_en_cajas_cerradas}
+                                  onChange={(e) => setForm((f) => ({ ...f, vende_en_cajas_cerradas: e.target.checked }))}
+                                />
+                                Vende en cajas cerradas
                               </span>
                             </label>
                           </div>
