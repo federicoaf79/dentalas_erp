@@ -120,6 +120,7 @@ export default function MonitorStock() {
   const [error, setError] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [verTodos, setVerTodos] = useState(false)
+  const [ocultarSinSeguridad, setOcultarSinSeguridad] = useState(false)
   const [paginaActual, setPaginaActual] = useState(1)
   const [filasPorPagina, setFilasPorPagina] = useState(50)
 
@@ -163,7 +164,7 @@ export default function MonitorStock() {
 
   useEffect(() => {
     setPaginaActual(1)
-  }, [busqueda, verTodos, filasPorPagina])
+  }, [busqueda, verTodos, ocultarSinSeguridad, filasPorPagina])
 
   const ultimaSync = useMemo(() => {
     if (articulos.length === 0) return null
@@ -172,7 +173,7 @@ export default function MonitorStock() {
     return new Date(Math.max(...fechas))
   }, [articulos])
 
-  const articulosFiltrados = useMemo(() => {
+  const articulosBusqueda = useMemo(() => {
     return articulos.filter((a) => {
       if (!busqueda) return true
       const texto = busqueda.toLowerCase()
@@ -183,6 +184,22 @@ export default function MonitorStock() {
       )
     })
   }, [articulos, busqueda])
+
+  // Pedido del cliente (feedback 3/9/2026): con "Stock Seguridad" en 0
+  // (sin cargar en YiQi) hay artículos que no dicen nada útil acá -- se
+  // pueden ocultar para reducir el ruido. Es un filtro más, se combina
+  // con la búsqueda de texto y afecta tanto "Ver todos" como el conteo
+  // de Alertas activas (si estaba en 0, igual solo entra en Alertas
+  // cuando el stock también está en 0 -- ver calcularAlerta más arriba).
+  const sinStockSeguridadTotal = useMemo(
+    () => articulosBusqueda.filter((a) => (a.mate_stock_seguridad ?? null) === 0).length,
+    [articulosBusqueda]
+  )
+
+  const articulosFiltrados = useMemo(() => {
+    if (!ocultarSinSeguridad) return articulosBusqueda
+    return articulosBusqueda.filter((a) => (a.mate_stock_seguridad ?? null) !== 0)
+  }, [articulosBusqueda, ocultarSinSeguridad])
 
   const conAlerta = useMemo(() => {
     return articulosFiltrados.filter((a) => {
@@ -317,6 +334,16 @@ export default function MonitorStock() {
           className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
         />
         <div className="flex items-center gap-3">
+          {sinStockSeguridadTotal > 0 && (
+            <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={ocultarSinSeguridad}
+                onChange={(e) => setOcultarSinSeguridad(e.target.checked)}
+              />
+              Ocultar Stock Seguridad = 0 ({sinStockSeguridadTotal})
+            </label>
+          )}
           <label className="flex items-center gap-2 text-sm text-gray-500">
             Filas por página
             <select
