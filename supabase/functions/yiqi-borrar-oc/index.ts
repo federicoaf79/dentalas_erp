@@ -62,13 +62,35 @@ Deno.serve(async (req: Request) => {
     const chequeo = await verificarLlamador(req, supabaseAdmin, { soloAdmin: true });
     if (!chequeo.ok) return respuestaAuthError(chequeo, CORS_HEADERS);
 
-    let body: { yiqi_id?: number | string; entidad?: string; metodo?: string };
+    let body: { yiqi_id?: number | string; entidad?: string; metodo?: string; asunto?: string };
     try {
       body = await req.json();
     } catch {
       return new Response(
         JSON.stringify({ ok: false, error: 'Body inválido: se espera JSON con { yiqi_id }' }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Modo diagnóstico: { asunto: "Dentalab-Compras #8" } -- busca en vivo
+    // en el smartie REPORTE_DE_OC y devuelve la fila CRUDA completa (todas
+    // las columnas que trae el smartie, no solo las que usa sync-yiqi), para
+    // ver si hay algún campo de foreign key hacia el id real de
+    // ORDEN_DE_COMPRA (ej. ORDC_ID_ORDC), distinto del id/ID propio de la
+    // fila del reporte.
+    if (body.asunto) {
+      const config = await getYiqiConfig(supabaseAdmin, 'yiqi-borrar-oc');
+      const SMARTIE_ID_REPORTE_OC = '2345';
+      const url = `${config.base_url}/api/public/REPORTE_DE_OC/smartie?smartieId=${SMARTIE_ID_REPORTE_OC}&schemaId=${config.schema_id}&page=1`;
+      const respYiqi = await fetch(url, {
+        headers: { Authorization: `Bearer ${config.bearer_token}`, 'Content-Type': 'application/json' },
+      });
+      const json = await respYiqi.json().catch(() => null);
+      const filas = json?.data ?? [];
+      const matches = filas.filter((f: any) => (f.ASUNTO ?? '') === body.asunto);
+      return new Response(
+        JSON.stringify({ ok: respYiqi.ok, status: respYiqi.status, url, columns: json?.columns ?? null, matches }),
+        { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
 
