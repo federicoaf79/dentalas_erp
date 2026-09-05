@@ -62,7 +62,14 @@ Deno.serve(async (req: Request) => {
     const chequeo = await verificarLlamador(req, supabaseAdmin, { soloAdmin: true });
     if (!chequeo.ok) return respuestaAuthError(chequeo, CORS_HEADERS);
 
-    let body: { yiqi_id?: number | string; entidad?: string; metodo?: string; asunto?: string };
+    let body: {
+      yiqi_id?: number | string;
+      entidad?: string;
+      metodo?: string;
+      asunto?: string;
+      operador?: string;
+      sin_filtro?: boolean;
+    };
     try {
       body = await req.json();
     } catch {
@@ -78,15 +85,24 @@ Deno.serve(async (req: Request) => {
     // consulta la entidad ORDEN_DE_COMPRA directamente vía POST /query,
     // filtrando por ORDC_ASUNTO. El "id" que devuelve acá SÍ es el id real
     // de la entidad, usable directo en GET/DELETE /ORDEN_DE_COMPRA/{id}.
-    if (body.asunto) {
+    if (body.asunto || body.sin_filtro) {
       const config = await getYiqiConfig(supabaseAdmin, 'yiqi-borrar-oc');
       const url = `${config.base_url}/api/public/ORDEN_DE_COMPRA/query?schemaId=${config.schema_id}`;
+      // Por default LIKE (no "=") para no fallar por un espacio de más u
+      // otra diferencia sutil de string. body.sin_filtro:true -- sin ningún
+      // filtro, solo para confirmar que el endpoint devuelve datos en
+      // general (sanity check).
+      const operador = body.operador || 'LIKE';
+      const valorFiltro = operador === 'LIKE' ? `%${body.asunto}%` : body.asunto;
+      const filters = body.sin_filtro
+        ? []
+        : [{ columnName: 'ORDC_ASUNTO', operator: operador, value: valorFiltro }];
       const respYiqi = await fetch(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${config.bearer_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           page: 1,
-          pageSize: 1000,
+          pageSize: 20,
           columns: [
             { field: 'id' },
             { field: 'ORDC_NRO_OC' },
@@ -96,12 +112,12 @@ Deno.serve(async (req: Request) => {
             { field: 'ORDC_IMPORTE_TOTAL' },
             { field: 'AUDI_FECHA_ALTA' },
           ],
-          filters: [{ columnName: 'ORDC_ASUNTO', operator: '=', value: body.asunto }],
+          filters,
         }),
       });
       const json = await respYiqi.json().catch(() => null);
       return new Response(
-        JSON.stringify({ ok: respYiqi.ok, status: respYiqi.status, url, respuesta: json }),
+        JSON.stringify({ ok: respYiqi.ok, status: respYiqi.status, url, filters, respuesta: json }),
         { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
