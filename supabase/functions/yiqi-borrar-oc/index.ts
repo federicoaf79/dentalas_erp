@@ -69,6 +69,8 @@ Deno.serve(async (req: Request) => {
       asunto?: string;
       operador?: string;
       sin_filtro?: boolean;
+      desde?: string;
+      hasta?: string;
     };
     try {
       body = await req.json();
@@ -85,18 +87,26 @@ Deno.serve(async (req: Request) => {
     // consulta la entidad ORDEN_DE_COMPRA directamente vía POST /query,
     // filtrando por ORDC_ASUNTO. El "id" que devuelve acá SÍ es el id real
     // de la entidad, usable directo en GET/DELETE /ORDEN_DE_COMPRA/{id}.
-    if (body.asunto || body.sin_filtro) {
+    if (body.asunto || body.sin_filtro || (body.desde && body.hasta)) {
       const config = await getYiqiConfig(supabaseAdmin, 'yiqi-borrar-oc');
       const url = `${config.base_url}/api/public/ORDEN_DE_COMPRA/query?schemaId=${config.schema_id}`;
       // Por default LIKE (no "=") para no fallar por un espacio de más u
       // otra diferencia sutil de string. body.sin_filtro:true -- sin ningún
-      // filtro, solo para confirmar que el endpoint devuelve datos en
-      // general (sanity check).
-      const operador = body.operador || 'LIKE';
-      const valorFiltro = operador === 'LIKE' ? `%${body.asunto}%` : body.asunto;
-      const filters = body.sin_filtro
-        ? []
-        : [{ columnName: 'ORDC_ASUNTO', operator: operador, value: valorFiltro }];
+      // filtro (sanity check). body.desde/body.hasta -- filtra por
+      // AUDI_FECHA_ALTA (fecha real de creación del registro en YiQi), para
+      // medir cuántas órdenes se crearon de verdad en una ventana de tiempo,
+      // sin depender de ORDC_ASUNTO ni del reporte REPORTE_DE_OC.
+      let filters: Array<{ columnName: string; operator: string; value: string }> = [];
+      if (body.desde && body.hasta) {
+        filters = [
+          { columnName: 'AUDI_FECHA_ALTA', operator: '>=', value: body.desde },
+          { columnName: 'AUDI_FECHA_ALTA', operator: '<=', value: body.hasta },
+        ];
+      } else if (body.asunto) {
+        const operador = body.operador || 'LIKE';
+        const valorFiltro = operador === 'LIKE' ? `%${body.asunto}%` : body.asunto;
+        filters = [{ columnName: 'ORDC_ASUNTO', operator: operador, value: valorFiltro }];
+      }
       const respYiqi = await fetch(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${config.bearer_token}`, 'Content-Type': 'application/json' },
