@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
     const chequeo = await verificarLlamador(req, supabaseAdmin, { soloAdmin: true });
     if (!chequeo.ok) return respuestaAuthError(chequeo, CORS_HEADERS);
 
-    let body: { yiqi_id?: number | string; entidad?: string };
+    let body: { yiqi_id?: number | string; entidad?: string; metodo?: string };
     try {
       body = await req.json();
     } catch {
@@ -81,11 +81,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const entidad = body.entidad || ENTIDAD_DEFAULT;
+    // metodo: 'GET' para solo probar si el id resuelve a un registro real
+    // (diagnóstico, no toca nada), 'DELETE' (default) para borrar de verdad.
+    const metodo = (body.metodo || 'DELETE').toUpperCase();
     const config = await getYiqiConfig(supabaseAdmin, 'yiqi-borrar-oc');
 
     const url = `${config.base_url}/api/public/${entidad}/${yiqiId}?schemaId=${config.schema_id}`;
     const respYiqi = await fetch(url, {
-      method: 'DELETE',
+      method: metodo,
       headers: {
         Authorization: `Bearer ${config.bearer_token}`,
         'Content-Type': 'application/json',
@@ -101,13 +104,14 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(
-      `yiqi-borrar-oc: DELETE ${url} -> ${respYiqi.status}. Respuesta: ${textoRespuesta.slice(0, 500)}`
+      `yiqi-borrar-oc: ${metodo} ${url} -> ${respYiqi.status}. Respuesta: ${textoRespuesta.slice(0, 500)}`
     );
 
     return new Response(
       JSON.stringify({
         ok: respYiqi.ok,
         status: respYiqi.status,
+        metodo,
         url,
         yiqi_id: yiqiId,
         entidad,
