@@ -29,6 +29,14 @@
 // con method: 'DELETE'. Es una prueba -- si YiQi responde 404/405 acá
 // es la respuesta útil (significa que hay que buscar otra convención
 // o que YiQi no permite borrar por API).
+//
+// Extendida 5/9/2026: el modo de búsqueda (asunto/sin_filtro/desde-hasta)
+// ahora acepta { entidad, columns, pageSize } en el body -- antes estaba
+// fijo a ORDEN_DE_COMPRA. Se usó primero para resolver los id reales de
+// UBICACION_STOCK (depósitos) antes de escribir en MOVIMIENTO_STOCK, sin
+// tener que crear una función nueva por cada entidad de solo-lectura que
+// haga falta consultar. Sigue siendo SOLO ADMIN y de solo lectura en este
+// modo (el POST /query de YiQi es una consulta, no crea ni modifica nada).
 // ============================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -71,6 +79,13 @@ Deno.serve(async (req: Request) => {
       sin_filtro?: boolean;
       desde?: string;
       hasta?: string;
+      // columns/pageSize (5/9/2026): el modo de búsqueda estaba fijo a
+      // ORDEN_DE_COMPRA con sus propias columnas. Se generaliza para poder
+      // usar el mismo /query contra CUALQUIER entidad (ej. UBICACION_STOCK
+      // para resolver los id reales de los depósitos antes de escribir en
+      // MOVIMIENTO_STOCK) sin tener que crear una función nueva por entidad.
+      columns?: Array<string | { field: string }>;
+      pageSize?: number;
     };
     try {
       body = await req.json();
@@ -89,13 +104,17 @@ Deno.serve(async (req: Request) => {
     // de la entidad, usable directo en GET/DELETE /ORDEN_DE_COMPRA/{id}.
     if (body.asunto || body.sin_filtro || (body.desde && body.hasta)) {
       const config = await getYiqiConfig(supabaseAdmin, 'yiqi-borrar-oc');
-      const url = `${config.base_url}/api/public/ORDEN_DE_COMPRA/query?schemaId=${config.schema_id}`;
+      // entidadConsulta (5/9/2026): antes fijo a ORDEN_DE_COMPRA. Ahora
+      // configurable por body.entidad -- default ORDEN_DE_COMPRA para no
+      // romper las pruebas ya usadas contra esa entidad.
+      const entidadConsulta = body.entidad || ENTIDAD_DEFAULT;
+      const url = `${config.base_url}/api/public/${entidadConsulta}/query?schemaId=${config.schema_id}`;
       // Por default LIKE (no "=") para no fallar por un espacio de más u
       // otra diferencia sutil de string. body.sin_filtro:true -- sin ningún
-      // filtro (sanity check). body.desde/body.hasta -- filtra por
-      // AUDI_FECHA_ALTA (fecha real de creación del registro en YiQi), para
-      // medir cuántas órdenes se crearon de verdad en una ventana de tiempo,
-      // sin depender de ORDC_ASUNTO ni del reporte REPORTE_DE_OC.
+      // filtro (sanity check, sirve para CUALQUIER entidad). body.desde/
+      // body.hasta -- filtra por AUDI_FECHA_ALTA (fecha real de creación
+      // del registro en YiQi). body.asunto -- filtra por ORDC_ASUNTO,
+      // específico de ORDEN_DE_COMPRA (no tiene sentido en otra entidad).
       let filters: Array<{ columnName: string; operator: string; value: string }> = [];
       if (body.desde && body.hasta) {
         filters = [
@@ -107,21 +126,28 @@ Deno.serve(async (req: Request) => {
         const valorFiltro = operador === 'LIKE' ? `%${body.asunto}%` : body.asunto;
         filters = [{ columnName: 'ORDC_ASUNTO', operator: operador, value: valorFiltro }];
       }
+      // columnas (5/9/2026): configurable por body.columns (string simple
+      // o {field} ya armado) -- default son las columnas de ORDEN_DE_COMPRA
+      // de siempre, para no romper las pruebas ya usadas.
+      const columnasDefault = [
+        { field: 'id' },
+        { field: 'ORDC_NRO_OC' },
+        { field: 'ORDC_ASUNTO' },
+        { field: 'ORDC_FECHA' },
+        { field: 'ORDC_TOTAL_NETO' },
+        { field: 'ORDC_IMPORTE_TOTAL' },
+        { field: 'AUDI_FECHA_ALTA' },
+      ];
+      const columnas = Array.isArray(body.columns) && body.columns.length > 0
+        ? body.columns.map((c) => (typeof c === 'string' ? { field: c } : c))
+        : columnasDefault;
       const respYiqi = await fetch(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${config.bearer_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           page: 1,
-          pageSize: 20,
-          columns: [
-            { field: 'id' },
-            { field: 'ORDC_NRO_OC' },
-            { field: 'ORDC_ASUNTO' },
-            { field: 'ORDC_FECHA' },
-            { field: 'ORDC_TOTAL_NETO' },
-            { field: 'ORDC_IMPORTE_TOTAL' },
-            { field: 'AUDI_FECHA_ALTA' },
-          ],
+          pageSize: body.pageSize || 20,
+          columns: columnas,
           filters,
         }),
       });
@@ -193,6 +219,22 @@ Deno.serve(async (req: Request) => {
 // -- Project Settings -> API Keys en el dashboard de Supabase):
 //
 //   $body = @{ yiqi_id = 9999 } | ConvertTo-Json
+//   Invoke-RestMethod `
+//     -Uri "https://hsfudsnmooaesrzdwecg.supabase.co/functions/v1/yiqi-borrar-oc" `
+//     -Method Post `
+//     -Headers @{ Authorization = "Bearer TU_SERVICE_ROLE_KEY_ACA" } `
+//     -ContentType "application/json" `
+//     -Body $body
+//
+// Ejemplo con la extensión del 5/9/2026 (consultar OTRA entidad, ej.
+// UBICACION_STOCK, sin ningún filtro):
+//
+//   $body = @{
+//     sin_filtro = $true
+//     entidad    = "UBICACION_STOCK"
+//     columns    = @("id", "CEDI_NOMBRE", "CEDI_CODIGO")
+//     pageSize   = 100
+//   } | ConvertTo-Json
 //   Invoke-RestMethod `
 //     -Uri "https://hsfudsnmooaesrzdwecg.supabase.co/functions/v1/yiqi-borrar-oc" `
 //     -Method Post `
