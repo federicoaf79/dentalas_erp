@@ -72,24 +72,36 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Modo diagnóstico: { asunto: "Dentalab-Compras #8" } -- busca en vivo
-    // en el smartie REPORTE_DE_OC y devuelve la fila CRUDA completa (todas
-    // las columnas que trae el smartie, no solo las que usa sync-yiqi), para
-    // ver si hay algún campo de foreign key hacia el id real de
-    // ORDEN_DE_COMPRA (ej. ORDC_ID_ORDC), distinto del id/ID propio de la
-    // fila del reporte.
+    // Modo diagnóstico/búsqueda: { asunto: "Dentalab-Compras #8" } -- en vez
+    // de REPORTE_DE_OC (entidad de reporte, con su PROPIO id, sin ninguna FK
+    // hacia ORDEN_DE_COMPRA -- confirmado contra el spec real de la API),
+    // consulta la entidad ORDEN_DE_COMPRA directamente vía POST /query,
+    // filtrando por ORDC_ASUNTO. El "id" que devuelve acá SÍ es el id real
+    // de la entidad, usable directo en GET/DELETE /ORDEN_DE_COMPRA/{id}.
     if (body.asunto) {
       const config = await getYiqiConfig(supabaseAdmin, 'yiqi-borrar-oc');
-      const SMARTIE_ID_REPORTE_OC = '2345';
-      const url = `${config.base_url}/api/public/REPORTE_DE_OC/smartie?smartieId=${SMARTIE_ID_REPORTE_OC}&schemaId=${config.schema_id}&page=1`;
+      const url = `${config.base_url}/api/public/ORDEN_DE_COMPRA/query?schemaId=${config.schema_id}`;
       const respYiqi = await fetch(url, {
+        method: 'POST',
         headers: { Authorization: `Bearer ${config.bearer_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          page: 1,
+          pageSize: 1000,
+          columns: [
+            { field: 'id' },
+            { field: 'ORDC_NRO_OC' },
+            { field: 'ORDC_ASUNTO' },
+            { field: 'ORDC_FECHA' },
+            { field: 'ORDC_TOTAL_NETO' },
+            { field: 'ORDC_IMPORTE_TOTAL' },
+            { field: 'AUDI_FECHA_ALTA' },
+          ],
+          filters: [{ columnName: 'ORDC_ASUNTO', operator: '=', value: body.asunto }],
+        }),
       });
       const json = await respYiqi.json().catch(() => null);
-      const filas = json?.data ?? [];
-      const matches = filas.filter((f: any) => (f.ASUNTO ?? '') === body.asunto);
       return new Response(
-        JSON.stringify({ ok: respYiqi.ok, status: respYiqi.status, url, columns: json?.columns ?? null, matches }),
+        JSON.stringify({ ok: respYiqi.ok, status: respYiqi.status, url, respuesta: json }),
         { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
