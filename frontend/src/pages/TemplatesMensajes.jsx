@@ -212,6 +212,18 @@ export default function TemplatesMensajes() {
 
             {sel && (
               <>
+                {sel.canal === 'email' && (
+                  // 6/9/2026 (auditoría UX, H-10): el banner de arriba explica que
+                  // el envío por email no está implementado, pero es un <Aviso>
+                  // que se puede cerrar con la X -- una vez cerrado, no queda
+                  // ningún indicio acá adentro de que este editor no manda nada
+                  // solo. Este aviso vive DENTRO del editor, no se puede cerrar,
+                  // para que no desaparezca justo donde más hace falta.
+                  <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 text-[12px]">
+                    ⚠ Esta plantilla todavía no se envía sola por email — hoy solo sirve para ver el
+                    formato. El envío automático no está construido.
+                  </div>
+                )}
                 <label className="block mb-3">
                   <div className="text-[11px] text-gray-400 uppercase mb-1">Nombre de la plantilla</div>
                   <input
