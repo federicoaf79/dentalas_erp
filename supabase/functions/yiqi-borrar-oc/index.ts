@@ -64,28 +64,6 @@ Deno.serve(async (req: Request) => {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    // DIAGNOSTICO TEMPORAL 5/9/2026 -- verificarLlamador rechaza la
-    // service_role legacy real (JWT correcto, role/ref confirmados a
-    // mano) con "Sesión inválida o vencida", lo que solo pasa si NO
-    // matchea contra Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'). Este
-    // bloque devuelve SOLO largo + primeros 12 caracteres de esa env
-    // var (mismo nivel de exposición que ya se usó del lado cliente),
-    // sin pasar por verificarLlamador, para comparar contra la key real
-    // sin exponer ningún secreto completo. Sacar apenas se confirme la
-    // causa -- no debe quedar en producción.
-    try {
-      const bodyDiag = await req.clone().json();
-      if (bodyDiag?.diagnostico === 'env-service-role') {
-        const envKey = SUPABASE_SERVICE_ROLE_KEY ?? '';
-        return new Response(
-          JSON.stringify({ largo: envKey.length, prefijo: envKey.slice(0, 12) }),
-          { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-        );
-      }
-    } catch {
-      // body no era JSON o no tenía el flag -- seguir el flujo normal.
-    }
-
     // soloAdmin: true -- esto borra datos reales en YiQi, no es para
     // cualquier usuario logueado. El camino de service_role (cron,
     // pruebas manuales con la key de servicio) también pasa.
