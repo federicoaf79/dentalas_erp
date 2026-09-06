@@ -442,3 +442,14 @@ verify_jwt = false
 
 [functions.yiqi-borrar-oc]
 verify_jwt = false
+
+# Agregado 6/9/2026 -- mover-stock-yiqi usa verificarLlamador() (auth
+# propia, mismo criterio que las 6 funciones de arriba). Se agrega acá
+# de entrada para no repetir el mismo diagnostico de 401 que costo horas
+# el 6/9/2026 al probarla con la service_role key (ver
+# INCIDENTE_duplicados_ordenes_yiqi_5-9-2026.md) -- aunque en producción
+# esta función solo la llama un usuario real logueado (JWT de sesión
+# real, que sí pasa el gateway), también se prueba a mano con la
+# service_role key, que no.
+[functions.mover-stock-yiqi]
+verify_jwt = false
