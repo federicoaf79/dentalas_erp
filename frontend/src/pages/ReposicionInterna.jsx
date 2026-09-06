@@ -425,6 +425,18 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
         p_cantidad_movida: cantidad_movida,
       })
       if (errRpc) throw errRpc
+
+      // Reflejar en YiQi (6/9/2026, pendiente #5 -- confirmado por Aris).
+      // Fire-and-forget: un error acá NUNCA deshace el "movido" local, que
+      // ya se confirmó arriba -- mismo patrón que enviar-oc-yiqi después
+      // de aprobar una OC. mover-stock-yiqi guarda su propio resultado
+      // (yiqi_movimiento_id / yiqi_error) en reposiciones_sugeridas.
+      if (modal.variante === 'movido') {
+        supabase.functions
+          .invoke('mover-stock-yiqi', { body: { reposicion_id: modal.fila.id } })
+          .catch((e) => console.error('[mover-stock-yiqi]', e))
+      }
+
       setAccionables((prev) => prev.filter((f) => f.id !== modal.fila.id))
       setModal(null)
       setAviso(
