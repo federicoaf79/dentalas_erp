@@ -411,3 +411,34 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Agregado 5/9/2026 -- las 6 funciones de abajo NO dependen del chequeo
+# de JWT de la plataforma para autorizar: verificarLlamador() (ver
+# supabase/functions/_shared/auth.ts) ya implementa su propia
+# validacion completa (service_role exacta O sesion real de usuario
+# vía supabaseAdmin.auth.getUser). El diseño original de auth.ts decia
+# explicitamente que debia funcionar "sin importar si Verify JWT esta
+# prendido o apagado a nivel plataforma" -- pero desde que el proyecto
+# migro al formato de key nuevo (sb_secret_...), el gateway de
+# plataforma quedo exigiendo forma de JWT clasico en el header
+# Authorization, lo cual choca con la key de servicio nueva y rompe
+# el camino 1 (llamadas internas: cron, scripts admin). Se desactiva
+# el chequeo de plataforma para dejar que auth.ts haga todo el trabajo,
+# como estaba pensado.
+[functions.yiqi-connector]
+verify_jwt = false
+
+[functions.admin-usuarios]
+verify_jwt = false
+
+[functions.sync-yiqi]
+verify_jwt = false
+
+[functions.editar-oc-yiqi]
+verify_jwt = false
+
+[functions.enviar-oc-yiqi]
+verify_jwt = false
+
+[functions.yiqi-borrar-oc]
+verify_jwt = false
