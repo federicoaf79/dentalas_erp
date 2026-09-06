@@ -37,6 +37,16 @@
 // tener que crear una función nueva por cada entidad de solo-lectura que
 // haga falta consultar. Sigue siendo SOLO ADMIN y de solo lectura en este
 // modo (el POST /query de YiQi es una consulta, no crea ni modifica nada).
+//
+// Extendida 6/9/2026: modo { crear: true, entidad, data } -- POST crudo
+// de creación contra CUALQUIER entidad (ej. MOVIMIENTO_STOCK), mismo
+// wrapper { schemaId, data } que ya usa enviar-oc-yiqi para ORDEN_DE_COMPRA.
+// Existe SOLO para probar a mano, con datos mínimos, antes de construir
+// una integración real (mismo criterio ya usado con editar-oc-yiqi y
+// enviar-oc-yiqi) -- una vez confirmado el comportamiento real de la API
+// para una entidad nueva, la integración de producción va en su propia
+// función dedicada, no queda viviendo acá. SOLO ADMIN, como el resto de
+// este archivo -- este modo SÍ escribe datos reales en YiQi.
 // ============================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -86,6 +96,10 @@ Deno.serve(async (req: Request) => {
       // MOVIMIENTO_STOCK) sin tener que crear una función nueva por entidad.
       columns?: Array<string | { field: string }>;
       pageSize?: number;
+      // crear/data (6/9/2026): modo de creación cruda contra cualquier
+      // entidad -- ver comentario del encabezado.
+      crear?: boolean;
+      data?: Record<string, unknown>;
     };
     try {
       body = await req.json();
@@ -93,6 +107,48 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ ok: false, error: 'Body inválido: se espera JSON con { yiqi_id }' }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Modo creación cruda (6/9/2026): { crear: true, entidad, data }.
+    // Mismo wrapper { schemaId, data } que enviar-oc-yiqi/editar-oc-yiqi ya
+    // usan contra ORDEN_DE_COMPRA -- acá es genérico, para poder probar
+    // CUALQUIER entidad con datos mínimos antes de construir la integración
+    // real. Devuelve el status y cuerpo crudo de YiQi, éxito o error.
+    if (body.crear === true) {
+      if (!body.entidad) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Falta "entidad" en el body (modo crear)' }),
+          { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (!body.data || typeof body.data !== 'object') {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Falta "data" (objeto) en el body (modo crear)' }),
+          { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+      const config = await getYiqiConfig(supabaseAdmin, 'yiqi-borrar-oc');
+      const url = `${config.base_url}/api/public/${body.entidad}?schemaId=${config.schema_id}`;
+      const payload = { schemaId: config.schema_id, data: body.data };
+      const respYiqi = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${config.bearer_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const textoRespuesta = await respYiqi.text().catch(() => '');
+      let cuerpoParsed: unknown = null;
+      try {
+        cuerpoParsed = textoRespuesta ? JSON.parse(textoRespuesta) : null;
+      } catch {
+        cuerpoParsed = textoRespuesta;
+      }
+      console.log(
+        `yiqi-borrar-oc (crear): POST ${url} -> ${respYiqi.status}. Body enviado: ${JSON.stringify(payload)}. Respuesta: ${textoRespuesta.slice(0, 500)}`
+      );
+      return new Response(
+        JSON.stringify({ ok: respYiqi.ok, status: respYiqi.status, url, enviado: payload, respuesta: cuerpoParsed }),
+        { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -234,6 +290,28 @@ Deno.serve(async (req: Request) => {
 //     entidad    = "UBICACION_STOCK"
 //     columns    = @("id", "CEDI_NOMBRE", "CEDI_CODIGO")
 //     pageSize   = 100
+//   } | ConvertTo-Json
+//   Invoke-RestMethod `
+//     -Uri "https://hsfudsnmooaesrzdwecg.supabase.co/functions/v1/yiqi-borrar-oc" `
+//     -Method Post `
+//     -Headers @{ Authorization = "Bearer TU_SERVICE_ROLE_KEY_ACA" } `
+//     -ContentType "application/json" `
+//     -Body $body
+//
+// Ejemplo con la extensión del 6/9/2026 (crear un registro crudo contra
+// CUALQUIER entidad, ej. MOVIMIENTO_STOCK -- probar con datos mínimos
+// antes de construir la integración real):
+//
+//   $body = @{
+//     crear   = $true
+//     entidad = "MOVIMIENTO_STOCK"
+//     data    = @{
+//       MATE_ID_MATE = 12345      # yiqi_id de material_yiqi para el SKU
+//       MOST_CANTIDAD = 1
+//       CEDI_ID_CED1 = 155        # destino (Local)
+//       CEDI_ID_CEDI = 157        # origen (Central)
+//       MOST_OBSERVACIONES = "Prueba minima 6/9/2026"
+//     }
 //   } | ConvertTo-Json
 //   Invoke-RestMethod `
 //     -Uri "https://hsfudsnmooaesrzdwecg.supabase.co/functions/v1/yiqi-borrar-oc" `
