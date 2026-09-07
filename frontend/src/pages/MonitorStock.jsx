@@ -5,11 +5,22 @@ import Aviso from '../components/Aviso'
 import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
 
 // ============================================================
-// MonitorStock.jsx — v4
+// MonitorStock.jsx — v5
 // v3: leia de la tabla propia material_yiqi (sincronizada cada 15 min
 //     por el cron sync-material-cada-15-min) en vez de YiQi en vivo.
 // v4: aplica el filtro de proveedores asignados al usuario logueado.
 //     Admin (Aris) ve todo; operador (Ivana) ve solo lo suyo.
+// v5 (6/9/2026, auditoría UX, residual de H-1): esta pantalla nunca
+//     había incorporado el mecanismo de exclusión/pausa manual de
+//     alertas (articulos_excluidos_alertas / alertas_pausadas,
+//     reactivado en Alertas.jsx el 4/9/2026 -- ver v5 de ese archivo).
+//     Por eso el header de acá mostraba 3 alertas más que Alertas.jsx
+//     y el sidebar (2781 vs. 2778): eran justo 3 artículos excluidos a
+//     mano desde la pantalla de Alertas, que acá seguían contando. Se
+//     agrega la misma lectura + el mismo filtro (sin la resolución de
+//     nombres de usuario, que ahí es solo para mostrar en las
+//     pestañas "Excluidos"/"Pausadas" -- esta pantalla no tiene esas
+//     pestañas, solo necesita el número correcto).
 // ============================================================
 
 const COLOR_CLASSES = {
@@ -57,6 +68,20 @@ async function traerMaterialLocal(permisos) {
   }
 
   return acumulado
+}
+
+// 6/9/2026 (v5) — mismo par de tablas que traerExclusionesYPausas() en
+// Alertas.jsx, pero sin resolver nombres de usuario (esta pantalla no
+// los muestra en ningún lado, solo necesita los mate_codigo para
+// restarlos del conteo de alertas).
+async function traerExclusionesYPausas() {
+  const [resExcl, resPaus] = await Promise.all([
+    supabase.from('articulos_excluidos_alertas').select('mate_codigo'),
+    supabase.from('alertas_pausadas').select('mate_codigo, reactivar_en'),
+  ])
+  if (resExcl.error) throw new Error(resExcl.error.message)
+  if (resPaus.error) throw new Error(resPaus.error.message)
+  return { excluidos: resExcl.data ?? [], pausadas: resPaus.data ?? [] }
 }
 
 // Mismo criterio que Alertas.jsx (ítem 19, 21/8/2026): un artículo no
@@ -116,6 +141,9 @@ export default function MonitorStock() {
 
   const [articulos, setArticulos] = useState([])
   const [stockPorSku, setStockPorSku] = useState({})
+  // v5 (6/9/2026): exclusiones/pausas manuales, mismo criterio que Alertas.jsx
+  const [excluidos, setExcluidos] = useState([])
+  const [pausadas, setPausadas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [busqueda, setBusqueda] = useState('')
@@ -132,15 +160,18 @@ export default function MonitorStock() {
       // En paralelo: el desglose por deposito no bloquea el resto de
       // la pantalla si por lo que sea tarda -- si falla, se loguea y
       // sigue mostrando el stock combinado igual (no es critico).
-      const [data, stock] = await Promise.all([
+      const [data, stock, exclusiones] = await Promise.all([
         traerMaterialLocal(permisos),
         traerStockPorDeposito().catch((err) => {
           console.warn('No se pudo cargar el desglose de stock por deposito:', err.message)
           return {}
         }),
+        traerExclusionesYPausas(),
       ])
       setArticulos(data)
       setStockPorSku(stock)
+      setExcluidos(exclusiones.excluidos)
+      setPausadas(exclusiones.pausadas)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -201,13 +232,22 @@ export default function MonitorStock() {
     return articulosBusqueda.filter((a) => (a.mate_stock_seguridad ?? null) !== 0)
   }, [articulosBusqueda, ocultarSinSeguridad])
 
+  // v5 (6/9/2026): mismo criterio que codigosExcluidos/codigosPausadosVigentes
+  // en Alertas.jsx -- una pausa vencida vuelve a contar sola, sin acción de nadie.
+  const codigosExcluidos = useMemo(() => new Set(excluidos.map((e) => e.mate_codigo)), [excluidos])
+  const codigosPausadosVigentes = useMemo(
+    () => new Set(pausadas.filter((p) => new Date(p.reactivar_en).getTime() > Date.now()).map((p) => p.mate_codigo)),
+    [pausadas]
+  )
+
   const conAlerta = useMemo(() => {
     return articulosFiltrados.filter((a) => {
       if (esExcluidoDeAlertas(a)) return false
+      if (codigosExcluidos.has(a.mate_codigo) || codigosPausadosVigentes.has(a.mate_codigo)) return false
       const { nivel } = calcularAlerta(a)
       return nivel === 'critica' || nivel === 'preventiva'
     })
-  }, [articulosFiltrados])
+  }, [articulosFiltrados, codigosExcluidos, codigosPausadosVigentes])
 
   const criticas = useMemo(
     () => conAlerta.filter((a) => calcularAlerta(a).nivel === 'critica').length,
