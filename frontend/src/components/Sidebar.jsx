@@ -40,7 +40,13 @@ const NAV_CONFIG = [
   { key: 'condiciones', label: 'Condiciones comerciales', icon: '🤝' },
   { key: 'usuarios', label: 'Usuarios y accesos', icon: '👥' },
   { key: 'causas', label: 'Catálogo de causas', icon: '🏷️' },
-  { key: 'reglas', label: 'Reglas y alertas', icon: '⚙️' },
+  // 7/9/2026 (auditoría de usabilidad, U-3): se llamaba "Reglas y
+  // alertas", nombre que se pisa con la pantalla "Alertas" de más
+  // arriba sin ser lo mismo — acá se configuran límites de aprobación
+  // y cobertura de reposición, no los umbrales de Mín./Máx./Stock
+  // Seguridad que se ven en Alertas. La key ('reglas') y el archivo
+  // (ReglasAlertas.jsx) no cambian, solo el rótulo visible.
+  { key: 'reglas', label: 'Reglas de compra y aprobación', icon: '⚙️' },
   { key: 'templates', label: 'Templates de mensajes', icon: '💬' },
   { key: 'yiqi', label: 'Conector YiQi', icon: '🔌' },
 ]

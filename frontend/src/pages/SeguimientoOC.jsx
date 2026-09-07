@@ -364,8 +364,19 @@ export default function SeguimientoOC() {
                 <p className="font-semibold text-gray-800">
                   OC #{o.nroOC} — {o.proveedor}
                 </p>
+                {/* 7/9/2026 (auditoría de usabilidad, U-2): "asunto" es el
+                    campo de texto libre de YiQi que Ivana usa a mano como
+                    marca de su propio flujo (ver ítem 12 de pendientes,
+                    ej. "Listo- dsps borrar contenido") — en Órdenes de
+                    compra e Historial de OC va en una columna rotulada
+                    "Asunto", pero acá se mostraba pelado, como si fuera un
+                    estado generado por el sistema. Se agrega el mismo
+                    rótulo para que quede claro que es una nota manual. */}
                 <p className="text-sm text-gray-500">
-                  {o.asunto} · {formatoFecha(o.fecha)}
+                  {o.asunto && <span className="text-gray-400">Asunto: </span>}
+                  {o.asunto}
+                  {o.asunto ? ' · ' : ''}
+                  {formatoFecha(o.fecha)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -423,7 +434,13 @@ export default function SeguimientoOC() {
                             <p className="font-medium text-gray-700 text-sm">
                               OC #{o.nroOC} — {o.proveedor}
                             </p>
-                            <p className="text-xs text-gray-400">{o.asunto}</p>
+                            {/* 7/9/2026 (U-2): mismo rótulo que en la fila de arriba */}
+                            {o.asunto && (
+                              <p className="text-xs text-gray-400">
+                                <span className="text-gray-300">Asunto: </span>
+                                {o.asunto}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-3">
                             {causasPorOC[o.nroOC] && (

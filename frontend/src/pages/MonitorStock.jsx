@@ -464,9 +464,34 @@ export default function MonitorStock() {
                       })()}
                     </td>
                     <td className="px-3.5 py-1.5 text-gray-400">
-                      {a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : '— (sin config.)'}
+                      {a.mate_punto_de_pedido > 0 ? (
+                        a.mate_punto_de_pedido
+                      ) : (
+                        <span title="No hay Punto de pedido cargado para este artículo: la alerta usa Stock Seguridad como respaldo (ver columna de al lado).">
+                          — (usa Stock Seguridad →)
+                        </span>
+                      )}
                     </td>
-                    <td className="px-3.5 py-1.5 text-gray-400">{a.mate_stock_seguridad ?? '—'}</td>
+                    {/* 7/9/2026 (auditoría de usabilidad, U-1/U-5): cuando no hay
+                        Punto de pedido cargado, Stock Seguridad pasa a ser el
+                        criterio real de la alerta (ver calcularAlerta más arriba)
+                        pero antes se veía igual de gris/apagado que cualquier
+                        otro dato — nada distinguía "este valor decide la alerta"
+                        de "este valor es solo informativo". Se resalta y se marca
+                        con un punto cuando está activo. */}
+                    <td
+                      className={`px-3.5 py-1.5 ${
+                        a.mate_punto_de_pedido > 0 ? 'text-gray-400' : 'text-gray-700 font-semibold'
+                      }`}
+                    >
+                      {a.mate_stock_seguridad ?? '—'}
+                      {!(a.mate_punto_de_pedido > 0) && a.mate_stock_seguridad != null && (
+                        <span
+                          className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--ind,#4338ca)] align-middle"
+                          title="Este es el valor que decide la alerta: no hay Punto de pedido cargado para este artículo."
+                        />
+                      )}
+                    </td>
                     <td
                       className="px-3.5 py-2.5 text-gray-400 text-xs max-w-[180px] truncate"
                       title={a.mate_notas_sobre_punto_de ?? ''}

@@ -129,7 +129,10 @@ export default function ReglasAlertas() {
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
       <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
         <div>
-          <div className="text-[17px] font-bold">Reglas y alertas</div>
+          {/* 7/9/2026 (U-3): rótulo alineado con el del sidebar — ver
+              comentario en Sidebar.jsx sobre por qué se sacó "alertas"
+              del nombre. */}
+          <div className="text-[17px] font-bold">Reglas de compra y aprobación</div>
           <div className="text-[12px] text-[var(--sub)] mt-0.5">
             Parámetros que usa el sistema para sugerir cantidades y decidir qué requiere aprobación
           </div>

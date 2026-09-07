@@ -670,13 +670,28 @@ export default function OrdenesPropias({ onCambio }) {
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${est.clase}`}>
                         {est.label}
                       </span>
+                      {/* 7/9/2026 (auditoría de usabilidad, U-4): el motivo real
+                          (o.yiqi_error) ya llegaba desde el backend, pero solo se
+                          veía al pasar el mouse por encima (title) — nada visible
+                          explicaba la causa ni qué hacía "Reintentar envío". Se
+                          muestra el motivo en texto, no solo en el tooltip. */}
                       {o.estado === 'aprobada' && !o.yiqi_id_creado && (
-                        <span
-                          title={o.yiqi_error || 'Todavía no se envió a YiQi.'}
-                          className="block mt-1 text-[10px] font-semibold text-[#b45309]"
-                        >
-                          ⚠ Error de vinculación a YiQi
-                        </span>
+                        <div className="mt-1">
+                          <span
+                            title={o.yiqi_error || 'Todavía no se envió a YiQi.'}
+                            className="text-[10px] font-semibold text-[#b45309]"
+                          >
+                            ⚠ Error de vinculación a YiQi
+                          </span>
+                          {o.yiqi_error && (
+                            <div
+                              className="text-[10px] text-gray-400 max-w-[220px] leading-snug"
+                              title={o.yiqi_error}
+                            >
+                              {o.yiqi_error}
+                            </div>
+                          )}
+                        </div>
                       )}
                       {causasPorOrden[String(o.id)] && (
                         <span
@@ -758,11 +773,13 @@ export default function OrdenesPropias({ onCambio }) {
                           </button>
                         </>
                       )}
+                      {/* 7/9/2026 (U-4): título aclara qué hace el botón, no solo
+                          por qué falló la primera vez. */}
                       {filtro === 'activas' && permisos.esAdmin && o.estado === 'aprobada' && !o.yiqi_id_creado && (
                         <button
                           disabled={ocupado}
                           onClick={() => reintentarEnvioYiqi(o)}
-                          title={o.yiqi_error || 'Todavía no se envió a YiQi.'}
+                          title={`${o.yiqi_error || 'Todavía no se envió a YiQi.'} — Reintentar vuelve a mandar esta misma orden a YiQi con los mismos datos.`}
                           className="text-sm font-semibold text-[#b45309] hover:underline mr-3 disabled:opacity-40"
                         >
                           Reintentar envío
@@ -871,6 +888,7 @@ export default function OrdenesPropias({ onCambio }) {
                 <button
                   disabled={ocupado}
                   onClick={() => reintentarEnvioYiqi(abierta)}
+                  title="Vuelve a mandar esta misma orden a YiQi con los mismos datos."
                   className="shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[#b45309] text-white hover:opacity-90 disabled:opacity-40"
                 >
                   {ocupado ? 'Reintentando…' : 'Reintentar envío'}

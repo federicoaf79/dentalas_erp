@@ -613,12 +613,35 @@ export default function Alertas() {
                       <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
                       <td className="px-3.5 py-1.5 font-bold">{a.mate_stock_disponible ?? 0}</td>
                       <td className="px-3.5 py-1.5 text-gray-400">
-                        {a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : '—'}
+                        {a.mate_punto_de_pedido > 0 ? (
+                          a.mate_punto_de_pedido
+                        ) : (
+                          <span title="No hay Punto de pedido (Mín.) cargado para este artículo: la alerta usa Stock Seguridad como respaldo.">
+                            —
+                          </span>
+                        )}
                       </td>
                       <td className="px-3.5 py-1.5 text-gray-400">
                         {a.mate_punto_pedido_max > 0 ? a.mate_punto_pedido_max : '—'}
                       </td>
-                      <td className="px-3.5 py-1.5 text-gray-400">{a.mate_stock_seguridad ?? '—'}</td>
+                      {/* 7/9/2026 (auditoría de usabilidad, U-1/U-5): mismo criterio
+                          que MonitorStock.jsx — cuando Mín. no está cargado, Stock
+                          Seguridad es el que decide "Crítica"/"Preventiva" (ver
+                          calcularAlerta), y antes no había ninguna marca que lo
+                          distinguiera de un dato simplemente vacío. */}
+                      <td
+                        className={`px-3.5 py-1.5 ${
+                          a.mate_punto_de_pedido > 0 ? 'text-gray-400' : 'text-gray-700 font-semibold'
+                        }`}
+                      >
+                        {a.mate_stock_seguridad ?? '—'}
+                        {!(a.mate_punto_de_pedido > 0) && a.mate_stock_seguridad != null && (
+                          <span
+                            className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--ind,#4338ca)] align-middle"
+                            title="Este es el valor que decide la alerta: no hay Punto de pedido (Mín.) cargado para este artículo."
+                          />
+                        )}
+                      </td>
                       <td
                         className="px-3.5 py-2.5 text-gray-400 text-xs max-w-[180px] truncate"
                         title={a.mate_notas_sobre_punto_de ?? ''}
