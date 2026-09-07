@@ -1,15 +1,18 @@
 // ---------------------------------------------------------------
 // usePermisos — Dentalab-Compras
 // ---------------------------------------------------------------
-// Responde dos preguntas para el usuario logueado:
+// Responde tres preguntas para el usuario logueado:
 //   1) ¿Es admin? (ve todo)
-//   2) Si no lo es, ¿qué proveedores tiene asignados?
+//   2) Si es operador, ¿qué proveedores tiene asignados?
+//   3) Si es de depósito (7/9/2026, circuito de reposición
+//      Central↔Local), ¿a qué depósito(s) está asignado?
 //
 // Fuentes:
-//   - usuarios_config   -> rol ('admin' | 'operador') y activo
-//   - usuario_proveedor -> asignaciones (solo si NO es admin)
+//   - usuarios_config   -> rol ('admin' | 'operador' | 'deposito') y activo
+//   - usuario_proveedor -> asignaciones (solo si rol = 'operador')
+//   - usuario_deposito  -> asignaciones (solo si rol = 'deposito')
 //
-// Ambas tablas tienen RLS: cada usuario lee únicamente sus filas.
+// Las tres tablas tienen RLS: cada usuario lee únicamente sus filas.
 //
 // REGLA DE ORO: ninguna pantalla debe consultar datos mientras
 // `cargando` sea true. Si lo hace, filtraría con listas vacías y
@@ -21,6 +24,8 @@ import { supabase } from '../lib/supabase'
 
 const SIN_PERMISOS = {
   esAdmin: false,
+  esDeposito: false,
+  misDepositos: [],
   codigos: [],
   nombres: [],
   nombreUsuario: null,
@@ -70,6 +75,8 @@ export function usePermisos() {
           if (vivo) {
             setEstado({
               esAdmin: true,
+              esDeposito: false,
+              misDepositos: [],
               codigos: [],
               nombres: [],
               nombreUsuario: config.nombre,
@@ -80,7 +87,34 @@ export function usePermisos() {
           return
         }
 
-        // --- 2b) Operador: traer sus proveedores ---------------------
+        // --- 2b) Depósito (7/9/2026): traer sus depósitos asignados --
+        // Cuentas acotadas al circuito de reposición Central↔Local
+        // (ver DISENO_TECNICO_Reposicion_CentralLocal_7-9-2026.md) —
+        // no ven Compras, OC, Alertas ni el resto del sistema.
+        if (config.rol === 'deposito') {
+          const { data: asignacionesDeposito, error: errDep } = await supabase
+            .from('usuario_deposito')
+            .select('deposito_id')
+            .eq('usuario_id', user.id)
+
+          if (errDep) throw errDep
+
+          if (vivo) {
+            setEstado({
+              esAdmin: false,
+              esDeposito: true,
+              misDepositos: (asignacionesDeposito ?? []).map((f) => f.deposito_id),
+              codigos: [],
+              nombres: [],
+              nombreUsuario: config.nombre,
+              cargando: false,
+              error: null,
+            })
+          }
+          return
+        }
+
+        // --- 2c) Operador: traer sus proveedores ---------------------
         const { data: asignaciones, error: errAsig } = await supabase
           .from('usuario_proveedor')
           .select('proveedor_codigo, proveedor_nombre')
@@ -101,6 +135,8 @@ export function usePermisos() {
         if (vivo) {
           setEstado({
             esAdmin: false,
+            esDeposito: false,
+            misDepositos: [],
             codigos: limpiar('proveedor_codigo'),
             nombres: limpiar('proveedor_nombre'),
             nombreUsuario: config.nombre,

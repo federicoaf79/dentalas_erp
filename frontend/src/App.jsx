@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import { usePermisos } from './hooks/usePermisos'
 import Login from './pages/Login'
 import Sidebar from './components/Sidebar'
+import AppDeposito from './AppDeposito'
 import MonitorStock from './pages/MonitorStock'
 import SeguimientoOC from './pages/SeguimientoOC'
 import Proveedores from './pages/Proveedores'
@@ -181,6 +182,16 @@ function AppLogueada({ session, onLogout }) {
     cargarContadores()
     cargarYiqiEstado()
   }, [cargarContadores, cargarYiqiEstado])
+
+  // Cuentas de depósito (7/9/2026, circuito de reposición automática
+  // Central<->Local — ver DISENO_TECNICO_Reposicion_CentralLocal_
+  // 7-9-2026.md) tienen un shell completamente aparte: no ven Compras,
+  // OC, Alertas ni el resto del sidebar de admin/operador. Se corta acá,
+  // después de que ya corrieron todos los hooks de arriba (regla de los
+  // hooks), antes de armar el resto del layout que no les corresponde.
+  if (permisos.esDeposito) {
+    return <AppDeposito nombreUsuario={nombreUsuario} onLogout={onLogout} />
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
