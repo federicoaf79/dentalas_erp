@@ -18,6 +18,12 @@
 const NAV_STOCK = [
   { key: 'stock', label: 'Monitor de stock', icon: '📦' },
   { key: 'reposicion', label: 'Reposición interna', icon: '🔁' },
+  // 7/9/2026: vista de supervisión (solo lectura) del circuito nuevo
+  // Central<->Local — las acciones viven en las cuentas de depósito
+  // (AppDeposito.jsx), acá se ve el historial completo de los dos
+  // circuitos. Gate real de admin adentro de la pantalla misma, mismo
+  // patrón que "Usuarios y accesos".
+  { key: 'reposicion-central-local', label: 'Reposición Central-Local', icon: '🏭' },
 ]
 
 const NAV_COMPRAS = [

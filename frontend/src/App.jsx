@@ -20,6 +20,7 @@ import Empresa from './pages/Empresa'
 import TemplatesMensajes from './pages/TemplatesMensajes'
 import CondicionesProveedor from './pages/CondicionesProveedor'
 import ReposicionInterna from './pages/ReposicionInterna'
+import ReposicionCentralLocal from './pages/ReposicionCentralLocal'
 import ComparacionPrecios from './pages/ComparacionPrecios'
 import RevisarEquivalencias from './pages/RevisarEquivalencias'
 import Ayuda from './pages/Ayuda'
@@ -46,6 +47,7 @@ const PAGINAS_CON_DATOS_REALES = [
   'templates',
   'condiciones',
   'reposicion',
+  'reposicion-central-local',
   'precios',
   'equivalencias',
   'ayuda',
@@ -69,6 +71,7 @@ function PaginaEnConstruccion({ nombre }) {
 const TITULOS = {
   alertas: 'Alertas',
   reposicion: 'Reposición interna',
+  'reposicion-central-local': 'Reposición Central-Local',
   ocs: 'Órdenes de compra',
   historial: 'Historial de OC',
   'nueva-oc': 'Nueva OC',
@@ -214,6 +217,7 @@ function AppLogueada({ session, onLogout }) {
           }}
         />
       )}
+      {currentPage === 'reposicion-central-local' && <ReposicionCentralLocal />}
       {currentPage === 'seguimiento' && <SeguimientoOC />}
       {currentPage === 'proveedores' && (
         <Proveedores
