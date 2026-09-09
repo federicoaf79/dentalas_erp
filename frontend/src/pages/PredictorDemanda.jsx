@@ -52,22 +52,30 @@ function calcularCobertura(stock, promedio) {
   return s / p
 }
 
+// H-9 (auditoría UX 6/9/2026): esta columna mezclaba meses ("22,4 meses")
+// y días ("11 días") según el valor, sin ninguna marca que avisara el
+// cambio de unidad -- comparar dos filas de un vistazo era engañoso. Se
+// unifica todo a "meses"; para los casos urgentes (<1 mes) el equivalente
+// en días queda como tooltip, sin agregar una segunda unidad visible.
 function ColorCobertura({ meses }) {
   if (meses == null) {
     return <span className="text-gray-300 text-xs">—</span>
   }
   let clase = 'bg-[var(--grn-bg)] text-[var(--grn)]'
-  let texto = `${meses.toFixed(1)} meses`
+  const texto = meses <= 0 ? 'Sin stock' : `${meses.toFixed(1)} meses`
+  const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
 
   if (meses < 1) {
     clase = 'bg-[var(--red-bg)] text-[var(--red)]'
-    texto = meses <= 0 ? 'Sin stock' : `${Math.round(meses * 30)} días`
   } else if (meses < 2) {
     clase = 'bg-[var(--yel-bg)] text-[#92400e]'
   }
 
   return (
-    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${clase}`}>
+    <span
+      title={tooltip}
+      className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${clase}`}
+    >
       {texto}
     </span>
   )

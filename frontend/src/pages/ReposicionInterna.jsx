@@ -64,6 +64,22 @@ function formatoFechaHora(fechaStr) {
   }
 }
 
+// H-3 (auditoría UX 6/9/2026): los remitos son "una hoja de trabajo del
+// día" (ver comentario de generar_remitos_reposicion() en la migración),
+// pero no había ninguna marca visual de que uno viejo puede no coincidir
+// más con las prioridades actuales. Un remito generado en un día distinto
+// de hoy se marca como potencialmente desactualizado.
+function esDeOtroDia(fechaStr) {
+  if (!fechaStr) return false
+  const f = new Date(fechaStr)
+  const hoy = new Date()
+  return (
+    f.getFullYear() !== hoy.getFullYear() ||
+    f.getMonth() !== hoy.getMonth() ||
+    f.getDate() !== hoy.getDate()
+  )
+}
+
 // Default 2 decimales + separador de miles (es-AR: punto de miles, coma
 // decimal) para cualquier cantidad — incluye stock, porque Aris confirmó
 // que los decimales en stock son datos legítimos (fraccionados/producción),
@@ -310,6 +326,7 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
       prioridad_orden: f.prioridad_orden,
       prioridad_label: f.prioridad_label,
       venta_12_meses: f.venta_12_meses,
+      generado_en: f.generado_en,
       _accionable: true,
       _origen: f,
     }))
@@ -395,13 +412,22 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
       mapa.get(f.remito).push(f)
     }
     return Array.from(mapa.entries())
-      .map(([nombre, filas]) => ({
-        nombre,
-        filas,
-        prioridad_orden: filas[0]?.prioridad_orden,
-        prioridad_label: filas[0]?.prioridad_label,
-        totalUnidades: filas.reduce((acc, f) => acc + (Number(f.cantidad) || 0), 0),
-      }))
+      .map(([nombre, filas]) => {
+        // Fecha más vieja entre las filas del remito -- si una fila no se
+        // tocó desde una corrida anterior de "Actualizar sugerencias", su
+        // generado_en queda atrás y es la que manda para saber si todo el
+        // remito puede estar desactualizado (ver H-3, auditoría UX 6/9).
+        const fechas = filas.map((f) => f.generado_en).filter(Boolean)
+        const generadoMin = fechas.length > 0 ? fechas.reduce((a, b) => (a < b ? a : b)) : null
+        return {
+          nombre,
+          filas,
+          prioridad_orden: filas[0]?.prioridad_orden,
+          prioridad_label: filas[0]?.prioridad_label,
+          totalUnidades: filas.reduce((acc, f) => acc + (Number(f.cantidad) || 0), 0),
+          generadoMin,
+        }
+      })
       .sort((a, b) => {
         const na = parseInt(a.nombre.match(/\d+/)?.[0] ?? '0', 10)
         const nb = parseInt(b.nombre.match(/\d+/)?.[0] ?? '0', 10)
@@ -796,6 +822,16 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
                         {r.filas.length} artículo{r.filas.length === 1 ? '' : 's'}
                       </span>
                       <span className="text-[11px] text-[var(--sub)]">{num(r.totalUnidades, 2)} unidades</span>
+                      <span
+                        className={`text-[11px] ${esDeOtroDia(r.generadoMin) ? 'text-[var(--red)] font-semibold' : 'text-[var(--sub)]'}`}
+                        title={
+                          esDeOtroDia(r.generadoMin)
+                            ? 'Este remito no se tocó desde un día anterior — las prioridades pudieron haber cambiado desde entonces. Usá "↻ Generar remitos" para traerlo al día antes de repartirlo.'
+                            : 'Generado hoy con los datos más recientes.'
+                        }
+                      >
+                        {esDeOtroDia(r.generadoMin) ? '⚠ ' : ''}Generado: {formatoFechaHora(r.generadoMin)}
+                      </span>
                     </div>
                     <button
                       onClick={() => exportarRemitoExcel(r.nombre, r.filas)}

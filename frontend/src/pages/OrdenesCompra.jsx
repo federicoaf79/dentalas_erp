@@ -241,8 +241,21 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
           proveedor tuyo no tiene ninguna OC cargada, simplemente no aparece acá.
         </Aviso>
       )}
+      {/* H-2 (auditoría UX 6/9/2026): el resumen del header de arriba
+          ("X OC activas...") corresponde a ESTA tabla, no a "Órdenes
+          propias" que se renderiza justo antes -- son cosas distintas
+          y el layout no lo dejaba claro. Se agrega un título propio acá
+          para que quede a la vista a qué tabla corresponde el resumen. */}
+      <div className="px-4 pt-5 pb-1">
+        <div className="text-[13px] font-bold text-gray-700">Todas las OC sincronizadas desde YiQi</div>
+        <div className="text-[11px] text-gray-400 mt-0.5">
+          Es la tabla a la que corresponde el resumen de arriba. Distinto de "Órdenes propias" (sección de arriba),
+          que son las que se generan y aprueban desde este sistema.
+        </div>
+      </div>
+
       {/* Buscador */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between gap-3">
+      <div className="px-4 pt-2 pb-2 flex items-center justify-between gap-3">
         <input
           type="text"
           value={busqueda}
