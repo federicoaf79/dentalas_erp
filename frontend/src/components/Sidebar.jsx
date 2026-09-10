@@ -15,9 +15,16 @@
 // Agregar un módulo nuevo en el futuro = agregar un array + una
 // sección, sin tocar el resto.
 // ------------------------------------------------------------
+// 10/9/2026 (Decisión A/B de la unificación del Eje 1, ver
+// DISENO_TECNICO_Unificacion_Eje1_10-9-2026.md): "Reposición interna"
+// se saca del sidebar de Aris/Ivana. Ya no es necesaria — Federico,
+// 10/9: "los botones de movido y descartar no van a ser necesarios, es
+// una tarea manual que entorpece la automatización que ya hace el
+// sistema". Las acciones del circuito viven 100% en las cuentas de
+// depósito (AppDeposito.jsx); Aris/Ivana quedan con la vista de
+// supervisión de abajo, solo lectura.
 const NAV_STOCK = [
   { key: 'stock', label: 'Monitor de stock', icon: '📦' },
-  { key: 'reposicion', label: 'Reposición interna', icon: '🔁' },
   // 7/9/2026: vista de supervisión (solo lectura) del circuito nuevo
   // Central<->Local — las acciones viven en las cuentas de depósito
   // (AppDeposito.jsx), acá se ve el historial completo de los dos

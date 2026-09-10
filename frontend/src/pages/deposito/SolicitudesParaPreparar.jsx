@@ -2,28 +2,39 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
-import { nombreDeposito } from '../../lib/depositos'
+import { nombreDeposito, DEPOSITO_CENTRAL } from '../../lib/depositos'
+import { generarRemitoImprimible } from '../../lib/pdfRemito'
 
 // ============================================================
-// pages/deposito/SolicitudesParaPreparar.jsx — 7/9/2026
+// pages/deposito/SolicitudesParaPreparar.jsx — 7/9/2026, v2 10/9/2026
 // ============================================================
 // Pantalla del circuito de reposición automática Central<->Local
-// (ver DISENO_TECNICO_Reposicion_CentralLocal_7-9-2026.md, §12) para
-// la cuenta de depósito que ES ORIGEN de una solicitud — es decir,
-// quien tiene que prepararla. Sirve para las dos direcciones sin
-// distinguir rol: Depósito Central es origen en el circuito
-// principal, el Local es origen en el circuito inverso.
+// (ver DISENO_TECNICO_Reposicion_CentralLocal_7-9-2026.md, §12, y
+// DISENO_TECNICO_Unificacion_Eje1_10-9-2026.md) para la cuenta de
+// depósito que ES ORIGEN de una solicitud — es decir, quien tiene que
+// prepararla. Sirve para las dos direcciones sin distinguir rol:
+// Depósito Central es origen en el circuito principal, el Local es
+// origen en el circuito inverso.
 //
 // Dos estados posibles por solicitud:
-//   'solicitada'     -> la generó la regla automática de Aris, todavía
-//                        nadie calculó las líneas. Acá aparece el botón
-//                        "Generar remito de mercadería", que dispara
-//                        generar_remito_reposicion_central() -- el
-//                        cálculo en vivo, neteado contra reservas.
-//   'en_preparacion' -> ya tiene líneas armadas (reservadas). Por cada
-//                        una se declara "envía" (cantidad) / lo que
-//                        falta queda como "no hay" automático con
-//                        motivo -- decisión de Federico, 7/9/2026.
+//   'solicitada'     -> todavía nadie calculó las líneas. Para el
+//                        Local (circuito inverso) acá aparece el botón
+//                        "Generar remito de mercadería". Para Depósito
+//                        Central, esto ya no debería verse — desde el
+//                        10/9/2026 el trigger `trg_auto_preparar_central`
+//                        genera y declara automáticamente en cuanto se
+//                        crea la solicitud (Aris, 10/9: "ahorrar el paso
+//                        de que Depósito Central valide las cantidades,
+//                        ya que las mismas se ven desde Yiqi"). El botón
+//                        queda igual acá por si algún día hace falta
+//                        reprocesar una a mano.
+//   'en_preparacion' -> ya tiene líneas armadas (reservadas o ya
+//                        declaradas "en tránsito"). Por cada reservada
+//                        se declara "envía" (cantidad) / lo que falta
+//                        queda como "no hay" automático con motivo --
+//                        decisión de Federico, 7/9/2026. "Declarada" se
+//                        muestra como "En tránsito" desde el 10/9/2026
+//                        (pedido de Aris) — mismo dato, solo rótulo.
 // ============================================================
 
 function num(v, decimales = 2) {
@@ -111,9 +122,26 @@ export default function SolicitudesParaPreparar() {
   const [aviso, setAviso] = useState(null)
   const [generando, setGenerando] = useState(null)
   const [declarando, setDeclarando] = useState(null)
+  const [empresa, setEmpresa] = useState(null)
+  // SKU -> stock_yiqi.en_transito, para el chequeo de consistencia contra
+  // lo que YiQi ya calcula por su cuenta (Aris, 10/9: formalizar "En
+  // tránsito" cruzando contra ese dato).
+  const [enTransitoYiqi, setEnTransitoYiqi] = useState({})
 
   const misDepositos = permisos.misDepositos ?? []
   const claveFiltro = permisos.cargando || permisos.error ? null : misDepositos.join(',')
+
+  useEffect(() => {
+    // Membrete para el remito imprimible — mismos campos que usa
+    // pdfOrden.js. No es crítico: si falla, el remito sale sin membrete.
+    supabase
+      .from('empresa_config')
+      .select('*')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setEmpresa(data ?? null))
+      .catch(() => setEmpresa(null))
+  }, [])
 
   const cargar = useCallback(async () => {
     if (!misDepositos.length) {
@@ -147,6 +175,19 @@ export default function SolicitudesParaPreparar() {
           mapa[l.solicitud_id].push(l)
         }
         setLineasPorSolicitud(mapa)
+
+        // Cruce de consistencia contra stock_yiqi.en_transito — no bloquea
+        // nada, es solo informativo (badge junto a "En tránsito").
+        const skus = [...new Set((filasLineas ?? []).map((l) => l.sku))]
+        if (skus.length) {
+          const { data: filasStock } = await supabase
+            .from('stock_yiqi')
+            .select('sku, en_transito')
+            .in('sku', skus)
+          const mapaStock = {}
+          for (const f of filasStock ?? []) mapaStock[f.sku] = f.en_transito
+          setEnTransitoYiqi(mapaStock)
+        }
       } else {
         setLineasPorSolicitud({})
       }
@@ -258,19 +299,37 @@ export default function SolicitudesParaPreparar() {
                     → {nombreDeposito(s.deposito_destino_id)} · {formatoFechaHora(s.creada_en)}
                   </span>
                 </div>
-                {s.estado === 'solicitada' ? (
-                  <button
-                    onClick={() => generarRemito(s)}
-                    disabled={generando === s.id}
-                    className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--ind,#4338ca)] disabled:opacity-50"
-                  >
-                    {generando === s.id ? 'Generando…' : '📋 Generar remito de mercadería'}
-                  </button>
-                ) : (
-                  <span className="text-[11px] font-semibold text-[var(--ind)] bg-[var(--ind-bg)] px-2.5 py-1 rounded-full">
-                    En preparación
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {s.estado === 'en_preparacion' && (
+                    <button
+                      onClick={() =>
+                        generarRemitoImprimible({ solicitud: s, lineas: lineasPorSolicitud[s.id] ?? [], empresa })
+                      }
+                      title="Imprimir o guardar como PDF — el destino confirma la recepción contra este remito"
+                      className="px-2.5 py-1.5 rounded-lg text-[12px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+                    >
+                      🖨️ Imprimir remito
+                    </button>
+                  )}
+                  {s.estado === 'solicitada' ? (
+                    <button
+                      onClick={() => generarRemito(s)}
+                      disabled={generando === s.id}
+                      title={
+                        s.deposito_origen_id === DEPOSITO_CENTRAL
+                          ? 'Depósito Central se procesa solo automáticamente — usá esto solo si quedó sin procesar'
+                          : undefined
+                      }
+                      className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--ind,#4338ca)] disabled:opacity-50"
+                    >
+                      {generando === s.id ? 'Generando…' : '📋 Generar remito de mercadería'}
+                    </button>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-[var(--ind)] bg-[var(--ind-bg)] px-2.5 py-1 rounded-full">
+                      En preparación
+                    </span>
+                  )}
+                </div>
               </div>
 
               {s.estado === 'en_preparacion' && (
@@ -308,10 +367,20 @@ export default function SolicitudesParaPreparar() {
                             <td className="px-3.5 py-1.5 font-mono text-xs">{l.sku}</td>
                             <td className="px-3.5 py-1.5 text-sm">{l.mate_nombre}</td>
                             <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(l.cantidad_solicitada)}</td>
-                            <td className="px-3.5 py-1.5 text-sm font-semibold">{num(l.cantidad_enviada)}</td>
+                            <td className="px-3.5 py-1.5 text-sm font-semibold">
+                              {num(l.cantidad_enviada)}
+                              {enTransitoYiqi[l.sku] != null && l.estado_linea !== 'recibida' && (
+                                <span
+                                  className="ml-1.5 text-[10px] text-[var(--sub)] font-normal"
+                                  title="Lo que YiQi tiene registrado como en tránsito para este SKU (todos los movimientos, no solo este remito) — chequeo de consistencia, no se usa para calcular nada"
+                                >
+                                  (YiQi: {num(enTransitoYiqi[l.sku])} en tránsito)
+                                </span>
+                              )}
+                            </td>
                             <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{l.motivo_sin_stock ?? '—'}</td>
                             <td className="px-3.5 py-1.5 text-[11px] text-green-700 font-semibold">
-                              {l.estado_linea === 'recibida' ? '✓ Recibido' : 'Declarado — esperando recepción'}
+                              {l.estado_linea === 'recibida' ? '✓ Recibido' : 'En tránsito — esperando recepción'}
                             </td>
                           </tr>
                         )

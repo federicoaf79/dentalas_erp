@@ -3,16 +3,26 @@ import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
 import { nombreDeposito } from '../../lib/depositos'
+import { generarRemitoImprimible } from '../../lib/pdfRemito'
 
 // ============================================================
-// pages/deposito/ConfirmarRecepcion.jsx — 7/9/2026
+// pages/deposito/ConfirmarRecepcion.jsx — 7/9/2026, v2 10/9/2026
 // ============================================================
 // Pantalla del circuito de reposición automática Central<->Local
-// (ver DISENO_TECNICO_Reposicion_CentralLocal_7-9-2026.md, §12) para
-// la cuenta de depósito que ES DESTINO de una línea ya declarada
-// ("envía", con cantidad > 0). Confirmar acá es lo que ejecuta el
-// movimiento de stock real en YiQi (vía mover-stock-reposicion) — no
-// antes, ni cuando el otro lado declaró "envía".
+// (ver DISENO_TECNICO_Reposicion_CentralLocal_7-9-2026.md, §12, y
+// DISENO_TECNICO_Unificacion_Eje1_10-9-2026.md) para la cuenta de
+// depósito que ES DESTINO de una línea ya declarada ("en tránsito",
+// con cantidad > 0 — antes decía "declarada" en pantalla; renombrado
+// el 10/9/2026 a pedido de Aris, el estado en la base sigue siendo
+// `estado_linea = 'declarada'`, sin cambios). Confirmar acá es lo que
+// ejecuta el movimiento de stock real en YiQi (vía
+// mover-stock-reposicion) — no antes, ni cuando el otro lado declaró
+// "envía".
+//
+// Decisión de Federico, 10/9/2026: "el encargado del local confirma lo
+// enviado y con el remito impreso. Ya nadie más valida ese punto" — se
+// suma acá el botón para imprimir el mismo remito que armó el origen,
+// para confirmar contra ese documento físico, no solo contra pantalla.
 // ============================================================
 
 function num(v, decimales = 2) {
@@ -44,7 +54,7 @@ function FilaLineaDeclarada({ linea, onConfirmar, guardando }) {
     <tr className="border-b border-gray-100 last:border-0">
       <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
       <td className="px-3.5 py-1.5 text-sm">{linea.mate_nombre}</td>
-      <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(linea.cantidad_enviada)} declaradas</td>
+      <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(linea.cantidad_enviada)} en tránsito</td>
       <td className="px-3.5 py-1.5">
         <input
           type="number"
@@ -76,9 +86,21 @@ export default function ConfirmarRecepcion() {
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
+  const [empresa, setEmpresa] = useState(null)
 
   const misDepositos = permisos.misDepositos ?? []
   const claveFiltro = permisos.cargando || permisos.error ? null : misDepositos.join(',')
+
+  useEffect(() => {
+    // Membrete para el remito imprimible — igual que en SolicitudesParaPreparar.jsx.
+    supabase
+      .from('empresa_config')
+      .select('*')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setEmpresa(data ?? null))
+      .catch(() => setEmpresa(null))
+  }, [])
 
   const cargar = useCallback(async () => {
     if (!misDepositos.length) {
@@ -206,16 +228,25 @@ export default function ConfirmarRecepcion() {
             const s = solicitudesPorId[solicitudId]
             return (
               <div key={solicitudId} className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
-                <div className="px-3.5 py-2.5 bg-gray-50 border-b border-[var(--border)]">
-                  <span className="font-bold text-sm">{s?.remito_numero ?? `Solicitud #${solicitudId}`}</span>
-                  <span className="text-[11px] text-[var(--sub)] ml-2">
-                    de {nombreDeposito(s?.deposito_origen_id)} · {formatoFechaHora(s?.creada_en)}
-                  </span>
+                <div className="px-3.5 py-2.5 bg-gray-50 border-b border-[var(--border)] flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <span className="font-bold text-sm">{s?.remito_numero ?? `Solicitud #${solicitudId}`}</span>
+                    <span className="text-[11px] text-[var(--sub)] ml-2">
+                      de {nombreDeposito(s?.deposito_origen_id)} · {formatoFechaHora(s?.creada_en)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => generarRemitoImprimible({ solicitud: s ?? { id: solicitudId }, lineas: filasLineas, empresa })}
+                    title="Confirmá contra este remito impreso, no solo contra la pantalla"
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+                  >
+                    🖨️ Ver / imprimir remito
+                  </button>
                 </div>
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['SKU', 'Producto', 'Declarado', 'Cantidad recibida', ''].map((h) => (
+                      {['SKU', 'Producto', 'En tránsito', 'Cantidad recibida', ''].map((h) => (
                         <th
                           key={h}
                           className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"

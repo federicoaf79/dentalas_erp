@@ -19,7 +19,10 @@ import CatalogoCausas from './pages/CatalogoCausas'
 import Empresa from './pages/Empresa'
 import TemplatesMensajes from './pages/TemplatesMensajes'
 import CondicionesProveedor from './pages/CondicionesProveedor'
-import ReposicionInterna from './pages/ReposicionInterna'
+// 10/9/2026: ReposicionInterna.jsx se saca de circulación (ver
+// DISENO_TECNICO_Unificacion_Eje1_10-9-2026.md) — el archivo queda en
+// el repo sin tocar, por si hace falta consultarlo, pero ya no se
+// importa ni se rutea. Reemplazada por la vista de supervisión de abajo.
 import ReposicionCentralLocal from './pages/ReposicionCentralLocal'
 import ComparacionPrecios from './pages/ComparacionPrecios'
 import RevisarEquivalencias from './pages/RevisarEquivalencias'
@@ -46,7 +49,6 @@ const PAGINAS_CON_DATOS_REALES = [
   'empresa',
   'templates',
   'condiciones',
-  'reposicion',
   'reposicion-central-local',
   'precios',
   'equivalencias',
@@ -70,7 +72,6 @@ function PaginaEnConstruccion({ nombre }) {
 
 const TITULOS = {
   alertas: 'Alertas',
-  reposicion: 'Reposición interna',
   'reposicion-central-local': 'Reposición Central-Local',
   ocs: 'Órdenes de compra',
   historial: 'Historial de OC',
@@ -209,14 +210,6 @@ function AppLogueada({ session, onLogout }) {
       />
 
       {currentPage === 'stock' && <MonitorStock />}
-      {currentPage === 'reposicion' && (
-        <ReposicionInterna
-          onPedirAProveedor={(proveedor, sku) => {
-            setPreseleccionOC({ proveedor, sku })
-            setCurrentPage('nueva-oc')
-          }}
-        />
-      )}
       {currentPage === 'reposicion-central-local' && <ReposicionCentralLocal />}
       {currentPage === 'seguimiento' && <SeguimientoOC />}
       {currentPage === 'proveedores' && (
