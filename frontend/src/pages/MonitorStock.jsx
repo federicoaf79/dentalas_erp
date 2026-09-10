@@ -3,9 +3,11 @@ import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
+import { traerRotacionPorSku, calcularCobertura } from '../lib/rotacionPorSku'
+import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
 
 // ============================================================
-// MonitorStock.jsx — v5
+// MonitorStock.jsx — v6
 // v3: leia de la tabla propia material_yiqi (sincronizada cada 15 min
 //     por el cron sync-material-cada-15-min) en vez de YiQi en vivo.
 // v4: aplica el filtro de proveedores asignados al usuario logueado.
@@ -21,6 +23,17 @@ import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposi
 //     nombres de usuario, que ahí es solo para mostrar en las
 //     pestañas "Excluidos"/"Pausadas" -- esta pantalla no tiene esas
 //     pestañas, solo necesita el número correcto).
+// v6 (10/9/2026, a pedido de Federico): se agregan 3 cosas que faltaban
+//     para poder actuar sin salir de esta pantalla --
+//       - Rotación (Prom./mes y Cobertura), reusando historial_ventas_
+//         json() -- el mismo RPC que ya usa Predictor de Demanda, sin
+//         SQL nuevo. Es solo informativo: NO cambia calcularAlerta().
+//       - Estado de OC por SKU (Preparada/Solicitada/Entrega parcial),
+//         cruzando ordenes_propias y ordenes_yiqi -- ver
+//         lib/estadoOCPorSku.js para el criterio completo.
+//       - Orden por columna (asc/desc), clickeando el header. Sin
+//         columna elegida, queda el orden de siempre (el que trae la
+//         consulta).
 // ============================================================
 
 const COLOR_CLASSES = {
@@ -136,6 +149,76 @@ function formatoFechaHora(fechaStr) {
   }
 }
 
+function formatoNumero(n) {
+  if (n == null) return '—'
+  const num = Number(n)
+  if (!Number.isFinite(num)) return '—'
+  return num % 1 === 0 ? String(num) : num.toFixed(1)
+}
+
+// Mismo componente que ColorCobertura en PredictorDemanda.jsx (H-9,
+// auditoría UX 6/9/2026): todo en meses, con el equivalente en días
+// como tooltip para los casos urgentes (<1 mes) en vez de una segunda
+// unidad visible.
+function Cobertura({ meses }) {
+  if (meses == null) return <span className="text-gray-300 text-xs">—</span>
+  let clase = 'bg-[var(--grn-bg)] text-[var(--grn)]'
+  const texto = meses <= 0 ? 'Sin stock' : `${meses.toFixed(1)} m.`
+  const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
+  if (meses < 1) clase = 'bg-[var(--red-bg)] text-[var(--red)]'
+  else if (meses < 2) clase = 'bg-[var(--yel-bg)] text-[#92400e]'
+  return (
+    <span title={tooltip} className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${clase}`}>
+      {texto}
+    </span>
+  )
+}
+
+// v6 (10/9/2026) — orden por columna. Cada entrada sabe cómo sacarle
+// un valor comparable a una fila; el resto (asc/desc, nulls al final)
+// es genérico. Sin columna elegida no se toca el orden de siempre.
+const NIVEL_ALERTA_ORDEN = { critica: 3, preventiva: 2, ok: 1, 'sin-config': 0 }
+const NIVEL_OC_ORDEN = { entrega_parcial: 3, solicitada: 2, preparada: 1 }
+
+function valorParaOrdenar(columna, fila, contexto) {
+  switch (columna) {
+    case 'sku': return fila.mate_codigo ?? ''
+    case 'producto': return fila.mate_nombre ?? ''
+    case 'proveedor': return fila.clie_nombre ?? ''
+    case 'stock': return fila.mate_stock_disponible ?? 0
+    case 'puntoPedido': return fila.mate_punto_de_pedido ?? null
+    case 'stockSeguridad': return fila.mate_stock_seguridad ?? null
+    case 'rotacion': return contexto.rotacionPorSku[fila.mate_codigo]?.promedio ?? null
+    case 'cobertura': {
+      const promedio = contexto.rotacionPorSku[fila.mate_codigo]?.promedio
+      return calcularCobertura(fila.mate_stock_disponible, promedio)
+    }
+    case 'estadoOC': return NIVEL_OC_ORDEN[contexto.estadoOCPorSku[fila.mate_codigo]?.nivel] ?? -1
+    case 'estado': return NIVEL_ALERTA_ORDEN[calcularAlerta(fila).nivel] ?? -1
+    default: return null
+  }
+}
+
+function ordenarFilas(filas, sort, contexto) {
+  if (!sort.columna) return filas
+  const factor = sort.dir === 'desc' ? -1 : 1
+  return [...filas].sort((a, b) => {
+    const va = valorParaOrdenar(sort.columna, a, contexto)
+    const vb = valorParaOrdenar(sort.columna, b, contexto)
+    // nulls siempre al final, sin importar la dirección
+    if (va == null && vb == null) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    if (typeof va === 'string') return factor * va.localeCompare(vb, 'es')
+    return factor * (va - vb)
+  })
+}
+
+function FlechaOrden({ activa, dir }) {
+  if (!activa) return <span className="text-gray-300 ml-0.5">↕</span>
+  return <span className="text-[var(--ind,#4338ca)] ml-0.5">{dir === 'asc' ? '↑' : '↓'}</span>
+}
+
 export default function MonitorStock() {
   const permisos = usePermisos()
 
@@ -144,6 +227,12 @@ export default function MonitorStock() {
   // v5 (6/9/2026): exclusiones/pausas manuales, mismo criterio que Alertas.jsx
   const [excluidos, setExcluidos] = useState([])
   const [pausadas, setPausadas] = useState([])
+  // v6 (10/9/2026): rotación (Prom./mes, Cobertura) y estado de OC por SKU.
+  // Las 2 son "no críticas" igual que el desglose por depósito -- si
+  // fallan, se loguean y la pantalla sigue mostrando todo lo demás,
+  // solo esas columnas quedan en "—".
+  const [rotacionPorSku, setRotacionPorSku] = useState({})
+  const [estadoOCPorSku, setEstadoOCPorSku] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [busqueda, setBusqueda] = useState('')
@@ -151,6 +240,15 @@ export default function MonitorStock() {
   const [ocultarSinSeguridad, setOcultarSinSeguridad] = useState(false)
   const [paginaActual, setPaginaActual] = useState(1)
   const [filasPorPagina, setFilasPorPagina] = useState(50)
+  // v6 (10/9/2026): orden por columna, clickeando el header.
+  const [sort, setSort] = useState({ columna: null, dir: 'asc' })
+  function alHacerClickColumna(columna) {
+    setSort((actual) => {
+      if (actual.columna !== columna) return { columna, dir: 'asc' }
+      if (actual.dir === 'asc') return { columna, dir: 'desc' }
+      return { columna: null, dir: 'asc' } // 3er click: vuelve al orden de siempre
+    })
+  }
 
   async function cargarDatos() {
     if (permisos.cargando || permisos.error) return
@@ -160,18 +258,28 @@ export default function MonitorStock() {
       // En paralelo: el desglose por deposito no bloquea el resto de
       // la pantalla si por lo que sea tarda -- si falla, se loguea y
       // sigue mostrando el stock combinado igual (no es critico).
-      const [data, stock, exclusiones] = await Promise.all([
+      const [data, stock, exclusiones, rotacion, estadoOC] = await Promise.all([
         traerMaterialLocal(permisos),
         traerStockPorDeposito().catch((err) => {
           console.warn('No se pudo cargar el desglose de stock por deposito:', err.message)
           return {}
         }),
         traerExclusionesYPausas(),
+        traerRotacionPorSku().catch((err) => {
+          console.warn('No se pudo cargar la rotación por SKU:', err.message)
+          return {}
+        }),
+        traerEstadoOCPorSku(permisos).catch((err) => {
+          console.warn('No se pudo cargar el estado de OC por SKU:', err.message)
+          return {}
+        }),
       ])
       setArticulos(data)
       setStockPorSku(stock)
       setExcluidos(exclusiones.excluidos)
       setPausadas(exclusiones.pausadas)
+      setRotacionPorSku(rotacion)
+      setEstadoOCPorSku(estadoOC)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -258,7 +366,11 @@ export default function MonitorStock() {
     [conAlerta]
   )
 
-  const filasAMostrar = verTodos ? articulosFiltrados : conAlerta
+  const filasSinOrdenar = verTodos ? articulosFiltrados : conAlerta
+  const filasAMostrar = useMemo(
+    () => ordenarFilas(filasSinOrdenar, sort, { rotacionPorSku, estadoOCPorSku }),
+    [filasSinOrdenar, sort, rotacionPorSku, estadoOCPorSku]
+  )
 
   const totalFilas = filasAMostrar.length
   const totalPaginasTabla = Math.max(1, Math.ceil(totalFilas / filasPorPagina))
@@ -419,16 +531,31 @@ export default function MonitorStock() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['SKU', 'Producto', 'Proveedor', 'Stock', 'Punto de pedido', 'Stock Seguridad', 'Notas', 'Estado'].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"
-                    >
-                      {h}
-                    </th>
-                  )
-                )}
+                {[
+                  { label: 'SKU', columna: 'sku' },
+                  { label: 'Producto', columna: 'producto' },
+                  { label: 'Proveedor', columna: 'proveedor' },
+                  { label: 'Stock', columna: 'stock' },
+                  { label: 'Punto de pedido', columna: 'puntoPedido' },
+                  { label: 'Stock Seguridad', columna: 'stockSeguridad' },
+                  { label: 'Prom./mes', columna: 'rotacion' },
+                  { label: 'Cobertura', columna: 'cobertura' },
+                  { label: 'Estado OC', columna: 'estadoOC' },
+                  { label: 'Notas', columna: null },
+                  { label: 'Estado', columna: 'estado' },
+                ].map(({ label, columna }) => (
+                  <th
+                    key={label}
+                    onClick={columna ? () => alHacerClickColumna(columna) : undefined}
+                    className={`text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap ${
+                      columna ? 'cursor-pointer select-none hover:text-gray-700' : ''
+                    }`}
+                    title={columna ? 'Ordenar por esta columna' : undefined}
+                  >
+                    {label}
+                    {columna && <FlechaOrden activa={sort.columna === columna} dir={sort.dir} />}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -490,6 +617,23 @@ export default function MonitorStock() {
                           className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--ind,#4338ca)] align-middle"
                           title="Este es el valor que decide la alerta: no hay Punto de pedido cargado para este artículo."
                         />
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-[var(--ind,#4338ca)] font-semibold">
+                      {formatoNumero(rotacionPorSku[a.mate_codigo]?.promedio)}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <Cobertura meses={calcularCobertura(a.mate_stock_disponible, rotacionPorSku[a.mate_codigo]?.promedio)} />
+                    </td>
+                    <td className="px-3.5 py-1.5">
+                      {estadoOCPorSku[a.mate_codigo] ? (
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${estadoOCPorSku[a.mate_codigo].clase}`}
+                        >
+                          {estadoOCPorSku[a.mate_codigo].label}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
                       )}
                     </td>
                     <td
