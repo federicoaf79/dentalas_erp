@@ -87,6 +87,9 @@ export default function ConfirmarRecepcion() {
   const [aviso, setAviso] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
   const [empresa, setEmpresa] = useState(null)
+  // SKU -> clase_abc real (Aris) — solo para el remito impreso, mismo
+  // criterio que SolicitudesParaPreparar.jsx (10/9/2026, v3).
+  const [claseAbcPorSku, setClaseAbcPorSku] = useState({})
 
   const misDepositos = permisos.misDepositos ?? []
   const claveFiltro = permisos.cargando || permisos.error ? null : misDepositos.join(',')
@@ -137,6 +140,21 @@ export default function ConfirmarRecepcion() {
         .order('sku')
       if (errLin) throw errLin
       setLineas(filasLineas ?? [])
+
+      const skus = [...new Set((filasLineas ?? []).map((l) => l.sku))]
+      if (skus.length) {
+        const { data: filasAbc, error: errAbc } = await supabase
+          .rpc('reposicion_interna')
+          .select('sku, clase_abc')
+          .in('sku', skus)
+        if (errAbc) {
+          console.error('[claseAbcPorSku]', errAbc)
+        } else {
+          const mapaAbc = {}
+          for (const f of filasAbc ?? []) mapaAbc[f.sku] = f.clase_abc
+          setClaseAbcPorSku(mapaAbc)
+        }
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -236,7 +254,14 @@ export default function ConfirmarRecepcion() {
                     </span>
                   </div>
                   <button
-                    onClick={() => generarRemitoImprimible({ solicitud: s ?? { id: solicitudId }, lineas: filasLineas, empresa })}
+                    onClick={() =>
+                      generarRemitoImprimible({
+                        solicitud: s ?? { id: solicitudId },
+                        lineas: filasLineas,
+                        empresa,
+                        claseAbcPorSku,
+                      })
+                    }
                     title="Confirmá contra este remito impreso, no solo contra la pantalla"
                     className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
                   >

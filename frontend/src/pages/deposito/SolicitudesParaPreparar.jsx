@@ -6,7 +6,7 @@ import { nombreDeposito, DEPOSITO_CENTRAL } from '../../lib/depositos'
 import { generarRemitoImprimible } from '../../lib/pdfRemito'
 
 // ============================================================
-// pages/deposito/SolicitudesParaPreparar.jsx — 7/9/2026, v2 10/9/2026
+// pages/deposito/SolicitudesParaPreparar.jsx — 7/9/2026, v3 10/9/2026
 // ============================================================
 // Pantalla del circuito de reposición automática Central<->Local
 // (ver DISENO_TECNICO_Reposicion_CentralLocal_7-9-2026.md, §12, y
@@ -35,7 +35,32 @@ import { generarRemitoImprimible } from '../../lib/pdfRemito'
 //                        decisión de Federico, 7/9/2026. "Declarada" se
 //                        muestra como "En tránsito" desde el 10/9/2026
 //                        (pedido de Aris) — mismo dato, solo rótulo.
+//
+// Columna "Clase" (10/9/2026, v3): Federico notó en vivo que la lista
+// no distinguía qué línea es A/B/C, aunque el orden en que se armó el
+// remito ya respeta esa prioridad (ver generar_remito_reposicion_central
+// en la migración 20260910140000). Se agrega acá SOLO para mostrarla —
+// se trae la clasificación real con reposicion_interna() filtrada a los
+// SKU de la pantalla (no se reimplementa el cálculo).
 // ============================================================
+
+const CLASE_ABC_ESTILO = {
+  A: 'bg-[var(--red-bg,#fef2f2)] text-[var(--red,#b91c1c)]',
+  B: 'bg-[var(--yel-bg,#fffbeb)] text-[#92400e]',
+  C: 'bg-gray-100 text-gray-600',
+}
+
+function BadgeClaseAbc({ clase }) {
+  if (!clase) return <span className="text-[var(--sub)]">—</span>
+  return (
+    <span
+      className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${CLASE_ABC_ESTILO[clase] ?? CLASE_ABC_ESTILO.C}`}
+      title="Clasificación ABC real (Aris) — A = mayor rotación, prioridad más alta"
+    >
+      {clase}
+    </span>
+  )
+}
 
 function num(v, decimales = 2) {
   if (v == null) return '—'
@@ -62,7 +87,7 @@ function formatoFechaHora(fechaStr) {
 
 // Un solo campo de cantidad enviada — lo que falta queda como "no hay"
 // automático, con el motivo que se escriba acá al lado.
-function FilaLineaReservada({ linea, onDeclarar, guardando }) {
+function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
   const [cantidad, setCantidad] = useState(numInput(linea.cantidad_solicitada))
   const [motivo, setMotivo] = useState('')
 
@@ -72,6 +97,9 @@ function FilaLineaReservada({ linea, onDeclarar, guardando }) {
   return (
     <tr className="border-b border-gray-100 last:border-0">
       <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
+      <td className="px-3.5 py-1.5">
+        <BadgeClaseAbc clase={claseAbc} />
+      </td>
       <td className="px-3.5 py-1.5 text-sm">{linea.mate_nombre}</td>
       <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(linea.cantidad_solicitada)}</td>
       <td className="px-3.5 py-1.5">
@@ -127,6 +155,9 @@ export default function SolicitudesParaPreparar() {
   // lo que YiQi ya calcula por su cuenta (Aris, 10/9: formalizar "En
   // tránsito" cruzando contra ese dato).
   const [enTransitoYiqi, setEnTransitoYiqi] = useState({})
+  // SKU -> clase_abc real (Aris), traída de reposicion_interna() filtrada
+  // a los SKU en pantalla — no se reimplementa el cálculo (10/9/2026, v3).
+  const [claseAbcPorSku, setClaseAbcPorSku] = useState({})
 
   const misDepositos = permisos.misDepositos ?? []
   const claveFiltro = permisos.cargando || permisos.error ? null : misDepositos.join(',')
@@ -187,6 +218,20 @@ export default function SolicitudesParaPreparar() {
           const mapaStock = {}
           for (const f of filasStock ?? []) mapaStock[f.sku] = f.en_transito
           setEnTransitoYiqi(mapaStock)
+
+          // Clasificación ABC real — misma que usa el remito para
+          // priorizar, solo para mostrarla acá.
+          const { data: filasAbc, error: errAbc } = await supabase
+            .rpc('reposicion_interna')
+            .select('sku, clase_abc')
+            .in('sku', skus)
+          if (errAbc) {
+            console.error('[claseAbcPorSku]', errAbc)
+          } else {
+            const mapaAbc = {}
+            for (const f of filasAbc ?? []) mapaAbc[f.sku] = f.clase_abc
+            setClaseAbcPorSku(mapaAbc)
+          }
         }
       } else {
         setLineasPorSolicitud({})
@@ -303,7 +348,12 @@ export default function SolicitudesParaPreparar() {
                   {s.estado === 'en_preparacion' && (
                     <button
                       onClick={() =>
-                        generarRemitoImprimible({ solicitud: s, lineas: lineasPorSolicitud[s.id] ?? [], empresa })
+                        generarRemitoImprimible({
+                          solicitud: s,
+                          lineas: lineasPorSolicitud[s.id] ?? [],
+                          empresa,
+                          claseAbcPorSku,
+                        })
                       }
                       title="Imprimir o guardar como PDF — el destino confirma la recepción contra este remito"
                       className="px-2.5 py-1.5 rounded-lg text-[12px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
@@ -336,7 +386,7 @@ export default function SolicitudesParaPreparar() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['SKU', 'Producto', 'Pedido', 'Envía', 'Motivo si falta', ''].map((h) => (
+                      {['SKU', 'Clase', 'Producto', 'Pedido', 'Envía', 'Motivo si falta', ''].map((h) => (
                         <th
                           key={h}
                           className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"
@@ -349,7 +399,7 @@ export default function SolicitudesParaPreparar() {
                   <tbody>
                     {(lineasPorSolicitud[s.id] ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-3.5 py-4 text-center text-[var(--sub)] text-sm">
+                        <td colSpan={7} className="px-3.5 py-4 text-center text-[var(--sub)] text-sm">
                           No hay artículos con necesidad neta en este momento.
                         </td>
                       </tr>
@@ -359,12 +409,16 @@ export default function SolicitudesParaPreparar() {
                           <FilaLineaReservada
                             key={l.id}
                             linea={l}
+                            claseAbc={claseAbcPorSku[l.sku]}
                             onDeclarar={declararLinea}
                             guardando={declarando === l.id}
                           />
                         ) : (
                           <tr key={l.id} className="border-b border-gray-50 last:border-0 bg-gray-50/50">
                             <td className="px-3.5 py-1.5 font-mono text-xs">{l.sku}</td>
+                            <td className="px-3.5 py-1.5">
+                              <BadgeClaseAbc clase={claseAbcPorSku[l.sku]} />
+                            </td>
                             <td className="px-3.5 py-1.5 text-sm">{l.mate_nombre}</td>
                             <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(l.cantidad_solicitada)}</td>
                             <td className="px-3.5 py-1.5 text-sm font-semibold">

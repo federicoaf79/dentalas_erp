@@ -48,14 +48,25 @@ function etiquetaEstadoLinea(l) {
   return 'Pendiente de preparar'
 }
 
+// Badge de clase ABC en el HTML impreso — mismo criterio de color que
+// BadgeClaseAbc en SolicitudesParaPreparar.jsx (A = más urgente).
+function badgeClase(clase) {
+  if (!clase) return '<span class="gris">—</span>'
+  const color = clase === 'A' ? 'clase-a' : clase === 'B' ? 'clase-b' : 'clase-c'
+  return `<span class="clase ${color}">${esc(clase)}</span>`
+}
+
 // `solicitud`: fila de solicitudes_reposicion (remito_numero, deposito_origen_id,
 // deposito_destino_id, creada_en, procesada_en).
 // `lineas`: filas de solicitudes_reposicion_lineas (sku, mate_nombre,
 // cantidad_solicitada, cantidad_enviada, estado_linea, motivo_sin_stock).
 // `empresa`: fila de empresa_config (mismos campos que usa pdfOrden.js) —
 // opcional, si no se pasa se imprime sin membrete.
-export function generarRemitoImprimible({ solicitud, lineas, empresa }) {
+// `claseAbcPorSku`: mapa sku -> clase_abc real de Aris (opcional, 10/9/2026
+// v2) — si no se pasa, la columna Clase sale con "—" en todas las filas.
+export function generarRemitoImprimible({ solicitud, lineas, empresa, claseAbcPorSku }) {
   const e = empresa ?? {}
+  const clasePorSku = claseAbcPorSku ?? {}
   const origen = nombreDeposito(solicitud.deposito_origen_id)
   const destino = nombreDeposito(solicitud.deposito_destino_id)
   const totalPedido = lineas.reduce((acc, l) => acc + Number(l.cantidad_solicitada || 0), 0)
@@ -64,6 +75,7 @@ export function generarRemitoImprimible({ solicitud, lineas, empresa }) {
   const filas = lineas.map((l) => `
     <tr>
       <td class="mono">${esc(l.sku)}</td>
+      <td>${badgeClase(clasePorSku[l.sku])}</td>
       <td>${esc(l.mate_nombre ?? '')}</td>
       <td class="num">${numero(l.cantidad_solicitada)}</td>
       <td class="num">${l.cantidad_enviada != null ? numero(l.cantidad_enviada) : '<span class="gris">—</span>'}</td>
@@ -106,6 +118,11 @@ export function generarRemitoImprimible({ solicitud, lineas, empresa }) {
   .estado { display: inline-block; padding: 1px 7px; border-radius: 999px;
             background: #eef2ff; color: #4338ca; font-size: 9px; font-weight: 700; }
   .estado.ok { background: #d1fae5; color: #065f46; }
+  .clase { display: inline-block; min-width: 16px; text-align: center; padding: 1px 6px;
+           border-radius: 999px; font-size: 9px; font-weight: 700; }
+  .clase.clase-a { background: #fef2f2; color: #b91c1c; }
+  .clase.clase-b { background: #fffbeb; color: #92400e; }
+  .clase.clase-c { background: #f3f4f6; color: #6b7280; }
   .pie { margin-top: 18px; padding-top: 9px; border-top: 1px solid #e5e7eb;
          font-size: 9px; color: #9ca3af; white-space: pre-line; }
   .firmas { display: flex; gap: 40px; margin-top: 34px; }
@@ -165,7 +182,7 @@ export function generarRemitoImprimible({ solicitud, lineas, empresa }) {
 
   <table>
     <thead><tr>
-      <th>SKU</th><th>Artículo</th>
+      <th>SKU</th><th>Clase</th><th>Artículo</th>
       <th class="num">Pedido</th><th class="num">Envía</th><th>Motivo si falta</th><th>Estado</th>
     </tr></thead>
     <tbody>${filas}</tbody>
