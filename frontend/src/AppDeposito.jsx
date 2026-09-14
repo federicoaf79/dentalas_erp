@@ -2,9 +2,10 @@ import { useState } from 'react'
 import SolicitudesParaPreparar from './pages/deposito/SolicitudesParaPreparar'
 import ConfirmarRecepcion from './pages/deposito/ConfirmarRecepcion'
 import PedirAlOtroDeposito from './pages/deposito/PedirAlOtroDeposito'
+import AyudaDeposito from './pages/deposito/AyudaDeposito'
 
 // ============================================================
-// AppDeposito.jsx — 7/9/2026
+// AppDeposito.jsx — 7/9/2026, v2 14/9/2026
 // ============================================================
 // Shell separado para las cuentas de depósito (Depósito Central /
 // encargado del Local) del circuito de reposición automática
@@ -12,21 +13,29 @@ import PedirAlOtroDeposito from './pages/deposito/PedirAlOtroDeposito'
 // 7-9-2026.md, sección 12.
 //
 // A propósito NO reusa <Sidebar> ni el array de currentPage de
-// App.jsx: estas cuentas solo ven 3 pantallas acotadas a su propio
+// App.jsx: estas cuentas solo ven 4 pantallas acotadas a su propio
 // depósito (la RLS ya lo garantiza del lado de datos; acá además no
 // se les muestra ni un ítem de menú de Compras/OC/Alertas/Usuarios).
 //
-// Las 3 pantallas son las mismas para las dos cuentas: cada depósito
-// es "origen" en un circuito y "destino" en el otro (Central: origen
-// en el principal, destino en el inverso; el Local: al revés) — no
-// hace falta duplicar lógica por rol, la RLS + los filtros por
-// misDepositos ya resuelven qué ve cada uno.
+// Las 3 pantallas operativas son las mismas para las dos cuentas:
+// cada depósito es "origen" en un circuito y "destino" en el otro
+// (Central: origen en el principal, destino en el inverso; el Local:
+// al revés) — no hace falta duplicar lógica por rol, la RLS + los
+// filtros por misDepositos ya resuelven qué ve cada uno.
+//
+// [14/9/2026] Agregada "Ayuda" (AyudaDeposito.jsx) — Federico pidió
+// que cada perfil, incluidas estas cuentas, tenga sus propias
+// aclaraciones del circuito de pedidos/control dentro de su propio
+// acceso. Es una pantalla separada de Ayuda.jsx (esa sigue siendo
+// solo para Aris/Ivana, como referencia para entrenar a estas
+// cuentas) — estas cuentas nunca vieron ni van a ver Ayuda.jsx.
 // ============================================================
 
 const NAV = [
   { key: 'preparar', label: 'Solicitudes para preparar', icon: '📋' },
   { key: 'recepcion', label: 'Confirmar recepción', icon: '✓' },
   { key: 'pedir', label: 'Pedir al otro depósito', icon: '📤' },
+  { key: 'ayuda', label: 'Ayuda', icon: '❓' },
 ]
 
 export default function AppDeposito({ nombreUsuario, onLogout }) {
@@ -81,6 +90,7 @@ export default function AppDeposito({ nombreUsuario, onLogout }) {
       {pagina === 'preparar' && <SolicitudesParaPreparar />}
       {pagina === 'recepcion' && <ConfirmarRecepcion />}
       {pagina === 'pedir' && <PedirAlOtroDeposito />}
+      {pagina === 'ayuda' && <AyudaDeposito />}
     </div>
   )
 }

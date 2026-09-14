@@ -4,14 +4,33 @@ import { useMemo, useState } from 'react'
 // Ayuda.jsx — manual de uso in-app, pantalla por pantalla.
 //
 // Contenido derivado del código real de cada pantalla (no inventado),
-// revisado el 24/8/2026. Si una pantalla cambia, este archivo puede
-// quedar desactualizado — no hay ninguna sincronización automática
-// entre el código de una pantalla y su texto acá.
+// revisado por última vez el 14/9/2026. Si una pantalla cambia, este
+// archivo puede quedar desactualizado — no hay ninguna sincronización
+// automática entre el código de una pantalla y su texto acá.
 //
 // [27/8/2026] Actualizado: exclusión de la línea Acritone/NewcryL
 // (26/8/2026, a pedido de Aris — "SON PRODUCTOS, NO PROVEEDORES,
 // TODAVÍA NO LOS VAMOS A INCLUIR EN EL SISTEMA"). Afecta Alertas,
-// Monitor de stock y Reposición interna, ver sus secciones de reglas.
+// Monitor de stock y el cálculo de reposición, ver sus secciones de
+// reglas.
+//
+// [14/9/2026] Reescrito tras la unificación del Eje 1 (ver
+// DISENO_TECNICO_Unificacion_Eje1_10-9-2026.md), que quedó sin
+// reflejarse acá desde el 4/9/2026, antes de que el circuito nuevo
+// existiera:
+//   - "Reposición interna" (botones Movido/Descartar) sacada — la
+//     pantalla ya no se rutea para Aris/Ivana desde el 10/9/2026.
+//   - Agregada "Reposición Central-Local", la vista de supervisión
+//     nueva que la reemplaza en el sidebar (solo lectura, solo admin).
+//   - Agregado un módulo nuevo con las 3 pantallas de las cuentas de
+//     depósito (un shell completamente aparte, sin Sidebar ni esta
+//     misma pantalla de Ayuda — documentadas acá para que Aris/Ivana
+//     sepan qué ve y qué hace cada cuenta al entrenarlas). Esas
+//     cuentas tienen su propia Ayuda (AyudaDeposito.jsx) dentro de su
+//     propio shell, con el mismo contenido en segunda persona.
+// No se tocó nada del cálculo interno (exclusión de Patricia Bazan,
+// cap de outliers, exclusión de administrativos del Pareto) — son
+// reglas de cálculo, no cambian cómo se usa ninguna pantalla.
 //
 // Estructura: un array de MODULOS (mismo agrupamiento que el Sidebar),
 // cada uno con sus TABS (mismo orden que el menú). Cada tab tiene
@@ -130,42 +149,108 @@ const MODULOS = [
           'Una fila queda "sin config." (y no genera ninguna alerta) si el artículo no tiene ni Punto de Pedido ni Stock de Seguridad cargado en YiQi.',
           'Igual que en Alertas: un artículo nunca cuenta para las alertas de esta pantalla si es código administrativo, publicación de Mercado Libre, está marcado discontinuado, es de producción propia (proveedor "Dentalab"), o es de la línea Acritone/NewcryL (excluida del sistema el 26/8/2026, a pedido de Aris).',
         ],
-        noHace: ['No exporta a Excel ni PDF.', 'No permite editar nada — para eso están Reposición interna (mover stock) o Nueva OC (comprar).'],
+        noHace: ['No exporta a Excel ni PDF.', 'No permite editar nada — para eso están las cuentas de depósito (ver el módulo "Depósito" más abajo) o Nueva OC (comprar).'],
       },
       {
-        key: 'reposicion',
-        icon: '🔁',
-        label: 'Reposición interna',
+        key: 'reposicion-central-local',
+        icon: '🏭',
+        label: 'Reposición Central-Local',
         queEs: [
-          'La pantalla de trabajo diario para mover mercadería del Depósito Central al local sin comprarle a nadie — y, cuando Central tampoco alcanza, el puente directo a armar una orden de compra.',
+          'Vista de supervisión (solo lectura) del circuito de reposición automática entre Depósito Central y el Local — reemplaza a la vieja "Reposición interna" desde el 10/9/2026. Las acciones del circuito (generar remito, declarar qué se envía, confirmar recepción) ya no se hacen acá ni desde ninguna pantalla de Aris/Ivana: viven en las cuentas de depósito, un sistema aparte (ver el módulo "Depósito" más abajo). Acá se ve el estado y el historial completo de los dos circuitos, incluido lo ya resuelto.',
         ],
-        necesitas: [
-          'Sesión iniciada con permisos (mismo criterio que Monitor de stock).',
-          'El cálculo se genera solo una vez por día con un cron. Si querés la foto más actualizada, usá "↻ Actualizar" arriba, que lo vuelve a calcular al instante.',
-        ],
+        necesitas: [{ warn: 'Es exclusiva de Aris/admin — un operador no la ve. El gate corre en la pantalla, mismo patrón que "Usuarios y accesos".' }],
         comoSeUsa: [
-          'Hay dos vistas, con un selector arriba: "Lista" (para trabajar artículo por artículo) y "Remitos" (para el picking físico, de solo lectura).',
-          {
-            ol: [
-              'En "Lista": filtrá por prioridad con los chips de arriba (cada uno con su nombre y contador), o buscá por SKU/nombre/proveedor.',
-              'Por defecto las prioridades 8 y 9 ("No considerados" y "Sin necesidad") están ocultas — son la mayoría del catálogo y no requieren ninguna acción. Se muestran con el checkbox de arriba si hace falta revisarlas.',
-              'Las prioridades 1 a 5 (las que sí requieren acción) tienen dos botones en la columna Acción: "✓ Movido" (abre un modal con la cantidad sugerida, editable, para confirmar cuánto se movió realmente) y "✗ Descartar" (abre un modal que exige escribir un motivo — no se puede confirmar vacío).',
-              'La prioridad 6 ("Artículos a pedir", Central tampoco alcanza) tiene el botón "🛒 Pedir a proveedor": te lleva directo a Nueva OC con ese proveedor y ese SKU ya buscados, listo para que decidas si lo agregás a una orden. Si el artículo no tiene proveedor cargado en YiQi, en vez del botón aparece "Sin proveedor".',
-              'Las prioridades 7, 8 y 9 son informativas — no tienen botón de acción, solo el texto "Informativo".',
-            ],
-          },
-          'En "Remitos": las sugerencias pendientes (prioridad 1 a 5) se reparten solas en tandas de hasta 30 artículos, para llevar de referencia al hacer el picking. "↻ Generar remitos" las vuelve a repartir todas (lo ya movido/descartado no vuelve a aparecer). Cada remito se exporta a Excel individualmente o todos juntos con "⬇ Descargar todos".',
+          'Chips arriba: Activas / Completas / Todas. Botón "↻ Actualizar".',
+          'Tabla con una fila por solicitud (remito): circuito (origen → destino), si se generó por regla automática o a pedido manual del depósito, fecha, estado resumido y cantidad de líneas.',
+          'Click en una fila la expande y muestra el detalle línea por línea: SKU, producto, cantidad pedida, estado, cuánto se declaró que se envía, faltante y motivo si no se mandó todo, cuánto se confirmó recibido, y si el movimiento ya quedó registrado en YiQi (o si dio error).',
         ],
         reglas: [
-          { warn: 'Marcar "Movido" o "Descartar" es definitivo desde esta pantalla — no hay botón para deshacerlo después. Si te equivocaste, avisale a Federico.' },
-          'El objetivo de cobertura local es 1 mes de venta promedio de los últimos 12 meses, y nunca se sugiere mover más de lo que hay disponible en Central.',
-          'La vista "Remitos" es de solo lectura: marcar algo como movido o descartado se hace siempre desde "Lista", nunca desde ahí.',
-          'Mismo filtro que en Alertas: los artículos administrativos, de Mercado Libre, discontinuados, de producción propia, o de la línea Acritone/NewcryL (excluida el 26/8/2026) nunca aparecen acá, en ninguna prioridad.',
+          'El estado resumido de cada solicitud se arma a partir de sus líneas, no de una columna única: "✓ Completa" (todas las líneas recibidas), "Esperando confirmación" (alguna línea en tránsito, todavía sin confirmar), "En preparación", "Solicitada, sin procesar" o "Reemplazada" (una solicitud nueva reemplazó a esta antes de que se procesara).',
         ],
-        noHace: [
-          'No permite editar la cantidad sugerida antes de moverla (solo se puede corregir la cantidad real al confirmar "Movido").',
-          'No arma la orden de compra sola desde "Pedir a proveedor" — solo te deja parado en Nueva OC con los datos ya cargados en el buscador.',
+        noHace: ['No permite generar remitos, declarar envíos ni confirmar recepciones desde acá — es puramente de consulta.'],
+      },
+    ],
+  },
+  {
+    titulo: 'Depósito (cuentas aparte)',
+    tabs: [
+      {
+        key: 'deposito-intro',
+        icon: 'ℹ️',
+        label: 'Cómo funcionan las cuentas de depósito',
+        queEs: [
+          'Las 2 cuentas de depósito (Depósito Central y el encargado del Local) NO entran a esta app como Aris/Ivana: tienen su propio login y su propio menú de 4 pantallas (3 operativas + su propia Ayuda), y no ven Compras, OC, Alertas ni nada de Configuración. Nunca vieron ni van a ver esta pantalla de Ayuda que estás leyendo ahora — tienen la suya propia, más simple, escrita en segunda persona para ellas (AyudaDeposito.jsx, agregada el 14/9/2026). Lo de acá es para que Aris/Ivana sepan qué hacen esas cuentas al entrenarlas, no para que ellas lo lean.',
+          'Las mismas 3 pantallas operativas sirven para las dos cuentas: cada depósito es "origen" en un circuito y "destino" en el otro (Central es origen en el circuito principal hacia el Local; el Local es origen en el circuito inverso hacia Central) — no hay una versión distinta por cuenta, lo que cada una ve depende solo de qué solicitudes le tocan.',
         ],
+        necesitas: [],
+        comoSeUsa: [
+          {
+            ul: [
+              '**Solicitudes para preparar** — lo que esa cuenta tiene que armar y enviar.',
+              '**Confirmar recepción** — lo que le llegó del otro depósito, pendiente de confirmar contra lo físico.',
+              '**Pedir al otro depósito** — pedido puntual manual, para cuando necesita algo fuera del cálculo automático.',
+              '**Ayuda** — su propia guía del circuito, con las mismas reglas que acá pero explicadas para quien la opera, no para quien entrena.',
+            ],
+          },
+          { tip: 'Este circuito no tiene ningún paso de "aprobación" como sí tiene Compras (nadie autoriza un remito) — el único control real es la confirmación de recepción contra el remito impreso. Vale para explicarle esto a una cuenta nueva: no va a encontrar ningún botón de "aprobar".' },
+        ],
+        reglas: [],
+        noHace: [],
+      },
+      {
+        key: 'deposito-preparar',
+        icon: '📋',
+        label: 'Solicitudes para preparar',
+        queEs: [
+          'Lo que ese depósito tiene que preparar y enviar al otro. Para Depósito Central, en el circuito principal esto normalmente ya llega resuelto solo: un trigger genera y declara el remito automáticamente apenas se crea la solicitud (10/9/2026, a pedido de Aris, para no hacerle validar a mano cantidades que ya se ven en YiQi). El botón para generarlo a mano sigue ahí por si algún día hace falta reprocesar una solicitud.',
+        ],
+        necesitas: [],
+        comoSeUsa: [
+          'Cada solicitud es una tarjeta con su remito, destino y fecha.',
+          'Si está "Solicitada, sin procesar": botón "📋 Generar remito de mercadería" — recalcula en vivo la necesidad real al momento del clic (descontando lo ya reservado en otros remitos en preparación).',
+          'Si ya está "En preparación": tabla con cada artículo, su Clase (A/B/C, la clasificación real de Aris, solo para referencia visual), cantidad pedida, y un campo para declarar cuánto se envía. Botón "Declarar" por línea.',
+          'Botón "🖨️ Imprimir remito" (cuando está en preparación) — arma el PDF para llevar al picking físico.',
+        ],
+        reglas: [
+          { warn: 'Un solo campo de cantidad enviada por línea: lo que falte del pedido queda automáticamente como "no hay" con el motivo que se escriba al lado — eso dispara la orden de compra al proveedor y suspende la alerta de ese artículo hasta que vuelva a haber stock. No hay un campo separado para "cantidad faltante".' },
+          'Si se envía todo lo pedido, no hace falta escribir motivo — el campo se reemplaza por "Envía todo lo pedido".',
+        ],
+        noHace: ['No permite editar la cantidad pedida antes de declarar cuánto se envía.', 'No confirma la recepción del otro lado — eso lo hace el destino en "Confirmar recepción".'],
+      },
+      {
+        key: 'deposito-recepcion',
+        icon: '✓',
+        label: 'Confirmar recepción',
+        queEs: [
+          'Lo que el otro depósito ya declaró que envía ("en tránsito") y está esperando que esta cuenta confirme contra lo que llegó físicamente. Confirmar acá es lo que efectivamente mueve el stock real en YiQi — no antes, ni cuando el otro lado declaró "envía".',
+        ],
+        necesitas: [],
+        comoSeUsa: [
+          'Una tarjeta por remito, con botón "🖨️ Ver / imprimir remito" para confirmar contra el documento impreso, no solo contra la pantalla.',
+          'Por cada línea: SKU, producto, cantidad en tránsito, y un campo editable con esa misma cantidad precargada — se corrige ahí si no coincide contra lo físico. Botón "✓ Confirmar recibido".',
+        ],
+        reglas: [
+          { warn: 'Decisión de Federico, 10/9/2026: el encargado del local confirma contra el remito impreso, y ya nadie más valida ese punto — por eso el botón de imprimir vive en esta misma pantalla.' },
+          'Recién con "Confirmar recibido" se dispara el movimiento real de stock en YiQi. Si esa parte falla, la confirmación acá ya quedó guardada igual — no se deshace.',
+        ],
+        noHace: ['No permite rechazar o devolver una línea — solo confirmar la cantidad real recibida.'],
+      },
+      {
+        key: 'deposito-pedir',
+        icon: '📤',
+        label: 'Pedir al otro depósito',
+        queEs: [
+          'Circuito inverso manual: esta cuenta arma un pedido puntual (SKU y cantidad elegidos a mano, sin ningún cálculo automático) para que lo prepare el otro depósito. Aparece de inmediato en "Solicitudes para preparar" del otro lado, ya "en preparación".',
+        ],
+        necesitas: [],
+        comoSeUsa: [
+          'Buscador por SKU o nombre contra todo el catálogo. "+ Agregar" suma un artículo al pedido, con cantidad editable.',
+          'Botón "📤 Enviar pedido" — manda todo el carrito de una vez.',
+        ],
+        reglas: [
+          { tip: 'A diferencia de "Solicitudes para preparar" (que sí recalcula en vivo), acá no hay ningún cálculo — es exactamente lo que la persona eligió cargar.' },
+        ],
+        noHace: ['No sugiere cantidades ni artículos — es 100% manual.'],
       },
     ],
   },
@@ -565,13 +650,14 @@ export default function Ayuda() {
         {/* Roles, en una tarjeta fija arriba de todo — es la base para entender
             por qué varias pantallas se ven distinto según quién entra. */}
         <div className="bg-white rounded-xl border border-[var(--border)] p-4">
-          <div className="text-[13px] font-bold mb-2">Antes de nada: los dos roles</div>
+          <div className="text-[13px] font-bold mb-2">Antes de nada: los tres tipos de cuenta</div>
           <Bloques
             items={[
               {
                 ul: [
-                  '**Aris (administrador)**: ve y edita todo, sin ningún filtro de proveedores. Es el único que puede aprobar/rechazar órdenes pendientes, configurar Reglas y alertas, Templates, Catálogo de causas, Condiciones comerciales, Datos de la empresa, y entrar a Usuarios y accesos.',
+                  '**Aris (administrador)**: ve y edita todo, sin ningún filtro de proveedores. Es el único que puede aprobar/rechazar órdenes pendientes, configurar Reglas y alertas, Templates, Catálogo de causas, Condiciones comerciales, Datos de la empresa, entrar a Usuarios y accesos, y ver la supervisión de "Reposición Central-Local".',
                   '**Ivana / cualquier otro operador**: ve solo los proveedores que Aris le asignó en "Usuarios y accesos". Puede armar órdenes (Nueva OC), pero si superan el límite de aprobación, tienen algún ítem sin costo, o el proveedor exige aprobación siempre, la orden queda pendiente de que Aris la confirme.',
+                  '**Cuentas de depósito** (Depósito Central / encargado del Local): un login y un menú completamente aparte, sin nada de lo de arriba. Tienen su propia Ayuda dentro de ese menú (distinta de esta pantalla, que ellas nunca ven) — acá, en el módulo "Depósito (cuentas aparte)" más abajo, está lo mismo pero pensado para que Aris/Ivana sepan qué hacen esas cuentas al entrenarlas.',
                 ],
               },
               { tip: 'Si un usuario operador no tiene ningún proveedor asignado, ve el catálogo completo — no queda bloqueado. Y si el sistema no puede determinar los permisos de alguien (por un error), esa persona no ve ningún dato en ninguna pantalla: ante la duda, el sistema prefiere no mostrar nada antes que mostrar de más.' },
@@ -640,7 +726,7 @@ export default function Ayuda() {
                   'No manda mensajes (mail o WhatsApp) en forma automática — siempre arma el texto/PDF y sos vos quien lo envía.',
                   'No hay ninguna pantalla que edite cantidades de una orden ya aprobada — solo se puede sumar mercadería nueva a una orden ya vinculada a YiQi (desde "Órdenes de compra").',
                   'No hay estadísticas ni reportes (aparte de Predictor de demanda, que es historial, no proyección).',
-                  'Ninguna pantalla exporta a Excel salvo Reposición interna (remitos).',
+                  'Ninguna pantalla exporta a Excel. Los remitos del circuito de depósito se imprimen/guardan como PDF (botón "🖨️ Imprimir remito"), no se exportan a Excel.',
                 ],
               },
             ]}
