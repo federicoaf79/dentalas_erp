@@ -8,7 +8,7 @@ import { traerRotacionPorSku, calcularCobertura } from '../lib/rotacionPorSku'
 import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
 
 // ============================================================
-// Alertas.jsx — v6
+// Alertas.jsx — v7
 // v2: leia de la tabla propia material_yiqi (en vez de YiQi en vivo).
 // v3: aplica el filtro de proveedores asignados al usuario logueado.
 //     Admin (Aris) ve todo; operador (Ivana) ve solo lo suyo.
@@ -34,6 +34,15 @@ import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
 //     por columna clickeando el header. Ver ese archivo para el detalle
 //     completo del criterio -- acá es la misma lógica, aplicada a esta
 //     tabla (solo en la pestaña "Alertas", no en Excluidos/Pausadas).
+// v7 (16/9/2026, Sprint punto 4 -- hallazgo de Ivana): "cantidad en
+//     camino" -- lib/estadoOCPorSku.js ahora también suma cuánto de
+//     un SKU está en una OC aprobada/enviada aún no recibida, y
+//     calcularAlerta() la resta del déficit para no marcar Crítica/
+//     Preventiva algo que ya se pidió. El badge de Estado de OC
+//     muestra la cantidad (ej. "Solicitada (+40)") para que quede
+//     claro por qué bajó la alerta. Reemplaza el workaround manual de
+//     Ivana (escribir "Listo- dsps borrar contenido" en el Asunto de
+//     la OC en YiQi).
 // ============================================================
 
 const COLOR_CLASSES = {
@@ -159,8 +168,16 @@ function esExcluidoDeAlertas(articulo) {
   return false
 }
 
+// 16/9/2026 (Sprint punto 4 -- hallazgo de Ivana, ver
+// lib/estadoOCPorSku.js para el detalle completo): el stock que decide
+// el nivel de alerta ahora suma la "cantidad en camino" (OC
+// aprobada/enviada, aún no recibida) que cargarDatos() ya dejó en
+// articulo._cantidadEnCamino -- lo que se MUESTRA en la columna
+// "Stock" sigue siendo el stock real (mate_stock_disponible), esto
+// solo cambia qué tan crítico se ve.
 function calcularAlerta(articulo) {
-  const stock = articulo.mate_stock_disponible ?? 0
+  const cantidadEnCamino = articulo._cantidadEnCamino ?? 0
+  const stock = (articulo.mate_stock_disponible ?? 0) + cantidadEnCamino
   const puntoPedidoManual = articulo.mate_punto_de_pedido
   const stockSeguridad = articulo.mate_stock_seguridad
   const hayPuntoPedidoManual = puntoPedidoManual != null && puntoPedidoManual > 0
@@ -310,7 +327,13 @@ export default function Alertas() {
           return {}
         }),
       ])
-      setArticulos(data)
+      // 16/9/2026: cada artículo lleva pegada su "cantidad en camino"
+      // (ver estadoOCPorSku.js) para que calcularAlerta() la use sin
+      // tener que enganchar estadoOCPorSku como dependencia en cada
+      // useMemo que hoy llama a calcularAlerta().
+      setArticulos(
+        data.map((a) => ({ ...a, _cantidadEnCamino: estadoOC[a.mate_codigo]?.cantidadEnCamino ?? 0 }))
+      )
       setExcluidos(extra.excluidos)
       setPausadas(extra.pausadas)
       setRotacionPorSku(rotacion)
@@ -778,8 +801,15 @@ export default function Alertas() {
                         {estadoOCPorSku[a.mate_codigo] ? (
                           <span
                             className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${estadoOCPorSku[a.mate_codigo].clase}`}
+                            title={
+                              estadoOCPorSku[a.mate_codigo].cantidadEnCamino > 0
+                                ? `${formatoNumero(estadoOCPorSku[a.mate_codigo].cantidadEnCamino)} unidades ya pedidas, descontadas del cálculo de la alerta`
+                                : undefined
+                            }
                           >
                             {estadoOCPorSku[a.mate_codigo].label}
+                            {estadoOCPorSku[a.mate_codigo].cantidadEnCamino > 0 &&
+                              ` (+${formatoNumero(estadoOCPorSku[a.mate_codigo].cantidadEnCamino)})`}
                           </span>
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>

@@ -25,6 +25,24 @@ import { filtrarOrdenes } from '../hooks/usePermisos'
 // cuentan, y las líneas de ordenes_yiqi con saldo pendiente = 0
 // (completadas) tampoco -- no hay nada más que rastrear para ese SKU
 // en esa orden puntual.
+//
+// "Cantidad en camino" (16/9/2026, Sprint punto 4 -- hallazgo de
+// Ivana: escribía "Listo- dsps borrar contenido" en el Asunto de la
+// OC en YiQi a mano, para que un ítem ya pedido no le siguiera
+// apareciendo como Crítica en Alertas/Monitor de stock). Federico
+// eligió explícitamente "restar del stock disponible lo que está en
+// una OC aprobada/enviada aún no recibida" -- por eso solo suma:
+//   - ordenes_propias_items.cantidad de órdenes con estado='aprobada'
+//     Y todavía SIN vincular a YiQi (yiqi_id_creado null). Un borrador
+//     o una pendiente de aprobación no cuentan -- no son un pedido en
+//     firme todavía, mismo criterio que separa "preparada" del resto
+//     acá abajo.
+//   - ordenes_yiqi.cantidad_pendiente de las líneas ya sincronizadas
+//     (nivel "solicitada"/"entrega_parcial") -- es la cantidad real,
+//     ya neta de lo entregado. Una orden aprobada que YA se vinculó a
+//     YiQi (yiqi_id_creado no null) NO suma su ordenes_propias_items.
+//     cantidad de nuevo acá: sería contar lo mismo dos veces, porque
+//     esa misma orden ya tiene su reflejo en ordenes_yiqi.
 // ============================================================
 
 const TAMANIO_LOTE = 1000
@@ -64,7 +82,7 @@ export async function traerEstadoOCPorSku(permisos) {
   const [resPropias, filasYiqi] = await Promise.all([
     supabase
       .from('ordenes_propias')
-      .select('estado, archivada_en, yiqi_id_creado, ordenes_propias_items(mate_codigo)')
+      .select('estado, archivada_en, yiqi_id_creado, ordenes_propias_items(mate_codigo, cantidad)')
       .in('estado', ['borrador', 'pendiente', 'aprobada'])
       .is('archivada_en', null),
     traerOrdenesYiqiActivas(permisos),
@@ -78,20 +96,37 @@ export async function traerEstadoOCPorSku(permisos) {
     if (!actual || ORDEN_NIVEL[nivel] > ORDEN_NIVEL[actual]) nivelPorSku[codigo] = nivel
   }
 
+  const cantidadEnCaminoPorSku = {}
+  function sumarCantidad(codigo, cantidad) {
+    if (!codigo) return
+    cantidadEnCaminoPorSku[codigo] = (cantidadEnCaminoPorSku[codigo] ?? 0) + (Number(cantidad) || 0)
+  }
+
   for (const orden of resPropias.data ?? []) {
-    const nivel = orden.estado === 'aprobada' && orden.yiqi_id_creado ? 'solicitada' : 'preparada'
+    const yaVinculada = orden.estado === 'aprobada' && orden.yiqi_id_creado
+    const nivel = yaVinculada ? 'solicitada' : 'preparada'
     for (const item of orden.ordenes_propias_items ?? []) {
       marcar(item.mate_codigo, nivel)
+      // Solo aprobada y todavía sin vincular a YiQi -- ver nota de
+      // "Cantidad en camino" en el header de este archivo.
+      if (orden.estado === 'aprobada' && !yaVinculada) {
+        sumarCantidad(item.mate_codigo, item.cantidad)
+      }
     }
   }
   for (const linea of filasYiqi) {
     const nivel = (linea.cantidad_entregada ?? 0) > 0 ? 'entrega_parcial' : 'solicitada'
     marcar(linea.sku, nivel)
+    sumarCantidad(linea.sku, linea.cantidad_pendiente)
   }
 
   const resultado = {}
   for (const [codigo, nivel] of Object.entries(nivelPorSku)) {
-    resultado[codigo] = { nivel, ...NIVEL_OC[nivel] }
+    resultado[codigo] = {
+      nivel,
+      ...NIVEL_OC[nivel],
+      cantidadEnCamino: cantidadEnCaminoPorSku[codigo] ?? 0,
+    }
   }
   return resultado
 }
