@@ -6,6 +6,9 @@ import DeclararCausaModal from '../components/DeclararCausaModal'
 import { ultimasCausasPorReferencia } from '../lib/causas'
 import { traerRotacionPorSku, calcularCobertura } from '../lib/rotacionPorSku'
 import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
+import { aplicarFiltroProveedor, FILTRO_PROVEEDOR_INICIAL } from '../lib/filtroProveedor'
+import FiltroProveedor from '../components/FiltroProveedor'
+import BarraMinStockMax from '../components/BarraMinStockMax'
 
 // ============================================================
 // Alertas.jsx — v7
@@ -267,7 +270,7 @@ function FlechaOrden({ activa, dir }) {
   return <span className="text-[var(--ind,#4338ca)] ml-0.5">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
-export default function Alertas() {
+export default function Alertas({ onArmarOC }) {
   const permisos = usePermisos()
 
   const [articulos, setArticulos] = useState([])
@@ -293,6 +296,9 @@ export default function Alertas() {
   const [vista, setVista] = useState('alertas')
   const [filtroNivel, setFiltroNivel] = useState('todas')
   const [busqueda, setBusqueda] = useState('')
+  // Filtro de proveedores estilo YiQi (feedback del cliente, punto 1,
+  // 28/9/2026) -- ver lib/filtroProveedor.js para el criterio completo.
+  const [filtroProveedor, setFiltroProveedor] = useState(FILTRO_PROVEEDOR_INICIAL)
   const [paginaActual, setPaginaActual] = useState(1)
   const [filasPorPagina, setFilasPorPagina] = useState(50)
 
@@ -361,7 +367,16 @@ export default function Alertas() {
 
   useEffect(() => {
     setPaginaActual(1)
-  }, [busqueda, filtroNivel, filasPorPagina, vista])
+  }, [busqueda, filtroNivel, filtroProveedor, filasPorPagina, vista])
+
+  // Lista de proveedores para el selector del filtro (punto 1) --
+  // sobre `articulos` (ya pasó el filtro de permisos), no sobre
+  // `conAlertaTodas`, para poder filtrar por un proveedor aunque no
+  // tenga ningún artículo en alerta en este momento.
+  const proveedoresDisponibles = useMemo(() => {
+    const set = new Set(articulos.map((a) => a.clie_nombre).filter(Boolean))
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [articulos])
 
   const ultimaSync = useMemo(() => {
     if (articulos.length === 0) return null
@@ -406,7 +421,11 @@ export default function Alertas() {
   )
 
   const filtradas = useMemo(() => {
-    return conAlertaTodas.filter((a) => {
+    // Filtro de proveedores (punto 1) se aplica primero, como capa
+    // extra sobre lo ya visible para este usuario -- después nivel y
+    // búsqueda de texto, igual que antes.
+    const conProveedor = aplicarFiltroProveedor(conAlertaTodas, filtroProveedor)
+    return conProveedor.filter((a) => {
       if (filtroNivel !== 'todas' && a._alerta.nivel !== filtroNivel) return false
       if (busqueda) {
         const texto = busqueda.toLowerCase()
@@ -418,7 +437,7 @@ export default function Alertas() {
       }
       return true
     })
-  }, [conAlertaTodas, filtroNivel, busqueda])
+  }, [conAlertaTodas, filtroProveedor, filtroNivel, busqueda])
 
   const ordenPorDefecto = useMemo(() => {
     return [...filtradas].sort((a, b) => {
@@ -689,15 +708,22 @@ export default function Alertas() {
             ))}
           </div>
 
-          {/* Buscador y filas por página */}
+          {/* Buscador, filtro de proveedor y filas por página */}
           <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-3 flex-wrap">
-            <input
-              type="text"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por SKU, nombre o proveedor…"
-              className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
-            />
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <input
+                type="text"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar por SKU, nombre o proveedor…"
+                className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+              />
+              <FiltroProveedor
+                proveedoresDisponibles={proveedoresDisponibles}
+                valor={filtroProveedor}
+                onChange={setFiltroProveedor}
+              />
+            </div>
             <label className="flex items-center gap-2 text-sm text-gray-500">
               Filas por página
               <select
@@ -728,9 +754,7 @@ export default function Alertas() {
                       { label: 'SKU', columna: 'sku' },
                       { label: 'Producto', columna: 'producto' },
                       { label: 'Proveedor', columna: 'proveedor' },
-                      { label: 'Stock', columna: 'stock' },
-                      { label: 'Mín.', columna: 'min' },
-                      { label: 'Máx.', columna: 'max' },
+                      { label: 'Stock / Mín. / Máx.', columna: 'stock' },
                       { label: 'Stock Seguridad', columna: 'stockSeguridad' },
                       { label: 'Prom./mes', columna: 'rotacion' },
                       { label: 'Cobertura', columna: 'cobertura' },
@@ -760,18 +784,17 @@ export default function Alertas() {
                       <td className="px-3.5 py-1.5 font-mono text-xs">{a.mate_codigo}</td>
                       <td className="px-3.5 py-1.5 font-semibold">{a.mate_nombre}</td>
                       <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
-                      <td className="px-3.5 py-1.5 font-bold">{a.mate_stock_disponible ?? 0}</td>
-                      <td className="px-3.5 py-1.5 text-gray-400">
-                        {a.mate_punto_de_pedido > 0 ? (
-                          a.mate_punto_de_pedido
-                        ) : (
-                          <span title="No hay Punto de pedido (Mín.) cargado para este artículo: la alerta usa Stock Seguridad como respaldo.">
-                            —
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3.5 py-1.5 text-gray-400">
-                        {a.mate_punto_pedido_max > 0 ? a.mate_punto_pedido_max : '—'}
+                      {/* Punto 3 (28/9/2026): gráfico en vez de 3 columnas numéricas
+                          sueltas (Stock/Mín./Máx.) -- ver components/BarraMinStockMax.jsx.
+                          El umbral que se grafica como "Mín." es el mismo que decide la
+                          alerta (Punto de pedido si existe, si no Stock Seguridad como
+                          respaldo -- igual criterio que calcularAlerta más arriba). */}
+                      <td className="px-3.5 py-1.5">
+                        <BarraMinStockMax
+                          stock={a.mate_stock_disponible}
+                          min={a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : a.mate_stock_seguridad}
+                          max={a.mate_punto_pedido_max}
+                        />
                       </td>
                       {/* 7/9/2026 (auditoría de usabilidad, U-1/U-5): mismo criterio
                           que MonitorStock.jsx — cuando Mín. no está cargado, Stock
@@ -851,6 +874,23 @@ export default function Alertas() {
                       </td>
                       <td className="px-3.5 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
+                          {/* Punto 4 (28/9/2026): salta a Nueva OC con este proveedor +
+                              SKU ya cargados, reusando el puente preseleccionOC que
+                              antes alimentaba Reposición interna (App.jsx). */}
+                          {onArmarOC && (
+                            <button
+                              onClick={() => onArmarOC(a)}
+                              disabled={!a.clie_nombre}
+                              title={
+                                a.clie_nombre
+                                  ? `Armar OC a ${a.clie_nombre} con este artículo`
+                                  : 'Este artículo no tiene proveedor cargado'
+                              }
+                              className="px-2 py-1 rounded text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                            >
+                              🛒 Armar OC
+                            </button>
+                          )}
                           <button
                             onClick={() => pedirPausar(a)}
                             title="Pausar esta alerta por 15 días"

@@ -243,7 +243,20 @@ function AppLogueada({ session, onLogout }) {
       )}
       {currentPage === 'historial' && <HistorialOC />}
       {currentPage === 'usuarios' && <UsuariosAccesos />}
-      {currentPage === 'alertas' && <Alertas />}
+      {currentPage === 'alertas' && (
+        <Alertas
+          // Punto 4 (28/9/2026, feedback del cliente): "armar OC" desde
+          // una fila de Alertas salta directo a Nueva OC con el
+          // proveedor y el SKU ya cargados. Reusa el puente
+          // preseleccionOC que antes alimentaba Reposición interna
+          // (removida del ruteo el 10/9/2026) -- mismo patrón que
+          // onIrACondiciones de Proveedores más abajo.
+          onArmarOC={(articulo) => {
+            setPreseleccionOC({ proveedor: articulo.clie_nombre, sku: articulo.mate_codigo })
+            setCurrentPage('nueva-oc')
+          }}
+        />
+      )}
       {currentPage === 'ocs' && <OrdenesCompra onCambioOrdenes={cargarContadores} />}
       {currentPage === 'yiqi' && <ConectorYiQi />}
       {currentPage === 'predictor' && <PredictorDemanda />}

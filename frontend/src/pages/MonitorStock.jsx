@@ -5,6 +5,8 @@ import Aviso from '../components/Aviso'
 import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
 import { traerRotacionPorSku, calcularCobertura } from '../lib/rotacionPorSku'
 import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
+import { aplicarFiltroProveedor, FILTRO_PROVEEDOR_INICIAL } from '../lib/filtroProveedor'
+import FiltroProveedor from '../components/FiltroProveedor'
 
 // ============================================================
 // MonitorStock.jsx — v7
@@ -256,6 +258,9 @@ export default function MonitorStock() {
   const [busqueda, setBusqueda] = useState('')
   const [verTodos, setVerTodos] = useState(false)
   const [ocultarSinSeguridad, setOcultarSinSeguridad] = useState(false)
+  // Filtro de proveedores estilo YiQi (feedback del cliente, punto 1,
+  // 28/9/2026) -- ver lib/filtroProveedor.js para el criterio completo.
+  const [filtroProveedor, setFiltroProveedor] = useState(FILTRO_PROVEEDOR_INICIAL)
   const [paginaActual, setPaginaActual] = useState(1)
   const [filasPorPagina, setFilasPorPagina] = useState(50)
   // v6 (10/9/2026): orden por columna, clickeando el header.
@@ -327,7 +332,14 @@ export default function MonitorStock() {
 
   useEffect(() => {
     setPaginaActual(1)
-  }, [busqueda, verTodos, ocultarSinSeguridad, filasPorPagina])
+  }, [busqueda, verTodos, ocultarSinSeguridad, filtroProveedor, filasPorPagina])
+
+  // Lista de proveedores para el selector del filtro (punto 1) -- sobre
+  // `articulos` (ya pasó el filtro de permisos).
+  const proveedoresDisponibles = useMemo(() => {
+    const set = new Set(articulos.map((a) => a.clie_nombre).filter(Boolean))
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [articulos])
 
   const ultimaSync = useMemo(() => {
     if (articulos.length === 0) return null
@@ -364,6 +376,14 @@ export default function MonitorStock() {
     return articulosBusqueda.filter((a) => (a.mate_stock_seguridad ?? null) !== 0)
   }, [articulosBusqueda, ocultarSinSeguridad])
 
+  // Filtro de proveedores (punto 1) -- se aplica después de búsqueda y
+  // "ocultar sin seguridad", y afecta tanto "Ver todos" como el
+  // conteo de Alertas activas (conAlerta más abajo).
+  const articulosConProveedor = useMemo(
+    () => aplicarFiltroProveedor(articulosFiltrados, filtroProveedor),
+    [articulosFiltrados, filtroProveedor]
+  )
+
   // v5 (6/9/2026): mismo criterio que codigosExcluidos/codigosPausadosVigentes
   // en Alertas.jsx -- una pausa vencida vuelve a contar sola, sin acción de nadie.
   const codigosExcluidos = useMemo(() => new Set(excluidos.map((e) => e.mate_codigo)), [excluidos])
@@ -373,13 +393,13 @@ export default function MonitorStock() {
   )
 
   const conAlerta = useMemo(() => {
-    return articulosFiltrados.filter((a) => {
+    return articulosConProveedor.filter((a) => {
       if (esExcluidoDeAlertas(a)) return false
       if (codigosExcluidos.has(a.mate_codigo) || codigosPausadosVigentes.has(a.mate_codigo)) return false
       const { nivel } = calcularAlerta(a)
       return nivel === 'critica' || nivel === 'preventiva'
     })
-  }, [articulosFiltrados, codigosExcluidos, codigosPausadosVigentes])
+  }, [articulosConProveedor, codigosExcluidos, codigosPausadosVigentes])
 
   const criticas = useMemo(
     () => conAlerta.filter((a) => calcularAlerta(a).nivel === 'critica').length,
@@ -390,7 +410,7 @@ export default function MonitorStock() {
     [conAlerta]
   )
 
-  const filasSinOrdenar = verTodos ? articulosFiltrados : conAlerta
+  const filasSinOrdenar = verTodos ? articulosConProveedor : conAlerta
   const filasAMostrar = useMemo(
     () => ordenarFilas(filasSinOrdenar, sort, { rotacionPorSku, estadoOCPorSku }),
     [filasSinOrdenar, sort, rotacionPorSku, estadoOCPorSku]
@@ -500,15 +520,22 @@ export default function MonitorStock() {
         </div>
       </div>
 
-      {/* Buscador y toggle ver todos */}
+      {/* Buscador, filtro de proveedor y toggle ver todos */}
       <div className="px-4 pb-2 flex items-center justify-between gap-3 flex-wrap">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por SKU, nombre o proveedor…"
-          className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
-        />
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por SKU, nombre o proveedor…"
+            className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+          />
+          <FiltroProveedor
+            proveedoresDisponibles={proveedoresDisponibles}
+            valor={filtroProveedor}
+            onChange={setFiltroProveedor}
+          />
+        </div>
         <div className="flex items-center gap-3">
           {sinStockSeguridadTotal > 0 && (
             <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer whitespace-nowrap">
@@ -536,7 +563,7 @@ export default function MonitorStock() {
             onClick={() => setVerTodos((v) => !v)}
             className="text-sm text-[var(--indigo,#4338ca)] hover:underline whitespace-nowrap"
           >
-            {verTodos ? 'Ver solo con alerta' : `Ver todos (${articulosFiltrados.length})`}
+            {verTodos ? 'Ver solo con alerta' : `Ver todos (${articulosConProveedor.length})`}
           </button>
         </div>
       </div>

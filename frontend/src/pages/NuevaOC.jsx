@@ -388,6 +388,18 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
     [filas]
   )
 
+  // Punto 10 (28/9/2026, feedback de Ivana): lo ya seleccionado no se
+  // pierde al pasar de página (seleccion/cantidades ya viven en el
+  // estado del componente, independientes de paginadas -- ver
+  // comentario de filas más arriba) pero antes no se podía VER ni
+  // ajustar sin volver a esa página a mano. Este bloque fijo, sin
+  // paginar, resuelve eso: siempre muestra todo lo tildado, sin
+  // importar en qué página de la tabla de abajo se esté parado.
+  const filasSeleccionadas = useMemo(
+    () => filas.filter((s) => seleccion.has(s.mate_codigo)),
+    [filas, seleccion]
+  )
+
   // NADA viene tildado por defecto. El sistema sugiere, la persona
   // decide: una orden de compra termina en plata gastada, asi que
   // ningun articulo entra sin que alguien lo haya elegido.
@@ -718,6 +730,72 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
           </select>
         </label>
       </div>
+
+      {/* Punto 10 (28/9/2026, feedback de Ivana): artículos ya
+          seleccionados, fijo arriba de la tabla paginada -- no se
+          pierden de vista al pasar de página. Mismos inputs de
+          cantidad que la tabla de abajo (mismo estado `cantidades`,
+          se editan en cualquiera de los dos lugares) + una acción para
+          sacarlos de la orden sin tener que ir a buscarlos a su página. */}
+      {filasSeleccionadas.length > 0 && (
+        <div className="bg-indigo-50/40 rounded-xl border border-indigo-100 overflow-hidden mb-3">
+          <div className="px-3.5 py-2 text-[11px] font-bold text-[var(--ind,#4338ca)] uppercase tracking-wide bg-indigo-50 border-b border-indigo-100">
+            Ya seleccionados ({filasSeleccionadas.length})
+          </div>
+          <table className="w-full border-collapse">
+            <tbody>
+              {filasSeleccionadas.map((s) => (
+                <tr key={`sel-${s.mate_codigo}`} className="border-b border-indigo-100 last:border-0">
+                  <td className="px-3 py-2 w-8">
+                    <button
+                      type="button"
+                      onClick={() => toggle(s.mate_codigo)}
+                      title="Sacar de la orden"
+                      className="text-gray-400 hover:text-[var(--red)] text-sm font-bold leading-none"
+                    >
+                      ×
+                    </button>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs">{s.mate_codigo}</td>
+                  <td className="px-3 py-2 text-[13px] font-medium max-w-[280px] truncate" title={s.mate_nombre ?? ''}>
+                    {s.mate_nombre ?? '—'}
+                  </td>
+                  <td className="px-3 py-2 text-sm text-gray-500 whitespace-nowrap">Mín. {formatoNumero(s.umbral)}</td>
+                  <td className="px-3 py-2 text-gray-400 text-sm whitespace-nowrap">
+                    {s.unidades_por_bulto ? `x${formatoNumero(s.unidades_por_bulto)}` : '—'}
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={cantidades[s.mate_codigo] ?? ''}
+                      onChange={(e) => {
+                        const valor = e.target.value
+                        setCantidades((prev) => ({ ...prev, [s.mate_codigo]: valor }))
+                      }}
+                      className="w-24 border border-[var(--border)] rounded-lg px-2 py-1 text-sm text-right"
+                    />
+                    {(() => {
+                      const cant = Number(cantidades[s.mate_codigo]) || 0
+                      const bulto = Number(s.unidades_por_bulto) || 0
+                      if (cant <= 0 || bulto <= 0 || esMultiploDeBulto(cant, bulto)) return null
+                      return (
+                        <div
+                          className="text-[10px] text-[var(--red)] mt-0.5"
+                          title={`Este proveedor vende en bultos de ${formatoNumero(bulto)}.`}
+                        >
+                          no es múltiplo del bulto
+                        </div>
+                      )
+                    })()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden mb-3">
         {cargando ? (
