@@ -231,6 +231,22 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // ---- Validar que todos los ítems tengan costo cargado (16/9/2026) ----
+      // YiQi rechaza la orden ENTERA (400, "El precio unitario y final no
+      // se corresponden") cuando algún ítem manda precio $0/null, sin decir
+      // cuál -- confirmado en vivo con la orden #2 (SKUs 51006/51007, sin
+      // costo cargado ni en la orden ni en material_yiqi). Se valida acá
+      // ANTES de armar el DETALLE y golpear la API, para fallar rápido con
+      // un mensaje específico en vez de que el sweep de pg_cron reintente
+      // cada 10 min contra YiQi sin ninguna chance real de éxito.
+      const itemsSinCosto = items.filter((i) => !(Number(i.costo_unitario) > 0));
+      if (itemsSinCosto.length > 0) {
+        const codigosSinCosto = itemsSinCosto.map((i) => i.mate_codigo).join(', ');
+        throw new Error(
+          `No se puede enviar a YiQi: los siguientes artículos no tienen costo cargado (costo_unitario vacío o $0): ${codigosSinCosto}. Cargar el costo en la orden o en YiQi antes de reintentar.`
+        );
+      }
+
       // ---- Armar DETALLE ----
       const detalle = items.map((item) => {
         const precioUnitarioNeto = Number(item.costo_unitario) || 0;

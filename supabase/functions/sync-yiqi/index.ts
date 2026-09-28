@@ -11,6 +11,12 @@
 //   GET .../sync-yiqi?entidad=oc         -> sincroniza REPORTE_DE_OC (~291 filas)
 //   GET .../sync-yiqi?entidad=clientes   -> sincroniza CLIENTE (~1.151 filas)
 //   GET .../sync-yiqi?entidad=ventas     -> sincroniza REPORTE_DE_VENTAS (pivoteado)
+//   GET .../sync-yiqi?entidad=ventas_vendedor -> sincroniza REPORTE_DE_VENTAS
+//                                          por vendedor (smartie 2369, para
+//                                          excluir a Patricia Bazan del
+//                                          promedio de reposicion_interna();
+//                                          cron propio diario 6:35am desde
+//                                          el 14/9/2026)
 //   GET .../sync-yiqi?entidad=stock      -> sincroniza STOCK por depósito (pivoteado)
 //   GET .../sync-yiqi?entidad=precios    -> sincroniza PRECIO_ARTICULO_COMP (~6.939 filas)
 //   GET .../sync-yiqi?entidad=movimientos -> último movimiento de stock por SKU (ver más abajo)
@@ -568,6 +574,135 @@ async function sincronizarVentas(
 }
 
 // ------------------------------------------------------------
+// Mapeo Z.API_Ventas_Vendedor_Origen_NO_BORRAR (smartie 2369) -> filas
+// planas para ventas_mensual_yiqi_vendedor.
+// ------------------------------------------------------------
+// Motivo (Federico, 11/9/2026): Patricia Bazan (licitaciones) vende
+// volumen grande y puntual que distorsiona el promedio mensual de
+// reposicion_interna(). Esta smartie es un DUPLICADO seguro de
+// REPORTE_DE_VENTAS (misma entidad, smartieId distinto: 2369 en vez
+// de 2353) con el campo VENDEDOR agregado -- no toca la smartie de
+// produccion 2353 ni su sync.
+//
+// Mismo pivot que mapearVentas: CODIGO + columnas de mes AAAA/MM
+// (reusa detectarColumnasDeMes). VENDEDOR llega como field plano,
+// igual que CODIGO/PROVEEDOR en mapearVentas (confirmado en vivo el
+// 11/9/2026 -- no es columna pivot).
+//
+// Se guarda el detalle COMPLETO por vendedor, no solo Patricia: el
+// filtro por vendedor especifico se aplica despues, en
+// reposicion_interna(), para no tener que volver a tocar el sync si
+// mañana hace falta excluir a alguien mas.
+// ------------------------------------------------------------
+function mapearVentasVendedor(filas: any[], columnas: any[]) {
+  const meses = detectarColumnasDeMes(columnas);
+
+  if (meses.length === 0) {
+    const titulos = (columnas ?? []).map((c: any) => c?.title).join(', ');
+    throw new Error(
+      'No se detecto ninguna columna de mes (formato AAAA/MM) en la smartie de ventas por vendedor. ' +
+      'Probablemente cambio la configuracion del pivot en YiQi. Titulos recibidos: ' + titulos
+    );
+  }
+
+  const planas: Array<{
+    mate_codigo: string;
+    vendedor: string;
+    periodo: string;
+    cantidad: number;
+  }> = [];
+
+  let filasSinCodigo = 0;
+  let filasSinVendedor = 0;
+
+  for (const f of filas) {
+    const codigo = f?.CODIGO != null ? String(f.CODIGO).trim() : '';
+    if (!codigo) {
+      filasSinCodigo++;
+      continue;
+    }
+    const vendedor = f?.VENDEDOR != null ? String(f.VENDEDOR).trim() : '';
+    if (!vendedor) {
+      filasSinVendedor++;
+      continue;
+    }
+
+    for (const mes of meses) {
+      const valor = f[mes.field];
+      // Mismo criterio que mapearVentas: 0 y negativos son datos
+      // validos (notas de credito, devoluciones); solo se descartan
+      // las celdas realmente vacias.
+      if (valor === null || valor === undefined || valor === '') continue;
+      const cantidad = Number(valor);
+      if (!Number.isFinite(cantidad)) continue;
+
+      planas.push({
+        mate_codigo: codigo,
+        vendedor,
+        periodo: mes.periodo,
+        cantidad,
+      });
+    }
+  }
+
+  return { planas, mesesDetectados: meses.length, filasSinCodigo, filasSinVendedor };
+}
+
+// ------------------------------------------------------------
+// Sincroniza VENTAS POR VENDEDOR (smartie 2369). Mismo patron que
+// sincronizarVentas: pivot + tandas + RPC propio
+// (upsert_ventas_mensual_yiqi_vendedor, migracion
+// 20260911170000_ventas_mensual_yiqi_vendedor.sql).
+//
+// Validada en vivo el 11/9/2026 (96.922 filas, 22 meses, 0 filas sin
+// codigo) y sumada a "todos" + cron propio diario el 14/9/2026 --
+// migracion 20260914090000_cron_ventas_vendedor.sql (jobid nuevo,
+// sync-ventas-vendedor-diario, 6:35am, 5 min despues de
+// sync-ventas-diario para no competir por el token de YiQi -- ver
+// incidente de renovacion simultanea documentado en
+// PROMPT_CONTINUIDAD_Dentalab-Compras.md).
+// ------------------------------------------------------------
+async function sincronizarVentasVendedor(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  config: any,
+) {
+  const { filas, columnas } = await traerSmartieCompleta(
+    config.base_url,
+    'REPORTE_DE_VENTAS',
+    '2369', // Z.API_Ventas_Vendedor_Origen_NO_BORRAR
+    config.schema_id,
+    config.bearer_token,
+  );
+
+  const { planas, mesesDetectados, filasSinCodigo, filasSinVendedor } = mapearVentasVendedor(filas, columnas);
+
+  // Idempotente por (mate_codigo, vendedor, periodo) -- igual que
+  // ventas, partir en tandas es seguro.
+  let filasEscritas = 0;
+  for (let i = 0; i < planas.length; i += TAMANIO_TANDA_VENTAS) {
+    const tanda = planas.slice(i, i + TAMANIO_TANDA_VENTAS);
+    const { error } = await supabaseAdmin.rpc('upsert_ventas_mensual_yiqi_vendedor', {
+      p_filas: tanda,
+    });
+    if (error) {
+      throw new Error(
+        `Error en upsert_ventas_mensual_yiqi_vendedor (tanda que empieza en ${i}): ${error.message}`
+      );
+    }
+    filasEscritas += tanda.length;
+  }
+
+  return {
+    entidad: 'ventas_vendedor',
+    filasSincronizadas: filasEscritas,
+    filasPivotOrigen: filas.length,
+    mesesDetectados,
+    filasSinCodigo,
+    filasSinVendedor,
+  };
+}
+
+// ------------------------------------------------------------
 // Mapeo MOVIMIENTO_STOCK -> filas para
 // upsert_ultimo_movimiento_stock_yiqi. Ver nota grande al inicio del
 // archivo: solo interesa el movimiento MÁS RECIENTE de cada SKU, no
@@ -882,11 +1017,14 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const entidadParam = url.searchParams.get('entidad');
 
-    const ENTIDADES_VALIDAS = ['material', 'oc', 'clientes', 'ventas', 'stock', 'precios', 'movimientos', 'todos'];
+    // ventas_vendedor (11/9/2026, smartie 2369) ya forma parte de
+    // "todos" y tiene cron propio diario desde el 14/9/2026 -- ver
+    // nota en sincronizarVentasVendedor().
+    const ENTIDADES_VALIDAS = ['material', 'oc', 'clientes', 'ventas', 'ventas_vendedor', 'stock', 'precios', 'movimientos', 'todos'];
     if (!entidadParam || !ENTIDADES_VALIDAS.includes(entidadParam)) {
       return new Response(
         JSON.stringify({
-          error: 'Parametro "entidad" invalido. Usar: material | oc | clientes | ventas | stock | precios | movimientos | todos',
+          error: 'Parametro "entidad" invalido. Usar: material | oc | clientes | ventas | ventas_vendedor | stock | precios | movimientos | todos',
         }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
@@ -897,7 +1035,7 @@ Deno.serve(async (req: Request) => {
 
     const entidadesAProcesar =
       entidadParam === 'todos'
-        ? (['material', 'oc', 'clientes', 'ventas', 'stock', 'precios', 'movimientos'] as const)
+        ? (['material', 'oc', 'clientes', 'ventas', 'ventas_vendedor', 'stock', 'precios', 'movimientos'] as const)
         : ([entidadParam] as const);
 
     for (const entidad of entidadesAProcesar) {
@@ -908,6 +1046,8 @@ Deno.serve(async (req: Request) => {
       let resultado;
       if (entidad === 'ventas') {
         resultado = await sincronizarVentas(supabaseAdmin, config);
+      } else if (entidad === 'ventas_vendedor') {
+        resultado = await sincronizarVentasVendedor(supabaseAdmin, config);
       } else if (entidad === 'stock') {
         resultado = await sincronizarStock(supabaseAdmin, config);
       } else if (entidad === 'movimientos') {
