@@ -88,6 +88,135 @@ export default function OrdenesPropias({ onCambio }) {
   const [causasPorOrden, setCausasPorOrden] = useState({})
   const [modalCausa, setModalCausa] = useState(null) // { referenciaId, referenciaTexto } | null
 
+  // ---- Deep link "Ver detalle" en pestaña nueva (28/9/2026) ----
+  // El botón "Ver detalle" de la tabla ahora abre `?page=ocs&orden=<id>`
+  // en una pestaña nueva (window.open) en vez de expandir el panel en la
+  // misma pestaña -- pedido explícito de Federico y del cliente. Esta
+  // pestaña nueva arranca sin nada abierto, así que acá se lee el query
+  // param UNA sola vez al montar (useState perezoso, no vuelve a leerse
+  // aunque cambie la URL) y, apenas la orden pedida aparece en `ordenes`
+  // (se carga async), se abre sola con `abrir()` -- mismo código que usa
+  // el click manual, ver más abajo.
+  const [ordenIdDesdeURL] = useState(() => {
+    try {
+      const idParam = new URLSearchParams(window.location.search).get('orden')
+      return idParam ? Number(idParam) : null
+    } catch {
+      return null
+    }
+  })
+  useEffect(() => {
+    if (!ordenIdDesdeURL || abierta) return
+    const encontrada = ordenes.find((o) => o.id === ordenIdDesdeURL)
+    if (encontrada) abrir(encontrada)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordenIdDesdeURL, ordenes])
+
+  // ---- Editar cantidades / quitar líneas (28/9/2026) ----
+  // Alcance A PROPÓSITO acotado a 'borrador' ÚNICAMENTE (ajustado el
+  // mismo día tras verificar la RLS real en vivo contra pg_policies):
+  // las 3 policies de escritura de ordenes_propias_items (crear/editar/
+  // borrar items) exigen TODAS `orden_id IN (SELECT id FROM
+  // ordenes_propias WHERE creada_por = auth.uid() AND estado =
+  // 'borrador')` -- sin excepción para 'pendiente' y SIN bypass de
+  // es_admin() (a diferencia del UPDATE de la cabecera ordenes_propias,
+  // que sí tiene es_admin() OR ...). O sea: hoy, ni siquiera Aris puede
+  // editar los ítems de una orden en borrador que armó Ivana -- cada
+  // tabla tiene su propia policy independiente. Por eso el gate de abajo
+  // usa solo 'borrador', y por lo mismo NO se oculta el botón según
+  // quién creó la orden ni según el rol: si Postgres rechaza el intento
+  // (por ejemplo Aris editando un borrador ajeno), el error real de RLS
+  // se muestra tal cual en errorEdicionItems -- no se enmascara. Ver
+  // migración opcional al final de este archivo (comentario, no se
+  // aplicó) si en algún momento se quiere sumar el bypass de admin y/o
+  // 'pendiente' a estas policies.
+  //
+  // Una orden 'aprobada' ya puede estar vinculada a YiQi
+  // (yiqi_id_creado) -- tocar cantidades o borrar líneas ahí
+  // desincronizaría el ERP del cliente sin que nadie lo pida ni esté
+  // probado (mismo motivo por el que editar-oc-yiqi solo permite
+  // AGREGAR líneas nuevas, nunca tocar las existentes). En 'borrador' no
+  // hay YiQi de por medio todavía -- es 100% local.
+  const [editandoItems, setEditandoItems] = useState(false)
+  const [itemsEdit, setItemsEdit] = useState([])
+  const [errorEdicionItems, setErrorEdicionItems] = useState(null)
+  function puedeEditarItems(orden) {
+    return !!orden && !orden.archivada_en && orden.estado === 'borrador'
+  }
+  function iniciarEdicionItems() {
+    setItemsEdit(items.map((i) => ({ ...i, _cantidad: String(i.cantidad) })))
+    setErrorEdicionItems(null)
+    setEditandoItems(true)
+  }
+  function cancelarEdicionItems() {
+    setEditandoItems(false)
+    setItemsEdit([])
+    setErrorEdicionItems(null)
+  }
+  function actualizarCantidadEdit(id, valor) {
+    setItemsEdit((prev) => prev.map((i) => (i.id === id ? { ...i, _cantidad: valor } : i)))
+  }
+  function quitarItemEdit(id) {
+    // Nunca deja la orden sin ítems desde acá (mismo criterio que
+    // quitarLineaNueva de "+ Agregar mercadería", más abajo): si hay que
+    // vaciarla del todo, se usa "Eliminar" (borrador) o "Archivar".
+    setItemsEdit((prev) => (prev.length <= 1 ? prev : prev.filter((i) => i.id !== id)))
+  }
+  async function guardarEdicionItems() {
+    if (!abierta) return
+    setErrorEdicionItems(null)
+    for (const it of itemsEdit) {
+      if (!(Number(it._cantidad) > 0)) {
+        setErrorEdicionItems(`Cantidad inválida para ${it.mate_nombre ?? it.mate_codigo}.`)
+        return
+      }
+    }
+    setOcupado(true)
+    try {
+      const idsRestantes = new Set(itemsEdit.map((i) => i.id))
+      const idsEliminados = items.filter((i) => !idsRestantes.has(i.id)).map((i) => i.id)
+      const cambiados = itemsEdit.filter((i) => {
+        const original = items.find((o) => o.id === i.id)
+        return original && Number(original.cantidad) !== Number(i._cantidad)
+      })
+      if (idsEliminados.length > 0) {
+        const { error } = await supabase.from('ordenes_propias_items').delete().in('id', idsEliminados)
+        if (error) throw new Error(error.message)
+      }
+      for (const it of cambiados) {
+        const { error } = await supabase
+          .from('ordenes_propias_items')
+          .update({ cantidad: Number(it._cantidad) })
+          .eq('id', it.id)
+        if (error) throw new Error(error.message)
+      }
+      // Recalcula total_estimado / items_sin_costo con lo que queda --
+      // mismo criterio que editar-oc-yiqi al sumar mercadería: estas dos
+      // columnas quedan desactualizadas si no se tocan acá también (la
+      // segunda además es la que bloquea la aprobación si queda mal).
+      const nuevoTotal = itemsEdit.reduce(
+        (acc, i) => acc + (Number(i.costo_unitario) || 0) * Number(i._cantidad), 0
+      )
+      const nuevoSinCosto = itemsEdit.filter((i) => !(Number(i.costo_unitario) > 0)).length
+      const { error: errTotal } = await supabase
+        .from('ordenes_propias')
+        .update({ total_estimado: nuevoTotal, items_sin_costo: nuevoSinCosto })
+        .eq('id', abierta.id)
+      if (errTotal) throw new Error(errTotal.message)
+
+      setAviso(`Ítems de la orden #${abierta.id} actualizados.`)
+      setEditandoItems(false)
+      setItemsEdit([])
+      await cargar()
+      await abrir(abierta)
+      avisarCambio()
+    } catch (e) {
+      setErrorEdicionItems(e.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
   useEffect(() => {
     if (!modal) return
     function onKeyDown(e) {
@@ -198,6 +327,11 @@ export default function OrdenesPropias({ onCambio }) {
   async function abrir(orden) {
     setAbierta(orden)
     setItems([])
+    // Por si se pasa de una orden a otra con la edición de ítems
+    // abierta: no se arrastra a la orden nueva.
+    setEditandoItems(false)
+    setItemsEdit([])
+    setErrorEdicionItems(null)
     const { data, error } = await supabase
       .from('ordenes_propias_items')
       .select('*')
@@ -713,8 +847,20 @@ export default function OrdenesPropias({ onCambio }) {
                     <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(o.creada_en)}</td>
                     <td className="px-3.5 py-1.5 text-xs">{o.cant_items ?? 0}</td>
                     <td className="px-3.5 py-1.5 text-right whitespace-nowrap">
-                      <button onClick={() => abrir(o)} className="text-sm text-[var(--ind,#4338ca)] hover:underline mr-3">
-                        Ver detalle
+                      <button
+                        onClick={() => {
+                          // Pestaña nueva de verdad (28/9/2026), no el panel
+                          // en esta misma pantalla. `?page=ocs` hace que
+                          // App.jsx arranque directo en esta sección y
+                          // `?orden=<id>` hace que OrdenesPropias se abra
+                          // sola en el detalle de esta orden (ver el efecto
+                          // de ordenIdDesdeURL más arriba).
+                          const url = `${window.location.origin}${window.location.pathname}?page=ocs&orden=${o.id}`
+                          window.open(url, '_blank', 'noopener')
+                        }}
+                        className="text-sm text-[var(--ind,#4338ca)] hover:underline mr-3"
+                      >
+                        Ver detalle ↗
                       </button>
                       <button onClick={() => imprimir(o)} className="text-sm text-gray-500 hover:text-[var(--ind,#4338ca)] hover:underline mr-3">
                         PDF
@@ -861,7 +1007,10 @@ export default function OrdenesPropias({ onCambio }) {
                     : abierta.whatsapp_enviada_en ? '💬 Reenviar por WhatsApp' : '💬 Enviar por WhatsApp'}
                 </button>
               )}
-              <button onClick={() => setAbierta(null)} className="text-sm text-gray-500 hover:underline">
+              <button
+                onClick={() => { setAbierta(null); setEditandoItems(false); setItemsEdit([]) }}
+                className="text-sm text-gray-500 hover:underline"
+              >
                 Cerrar
               </button>
             </div>
@@ -910,33 +1059,107 @@ export default function OrdenesPropias({ onCambio }) {
               {abierta.comentario_decision}
             </div>
           )}
+          {/* Editar cantidades / quitar líneas (28/9/2026) -- ver el bloque
+              de comentario junto a los estados de arriba (editandoItems).
+              Solo aparece en 'borrador' (RLS real de ordenes_propias_items
+              no admite 'pendiente' ni bypass de admin, ver comentario):
+              en cualquier otro estado la tabla queda 100% de solo lectura,
+              como siempre. Si Postgres rechaza igual (por ejemplo, Aris
+              sobre un borrador que no creó ella), el error de RLS se
+              muestra tal cual más abajo. */}
+          {puedeEditarItems(abierta) && !editandoItems && (
+            <div className="flex justify-end mb-2">
+              <button
+                type="button"
+                onClick={iniciarEdicionItems}
+                className="text-[13px] font-semibold text-[var(--ind,#4338ca)] hover:underline"
+              >
+                ✏ Editar cantidades / quitar ítems
+              </button>
+            </div>
+          )}
+          {errorEdicionItems && (
+            <div className="border border-[#fecaca] bg-[#fef2f2] text-[var(--red)] rounded-lg px-3 py-2 text-[13px] mb-2">
+              {errorEdicionItems}
+            </div>
+          )}
           <div className="border border-[var(--border)] rounded-lg overflow-hidden mb-3">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-[var(--border)]">
-                  {['SKU', 'Producto', 'Cantidad', 'Costo unit.', 'Stock al armar', 'Prom./mes'].map((h) => (
-                    <th key={h} className="text-left px-3.5 py-2 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
+                  {[
+                    'SKU', 'Producto', 'Cantidad', 'Costo unit.', 'Stock al armar', 'Prom./mes',
+                    ...(editandoItems ? [''] : []),
+                  ].map((h, idx) => (
+                    <th key={`${h}-${idx}`} className="text-left px-3.5 py-2 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {items.map((i) => (
+                {(editandoItems ? itemsEdit : items).map((i) => (
                   <tr key={i.id} className="border-b border-gray-100 last:border-0">
                     <td className="px-3.5 py-2 font-mono text-xs">{i.mate_codigo}</td>
                     <td className="px-3.5 py-2 text-[13px] font-medium">{i.mate_nombre ?? '—'}</td>
-                    <td className="px-3.5 py-2 font-bold">{formatoNumero(i.cantidad)}</td>
+                    <td className="px-3.5 py-2 font-bold">
+                      {editandoItems ? (
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={i._cantidad}
+                          onChange={(e) => actualizarCantidadEdit(i.id, e.target.value)}
+                          disabled={ocupado}
+                          className="w-20 border border-[var(--border)] rounded-lg px-2 py-1 text-[13px] disabled:opacity-60"
+                        />
+                      ) : (
+                        formatoNumero(i.cantidad)
+                      )}
+                    </td>
                     <td className="px-3.5 py-2 text-sm tabular-nums">
                       {i.costo_unitario ? formatoMoneda(i.costo_unitario) : '—'}
                     </td>
                     <td className="px-3.5 py-2 text-gray-400 text-sm">{formatoNumero(i.stock_al_momento)}</td>
                     <td className="px-3.5 py-2 text-gray-400 text-sm">{formatoNumero(i.promedio_mensual)}</td>
+                    {editandoItems && (
+                      <td className="px-3.5 py-2">
+                        <button
+                          type="button"
+                          disabled={ocupado || itemsEdit.length <= 1}
+                          onClick={() => quitarItemEdit(i.id)}
+                          title="Quitar línea"
+                          className="text-gray-400 hover:text-[var(--red)] disabled:opacity-30 text-lg leading-none"
+                        >
+                          ×
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {editandoItems && (
+            <div className="flex items-center justify-end gap-2 mb-3">
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={cancelarEdicionItems}
+                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={guardarEdicionItems}
+                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+              >
+                {ocupado ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </div>
+          )}
           {permisos.esAdmin && abierta.estado === 'pendiente' && !abierta.archivada_en && (
             <div className="flex items-center justify-end gap-2">
               <button

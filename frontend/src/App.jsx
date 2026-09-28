@@ -55,6 +55,27 @@ const PAGINAS_CON_DATOS_REALES = [
   'ayuda',
 ]
 
+// Deep link real para "Ver detalle" de una orden propia (28/9/2026,
+// pedido de Federico + feedback del cliente: el detalle tiene que abrir
+// en una PESTAÑA NUEVA de verdad, no expandir en la misma pantalla).
+// No hay react-router en este proyecto (navegación = `currentPage` en
+// memoria) así que esto es lo mínimo para que una pestaña nueva arranque
+// directo en la página correcta: se lee `?page=` UNA sola vez al montar
+// (useState con inicializador perezoso) y se usa como currentPage
+// inicial en vez del fijo 'stock'. Si el valor no es una página válida
+// (o no hay query param), cae al comportamiento de siempre. El query
+// param `?orden=<id>` que va junto con `?page=ocs` lo lee y consume
+// OrdenesPropias.jsx directamente -- acá no hace falta saber nada de eso.
+function paginaInicialDesdeURL() {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const pagina = params.get('page')
+    return pagina && PAGINAS_CON_DATOS_REALES.includes(pagina) ? pagina : 'stock'
+  } catch {
+    return 'stock'
+  }
+}
+
 function PaginaEnConstruccion({ nombre }) {
   return (
     <div className="flex-1 flex items-center justify-center bg-[#f7f8fa]">
@@ -100,7 +121,7 @@ const TITULOS = {
 // ============================================================
 function AppLogueada({ session, onLogout }) {
   const permisos = usePermisos()
-  const [currentPage, setCurrentPage] = useState('stock')
+  const [currentPage, setCurrentPage] = useState(paginaInicialDesdeURL)
   const [contadores, setContadores] = useState({})
   const [ultimaSync, setUltimaSync] = useState(null)
   const [yiqiEstado, setYiqiEstado] = useState(null)
