@@ -797,7 +797,11 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         )
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-gray-400 text-sm">{formatoNumero(s.umbral)}</td>
+                    {/* 28/9/2026 (feedback Ivana): antes text-gray-400 -- se leía
+                        como "poco relevante", cuando el Mínimo es justo el dato que
+                        más mira para decidir reposición (más que Costo unit., que
+                        sigue en texto normal más abajo). Mismo peso visual que Costo. */}
+                    <td className="px-3 py-2 text-sm">{formatoNumero(s.umbral)}</td>
                     <td className="px-3 py-2 text-sm">
                       {sinBase ? (
                         <span className="text-[11px] text-gray-400 italic whitespace-nowrap">Sin historial</span>

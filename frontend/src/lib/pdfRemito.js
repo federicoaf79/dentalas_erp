@@ -134,7 +134,7 @@ export function generarRemitoImprimible({ solicitud, lineas, empresa, claseAbcPo
            justify-content: space-between; align-items: center; }
   .barra button { background: #fff; color: #4338ca; border: 0; border-radius: 6px;
                   padding: 6px 14px; font-weight: 600; cursor: pointer; font-size: 13px; }
-  .cuerpo { margin-top: 46px; }
+  .cuerpo { margin-top: 46px; } /* fallback si por algo no corre el script de abajo */
   @media print { .cuerpo { margin-top: 0; } }
 </style></head>
 <body>
@@ -142,6 +142,17 @@ export function generarRemitoImprimible({ solicitud, lineas, empresa, claseAbcPo
   <span>Usá "Guardar como PDF" en el destino de impresión, o imprimí en papel para el control físico</span>
   <button onclick="window.print()">Imprimir / Guardar PDF</button>
 </div>
+<script>
+  // 28/9/2026 -- mismo fix que pdfOrden.js::generarPdfOrden(): margin-top
+  // fijo a mano reemplazado por el alto real de la barra, para que no
+  // tape el encabezado en pantalla. No afecta la impresión (la barra se
+  // esconde entera y el margen se anula en @media print).
+  (function () {
+    var barra = document.querySelector('.barra')
+    var cuerpo = document.querySelector('.cuerpo')
+    if (barra && cuerpo) cuerpo.style.marginTop = barra.offsetHeight + 'px'
+  })()
+</script>
 
 <div class="cuerpo">
   <div class="cab">
@@ -202,6 +213,10 @@ export function generarRemitoImprimible({ solicitud, lineas, empresa, claseAbcPo
     alert('El navegador bloqueó la ventana. Permití las ventanas emergentes para este sitio y probá de nuevo.')
     return
   }
+  // 28/9/2026 -- mismo fix que pdfOrden.js::generarPdfOrden() (ver ese
+  // archivo para el detalle): cortar el opener antes de escribir el HTML
+  // para que "Imprimir" en la pestaña nueva no congele esta pestaña.
+  win.opener = null
   win.document.write(html)
   win.document.close()
 }

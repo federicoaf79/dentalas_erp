@@ -125,7 +125,7 @@ export function generarPdfOrden({ orden, items, empresa, proveedor }) {
            justify-content: space-between; align-items: center; }
   .barra button { background: #fff; color: #4338ca; border: 0; border-radius: 6px;
                   padding: 6px 14px; font-weight: 600; cursor: pointer; font-size: 13px; }
-  .cuerpo { margin-top: 46px; }
+  .cuerpo { margin-top: 46px; } /* fallback si por algo no corre el script de abajo */
   @media print { .cuerpo { margin-top: 0; } }
 </style></head>
 <body>
@@ -133,6 +133,18 @@ export function generarPdfOrden({ orden, items, empresa, proveedor }) {
   <span>Usá “Guardar como PDF” en el destino de impresión</span>
   <button onclick="window.print()">Imprimir / Guardar PDF</button>
 </div>
+<script>
+  // 28/9/2026 (feedback cliente): el margin-top de 46px era un número fijo
+  // a mano -- si la barra real mide más (zoom del navegador, fuente del
+  // SO), tapa el encabezado del documento en pantalla ("se ve cortado").
+  // Al imprimir no afecta nada: la barra se esconde entera (.no-print) y
+  // el margen se anula (@media print). Solo corrige la vista en pantalla.
+  (function () {
+    var barra = document.querySelector('.barra')
+    var cuerpo = document.querySelector('.cuerpo')
+    if (barra && cuerpo) cuerpo.style.marginTop = barra.offsetHeight + 'px'
+  })()
+</script>
 
 <div class="cuerpo">
   <div class="cab">
@@ -210,6 +222,14 @@ export function generarPdfOrden({ orden, items, empresa, proveedor }) {
     alert('El navegador bloqueó la ventana. Permití las ventanas emergentes para este sitio y probá de nuevo.')
     return
   }
+  // 28/9/2026 (feedback cliente: "se congela completamente al generar un
+  // PDF"): cortar el vínculo opener -> pestaña nueva ANTES de escribirle
+  // el HTML. Sin esto, al apretar "Imprimir" en la pestaña nueva, el
+  // diálogo nativo de impresión de Chrome puede bloquear también ESTA
+  // pestaña, porque sin cortar el opener comparten el mismo proceso de
+  // renderer. Mismo efecto que rel="noopener", pero sin perder la
+  // referencia `win` que hace falta para poder escribirle el HTML.
+  win.opener = null
   win.document.write(html)
   win.document.close()
 }
