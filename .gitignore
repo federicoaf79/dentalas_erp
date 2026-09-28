@@ -22,3 +22,10 @@ _to_delete*/
 .vercel
 
 yiqi-compras-schema.json
+
+# Archivos de trabajo locales (datos de ventas, simulaciones, scripts sueltos)
+/*.csv
+/*.json
+/simulacion_*.sql
+/ventas_*.sql
+/verificar*.ps1
