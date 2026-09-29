@@ -361,15 +361,70 @@ function decodificarEntidadesHtml(s: string): string {
   return s.replace(/&#(\d+);/g, (_, cod) => String.fromCharCode(Number(cod)));
 }
 
+// ------------------------------------------------------------
+// Formato nuevo de la API de YiQi para smarties PIVOTEADAS (visto en
+// vivo el 29/9/2026, smartie 2360): TODAS las columnas llegan con
+// field genérico ("C1", "C2"...) y `title` IGUAL al field ("C1"); el
+// nombre real pasó a la propiedad `help` ("SKU", "Deposito 1 - Local",
+// "En tr&#225;nsito"...). Hasta el 28/9 el título real venía en
+// `title` y los campos planos con su nombre propio (STOC_SKU, CODIGO,
+// VENDEDOR...). Estos helpers aceptan los DOS formatos, así un nuevo
+// cambio de YiQi en cualquiera de los dos sentidos no vuelve a cortar
+// el sync.
+// ------------------------------------------------------------
+const REGEX_CAMPO_GENERICO = /^C\d+$/;
+
+function tituloDeColumna(c: any): string {
+  const title = decodificarEntidadesHtml(String(c?.title ?? '').trim());
+  const help = decodificarEntidadesHtml(String(c?.help ?? '').trim());
+  if (title && !REGEX_CAMPO_GENERICO.test(title)) return title;
+  return help || title;
+}
+
+// Comparación tolerante: sin mayúsculas, sin acentos, espacios simples.
+function normalizarTitulo(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Devuelve el field de la primera columna cuyo título (resuelto con
+// tituloDeColumna) coincide con alguno de los aceptados.
+function campoPorTitulo(columnas: any[], titulosAceptados: string[]): string | null {
+  const buscados = new Set(titulosAceptados.map(normalizarTitulo));
+  for (const c of columnas ?? []) {
+    if (!c?.field) continue;
+    if (buscados.has(normalizarTitulo(tituloDeColumna(c)))) return String(c.field);
+  }
+  return null;
+}
+
+// Lee un campo "plano" (no pivot) de una fila: primero por su nombre
+// propio de siempre (formato viejo), si no por el título (formato nuevo).
+function valorPlano(f: any, campoLegacy: string, campoNuevo: string | null): any {
+  const v = f?.[campoLegacy];
+  if (v !== undefined && v !== null) return v;
+  return campoNuevo ? f?.[campoNuevo] : undefined;
+}
+
 async function mapearStock(filas: any[], columnas: any[]) {
+  const titulosStockNormalizados: Record<string, string> = {};
+  for (const [t, col] of Object.entries(TITULOS_STOCK)) {
+    titulosStockNormalizados[normalizarTitulo(t)] = col;
+  }
   const fieldPorColumna: Record<string, string> = {};
   for (const c of columnas ?? []) {
-    const titulo = decodificarEntidadesHtml(String(c?.title ?? '').trim());
-    const columnaPropia = TITULOS_STOCK[titulo];
+    const columnaPropia = titulosStockNormalizados[normalizarTitulo(tituloDeColumna(c))];
     if (columnaPropia && c?.field) {
       fieldPorColumna[columnaPropia] = String(c.field);
     }
   }
+  // Formato nuevo (29/9/2026): el SKU y el nombre también llegan como C1/C2.
+  const campoSku = campoPorTitulo(columnas, ['SKU']);
+  const campoNombre = campoPorTitulo(columnas, ['Artículo - Nombre', 'Nombre']);
   const faltantes = Object.keys(TITULOS_STOCK).filter((t) => !fieldPorColumna[TITULOS_STOCK[t]]);
   if (faltantes.length > 0) {
     console.warn(
@@ -383,7 +438,8 @@ async function mapearStock(filas: any[], columnas: any[]) {
   for (const f of filas) {
     // SKU como texto SIEMPRE (regla de Aris: nunca convertir a número --
     // hay casos reales como "31110 T", "66679-F").
-    const sku = f.STOC_SKU != null ? String(f.STOC_SKU).trim() : '';
+    const skuCrudo = valorPlano(f, 'STOC_SKU', campoSku);
+    const sku = skuCrudo != null ? String(skuCrudo).trim() : '';
     if (!sku) {
       sinSku++;
       continue;
@@ -395,7 +451,7 @@ async function mapearStock(filas: any[], columnas: any[]) {
       return v == null ? null : Number(v);
     };
     const camposNegocio = {
-      mate_nombre: f.MATE_NOMBRE ?? null,
+      mate_nombre: valorPlano(f, 'MATE_NOMBRE', campoNombre) ?? null,
       stock_local: valorColumna('stock_local'),
       stock_central: valorColumna('stock_central'),
       stock_jorge: valorColumna('stock_jorge'),
@@ -415,6 +471,17 @@ async function mapearStock(filas: any[], columnas: any[]) {
   }
   if (sinSku > 0) {
     console.warn(`mapearStock: se saltearon ${sinSku} fila(s) de STOCK sin SKU.`);
+  }
+  // Falla RUIDOSO (29/9/2026): antes, si YiQi cambiaba el formato y no
+  // se reconocía ningún SKU, el sync devolvía "ok, 0 filas" y nadie se
+  // enteraba. Si YiQi mandó filas y no se pudo mapear ninguna, es un
+  // error, no un éxito vacío.
+  if ((filas?.length ?? 0) > 0 && resultado.length === 0) {
+    const titulos = (columnas ?? []).map((c: any) => tituloDeColumna(c)).join(', ');
+    throw new Error(
+      `mapearStock: YiQi devolvió ${filas.length} fila(s) pero no se pudo leer el SKU de ninguna. ` +
+      'Probablemente cambió el formato de la smartie STOCK (2360). Títulos recibidos: ' + titulos
+    );
   }
   return resultado;
 }
@@ -460,7 +527,7 @@ const REGEX_MES = /^(\d{4})\/(\d{2})$/;
 function detectarColumnasDeMes(columnas: any[]) {
   const meses: { field: string; periodo: string }[] = [];
   for (const c of columnas ?? []) {
-    const titulo = String(c?.title ?? '').trim();
+    const titulo = tituloDeColumna(c);
     const m = REGEX_MES.exec(titulo);
     if (!m || !c?.field) continue;
     // periodo = primer dia del mes (la columna es DATE, no texto)
@@ -475,7 +542,7 @@ function mapearVentas(filas: any[], columnas: any[]) {
   // Falla RUIDOSO a proposito: si el pivot cambio en YiQi, es mejor un
   // error visible que un sync "exitoso" que no guarda nada.
   if (meses.length === 0) {
-    const titulos = (columnas ?? []).map((c: any) => c?.title).join(', ');
+    const titulos = (columnas ?? []).map((c: any) => tituloDeColumna(c)).join(', ');
     throw new Error(
       'No se detecto ninguna columna de mes (formato AAAA/MM) en la smartie de ventas. ' +
       'Probablemente cambio la configuracion del pivot en YiQi. Titulos recibidos: ' + titulos
@@ -490,17 +557,21 @@ function mapearVentas(filas: any[], columnas: any[]) {
   }> = [];
 
   let filasSinCodigo = 0;
+  const campoCodigo = campoPorTitulo(columnas, ['Código', 'SKU']);
+  const campoProveedor = campoPorTitulo(columnas, ['Proveedor']);
 
   for (const f of filas) {
-    const codigo = f?.CODIGO != null ? String(f.CODIGO).trim() : '';
+    const codigoCrudo = valorPlano(f, 'CODIGO', campoCodigo);
+    const codigo = codigoCrudo != null ? String(codigoCrudo).trim() : '';
     if (!codigo) {
       // Hay lineas historicas sin SKU (vistas en datos reales de 2019).
       // No sirven para calcular demanda por articulo.
       filasSinCodigo++;
       continue;
     }
-    const proveedor = f?.PROVEEDOR != null && String(f.PROVEEDOR).trim() !== ''
-      ? String(f.PROVEEDOR)
+    const proveedorCrudo = valorPlano(f, 'PROVEEDOR', campoProveedor);
+    const proveedor = proveedorCrudo != null && String(proveedorCrudo).trim() !== ''
+      ? String(proveedorCrudo)
       : null;
 
     for (const mes of meses) {
@@ -598,7 +669,7 @@ function mapearVentasVendedor(filas: any[], columnas: any[]) {
   const meses = detectarColumnasDeMes(columnas);
 
   if (meses.length === 0) {
-    const titulos = (columnas ?? []).map((c: any) => c?.title).join(', ');
+    const titulos = (columnas ?? []).map((c: any) => tituloDeColumna(c)).join(', ');
     throw new Error(
       'No se detecto ninguna columna de mes (formato AAAA/MM) en la smartie de ventas por vendedor. ' +
       'Probablemente cambio la configuracion del pivot en YiQi. Titulos recibidos: ' + titulos
@@ -614,14 +685,18 @@ function mapearVentasVendedor(filas: any[], columnas: any[]) {
 
   let filasSinCodigo = 0;
   let filasSinVendedor = 0;
+  const campoCodigo = campoPorTitulo(columnas, ['Código', 'SKU']);
+  const campoVendedor = campoPorTitulo(columnas, ['Vendedor']);
 
   for (const f of filas) {
-    const codigo = f?.CODIGO != null ? String(f.CODIGO).trim() : '';
+    const codigoCrudo = valorPlano(f, 'CODIGO', campoCodigo);
+    const codigo = codigoCrudo != null ? String(codigoCrudo).trim() : '';
     if (!codigo) {
       filasSinCodigo++;
       continue;
     }
-    const vendedor = f?.VENDEDOR != null ? String(f.VENDEDOR).trim() : '';
+    const vendedorCrudo = valorPlano(f, 'VENDEDOR', campoVendedor);
+    const vendedor = vendedorCrudo != null ? String(vendedorCrudo).trim() : '';
     if (!vendedor) {
       filasSinVendedor++;
       continue;
