@@ -617,10 +617,31 @@ async function sincronizarVentas(
     config.bearer_token,
   );
 
-  const { planas, mesesDetectados, filasSinCodigo } = mapearVentas(filas, columnas);
+  const mapeo = mapearVentas(filas, columnas);
+  const { mesesDetectados, filasSinCodigo } = mapeo;
 
-  // El upsert es idempotente por (mate_codigo, periodo), asi que partir
-  // en tandas es seguro: si una tanda se repitiera, no duplica nada.
+  // [30/9/2026] Sumar por (mate_codigo, periodo) ANTES de partir en
+  // tandas. Mismo problema que ventas_vendedor: upsert_ventas_mensual_yiqi
+  // agrupa y suma dentro de cada tanda (proveedor = min) pero PISA entre
+  // tandas, asi que un SKU con filas en dos tandas (dos proveedores)
+  // quedaba con la suma de la ultima. Se replica aca exactamente la
+  // agregacion del RPC (sum de cantidad, min de proveedor no vacio).
+  const sumadas = new Map<string, { mate_codigo: string; proveedor: string | null; periodo: string; cantidad: number }>();
+  for (const p of mapeo.planas) {
+    const clave = `${p.mate_codigo}\u0000${p.periodo}`;
+    const prov = p.proveedor ? String(p.proveedor) : null;
+    const previa = sumadas.get(clave);
+    if (previa) {
+      previa.cantidad += p.cantidad;
+      if (prov && (previa.proveedor === null || prov < previa.proveedor)) previa.proveedor = prov;
+    } else {
+      sumadas.set(clave, { mate_codigo: p.mate_codigo, proveedor: prov, periodo: p.periodo, cantidad: p.cantidad });
+    }
+  }
+  const planas = Array.from(sumadas.values());
+
+  // Idempotente por (mate_codigo, periodo) y sin claves repetidas entre
+  // tandas.
   let filasEscritas = 0;
   for (let i = 0; i < planas.length; i += TAMANIO_TANDA_VENTAS) {
     const tanda = planas.slice(i, i + TAMANIO_TANDA_VENTAS);

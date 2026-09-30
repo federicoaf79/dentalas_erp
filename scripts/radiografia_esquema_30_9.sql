@@ -7,6 +7,9 @@
 -- Reemplaza el baseline con Docker/pg_dump: con la salida se escriben
 -- las migraciones de lo que se creó a mano en producción.
 -- Dónde: Supabase → SQL Editor (proyecto hsfudsnmooaesrzdwecg).
+-- Los textos 'create table' / 'alter table' / 'create policy' van partidos
+-- a propósito: el SQL Editor de Supabase los detecta en el texto y falla
+-- con 'relation "public" does not exist' (30/9/2026).
 -- ============================================================
 with tablas as (
   select c.oid, c.relname, c.relrowsecurity
@@ -15,7 +18,7 @@ with tablas as (
 ),
 ddl as (
   select t.relname,
-    'create table if not exists public.' || quote_ident(t.relname) || ' (' || E'\n  ' ||
+    'cre' || 'ate ta' || 'ble if not exists ' || 'pub' || 'lic' || chr(46) || quote_ident(t.relname) || ' (' || E'\n  ' ||
     (select string_agg(
         quote_ident(a.attname) || ' ' || format_type(a.atttypid, a.atttypmod)
         || coalesce(' default ' || pg_get_expr(d.adbin, d.adrelid), '')
@@ -31,9 +34,9 @@ ddl as (
                         from pg_index i
                         where i.indrelid = t.oid
                           and not exists (select 1 from pg_constraint co where co.conindid = i.indexrelid)), '')
-    || case when t.relrowsecurity then E'\nalter table public.' || quote_ident(t.relname) || ' enable row level security;' else '' end
+    || case when t.relrowsecurity then E'\n' || 'alt' || 'er ta' || 'ble ' || 'pub' || 'lic' || chr(46) || quote_ident(t.relname) || ' enable row level security;' else '' end
     || coalesce(E'\n' || (select string_agg(
-          'create policy ' || quote_ident(p.policyname) || ' on public.' || quote_ident(t.relname)
+          'cre' || 'ate pol' || 'icy ' || quote_ident(p.policyname) || ' on ' || 'pub' || 'lic' || chr(46) || quote_ident(t.relname)
           || ' as ' || p.permissive || ' for ' || p.cmd || ' to ' || array_to_string(p.roles, ', ')
           || coalesce(' using (' || p.qual || ')', '') || coalesce(' with check (' || p.with_check || ')', '') || ';',
           E'\n' order by p.policyname)
