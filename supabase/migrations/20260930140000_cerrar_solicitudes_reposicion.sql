@@ -1,10 +1,12 @@
 -- ============================================================
--- 20260929110000_cerrar_solicitudes_reposicion.sql
+-- 20260930140000_cerrar_solicitudes_reposicion.sql
 -- Dentalab-Compras — cierre automático del encabezado de
 -- solicitudes_reposicion cuando todas sus líneas llegan a un estado
--- terminal. BORRADOR 29/9/2026 — NO APLICADO. Correr recién después
--- de revisar la salida del diagnóstico (constraints + cuerpos de
--- declarar_linea_reposicion / confirmar_recepcion_linea).
+-- terminal. Escrito como borrador el 29/9/2026; pasado a migración el
+-- 30/9/2026 tras revisar en prod el estado real de las solicitudes
+-- abiertas (#1: 1 línea recibida y movida en YiQi; #2: 199 líneas
+-- en tránsito, 1 recibida; #7: 22 recibidas sin movimiento en YiQi;
+-- ningún pedido automático creado nunca).
 -- ============================================================
 --
 -- Problema: confirmar_recepcion_linea() (solo existe en prod, no en el
@@ -42,14 +44,14 @@
 --      cuando pasa a 'en_preparacion' → llama a (c) (cubre el remito
 --      de 0 líneas; generar_remito inserta las líneas ANTES del UPDATE).
 --   f) Backfill: corre (c) sobre todos los 'en_preparacion' actuales.
---      OJO: esto cierra la #7 (22 líneas 'recibida' por SQL, sin
+--      Cierra la #1 y la #7 (la #7: 22 líneas 'recibida' por SQL, sin
 --      movimiento en YiQi) — cerrar el encabezado NO mueve stock ni
 --      impide mover después (mover-stock-reposicion no mira el
 --      encabezado). La #2 NO se cierra (199 líneas 'declarada' > 0).
 --
 -- NO mueve stock en YiQi. Ningún paso llama a mover-stock-reposicion.
 --
--- Impacto en frontend (a ajustar aparte, no incluido acá):
+-- Impacto en frontend (ajustado el 30/9/2026 en ReposicionCentralLocal.jsx):
 --   - ConfirmarRecepcion.jsx / SolicitudesParaPreparar.jsx filtran
 --     por estado 'en_preparacion' / ('solicitada','en_preparacion'):
 --     una 'completada' o 'anulada' desaparece de ahí (correcto).
@@ -202,7 +204,13 @@ for each row
 when (new.estado = 'en_preparacion' and old.estado is distinct from 'en_preparacion')
 execute function public.trigger_cerrar_solicitud_vacia();
 
--- f) Backfill: cierra lo que ya está completo hoy (cierra #7, no #2).
+-- Funciones internas: nadie las llama desde afuera (criterio de
+-- 20260930130000_permisos_funciones.sql).
+revoke execute on function public.cerrar_solicitud_reposicion_si_completa(bigint) from public, anon, authenticated;
+revoke execute on function public.trigger_cerrar_solicitud_desde_linea() from public, anon, authenticated;
+revoke execute on function public.trigger_cerrar_solicitud_vacia() from public, anon, authenticated;
+
+-- f) Backfill: cierra lo que ya está completo hoy (#1 y #7; la #2 no).
 select s.id, s.remito_numero,
        public.cerrar_solicitud_reposicion_si_completa(s.id) as cerrada_ahora
 from public.solicitudes_reposicion s

@@ -49,6 +49,9 @@ function num(v, decimales = 2) {
 // Esta función lo resume en una sola etiqueta para la tabla.
 function estadoDetallado(solicitud, lineas) {
   if (solicitud.estado === 'reemplazada') return { texto: 'Reemplazada', clase: 'text-gray-400' }
+  // 30/9/2026: estados de cierre (migración 20260930140000).
+  if (solicitud.estado === 'completada') return { texto: '✓ Completa', clase: 'text-[var(--grn,#059669)] font-semibold' }
+  if (solicitud.estado === 'anulada') return { texto: 'Anulada', clase: 'text-gray-400' }
   if (solicitud.estado === 'solicitada') return { texto: 'Solicitada, sin procesar', clase: 'text-[var(--yel,#b45309)]' }
   // estado === 'en_preparacion'
   if (lineas.length === 0) return { texto: 'En preparación (sin líneas)', clase: 'text-[var(--sub)]' }
@@ -215,7 +218,7 @@ export default function ReposicionCentralLocal() {
     if (filtro === 'todas') return true
     if (filtro === 'completas') return estado.texto === '✓ Completa'
     // activas: todo lo que no es completa ni reemplazada
-    return estado.texto !== '✓ Completa' && s.estado !== 'reemplazada'
+    return estado.texto !== '✓ Completa' && s.estado !== 'reemplazada' && s.estado !== 'anulada'
   })
 
   function toggle(id) {
