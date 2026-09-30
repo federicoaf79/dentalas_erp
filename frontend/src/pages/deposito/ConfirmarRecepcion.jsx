@@ -141,20 +141,12 @@ export default function ConfirmarRecepcion() {
       if (errLin) throw errLin
       setLineas(filasLineas ?? [])
 
-      const skus = [...new Set((filasLineas ?? []).map((l) => l.sku))]
-      if (skus.length) {
-        const { data: filasAbc, error: errAbc } = await supabase
-          .rpc('reposicion_interna')
-          .select('sku, clase_abc')
-          .in('sku', skus)
-        if (errAbc) {
-          console.error('[claseAbcPorSku]', errAbc)
-        } else {
-          const mapaAbc = {}
-          for (const f of filasAbc ?? []) mapaAbc[f.sku] = f.clase_abc
-          setClaseAbcPorSku(mapaAbc)
-        }
-      }
+      // Clase ABC congelada en la línea al generarse el remito
+      // (migración 20260930100000). El depósito no llama más a
+      // reposicion_interna(): no necesita ver ventas.
+      const mapaAbc = {}
+      for (const l of filasLineas ?? []) if (l.clase_abc) mapaAbc[l.sku] = l.clase_abc
+      setClaseAbcPorSku(mapaAbc)
     } catch (err) {
       setError(err.message)
     } finally {

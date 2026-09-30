@@ -40,8 +40,8 @@ import { generarRemitoImprimible } from '../../lib/pdfRemito'
 // no distinguía qué línea es A/B/C, aunque el orden en que se armó el
 // remito ya respeta esa prioridad (ver generar_remito_reposicion_central
 // en la migración 20260910140000). Se agrega acá SOLO para mostrarla —
-// se trae la clasificación real con reposicion_interna() filtrada a los
-// SKU de la pantalla (no se reimplementa el cálculo).
+// se lee la clasificación congelada en la línea (clase_abc, desde 30/9/2026;
+// migración 20260930100000) — no se llama más a reposicion_interna().
 // ============================================================
 
 const CLASE_ABC_ESTILO = {
@@ -155,8 +155,8 @@ export default function SolicitudesParaPreparar() {
   // lo que YiQi ya calcula por su cuenta (Aris, 10/9: formalizar "En
   // tránsito" cruzando contra ese dato).
   const [enTransitoYiqi, setEnTransitoYiqi] = useState({})
-  // SKU -> clase_abc real (Aris), traída de reposicion_interna() filtrada
-  // a los SKU en pantalla — no se reimplementa el cálculo (10/9/2026, v3).
+  // SKU -> clase_abc real (Aris), leída de la línea del remito (30/9/2026;
+  // migración 20260930100000) — el depósito no lee ventas.
   const [claseAbcPorSku, setClaseAbcPorSku] = useState({})
 
   const misDepositos = permisos.misDepositos ?? []
@@ -219,19 +219,12 @@ export default function SolicitudesParaPreparar() {
           for (const f of filasStock ?? []) mapaStock[f.sku] = f.en_transito
           setEnTransitoYiqi(mapaStock)
 
-          // Clasificación ABC real — misma que usa el remito para
-          // priorizar, solo para mostrarla acá.
-          const { data: filasAbc, error: errAbc } = await supabase
-            .rpc('reposicion_interna')
-            .select('sku, clase_abc')
-            .in('sku', skus)
-          if (errAbc) {
-            console.error('[claseAbcPorSku]', errAbc)
-          } else {
-            const mapaAbc = {}
-            for (const f of filasAbc ?? []) mapaAbc[f.sku] = f.clase_abc
-            setClaseAbcPorSku(mapaAbc)
-          }
+          // Clase ABC congelada en la línea al generarse el remito
+          // (migración 20260930100000). El depósito no llama más a
+          // reposicion_interna(): no necesita ver ventas.
+          const mapaAbc = {}
+          for (const l of filasLineas ?? []) if (l.clase_abc) mapaAbc[l.sku] = l.clase_abc
+          setClaseAbcPorSku(mapaAbc)
         }
       } else {
         setLineasPorSolicitud({})
@@ -409,7 +402,7 @@ export default function SolicitudesParaPreparar() {
                           <FilaLineaReservada
                             key={l.id}
                             linea={l}
-                            claseAbc={claseAbcPorSku[l.sku]}
+                            claseAbc={l.clase_abc ?? claseAbcPorSku[l.sku]}
                             onDeclarar={declararLinea}
                             guardando={declarando === l.id}
                           />
@@ -417,7 +410,7 @@ export default function SolicitudesParaPreparar() {
                           <tr key={l.id} className="border-b border-gray-50 last:border-0 bg-gray-50/50">
                             <td className="px-3.5 py-1.5 font-mono text-xs">{l.sku}</td>
                             <td className="px-3.5 py-1.5">
-                              <BadgeClaseAbc clase={claseAbcPorSku[l.sku]} />
+                              <BadgeClaseAbc clase={l.clase_abc ?? claseAbcPorSku[l.sku]} />
                             </td>
                             <td className="px-3.5 py-1.5 text-sm">{l.mate_nombre}</td>
                             <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(l.cantidad_solicitada)}</td>
