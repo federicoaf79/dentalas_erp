@@ -136,6 +136,17 @@ export function generarRemitoImprimible({ solicitud, lineas, empresa, claseAbcPo
                   padding: 6px 14px; font-weight: 600; cursor: pointer; font-size: 13px; }
   .cuerpo { margin-top: 46px; } /* fallback si por algo no corre el script de abajo */
   @media print { .cuerpo { margin-top: 0; } }
+  /* 30/9/2026: en pantalla la vista previa se ve como una hoja A4 centrada,
+     con los mismos márgenes que la impresión (antes el contenido iba pegado
+     a los bordes y se cortaba el lado derecho). Al imprimir no cambia nada:
+     el tamaño y los márgenes los pone @page. */
+  @media screen {
+    html { background: #e5e7eb; }
+    body { background: #e5e7eb; }
+    .cuerpo { max-width: 210mm; margin-left: auto; margin-right: auto;
+              margin-bottom: 24px; padding: 16mm 14mm; background: #fff;
+              box-shadow: 0 1px 4px rgba(0,0,0,.15); overflow-wrap: anywhere; }
+  }
 </style></head>
 <body>
 <div class="barra no-print">

@@ -53,6 +53,20 @@ function formatoFecha(f) {
     })
   } catch { return '—' }
 }
+
+// Botones de la columna de acciones (30/9/2026). Mismo alto para todos
+// (h-7) así la fila queda alineada; los de consulta son neutros y los de
+// la acción del estado llevan color.
+const BTN_BASE = 'inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[12px] font-semibold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+const BTN_SEC = `${BTN_BASE} bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-[var(--ind,#4338ca)]`
+const BTN_PRIM = `${BTN_BASE} bg-[var(--ind,#4338ca)] border-[var(--ind,#4338ca)] text-white hover:opacity-90`
+const BTN_OK = `${BTN_BASE} bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700`
+const BTN_PELIGRO = `${BTN_BASE} bg-white border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300`
+const BTN_WA = `${BTN_BASE} bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100`
+const BTN_WA_OUT = `${BTN_BASE} bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50`
+const BTN_AVISO = `${BTN_BASE} bg-amber-50 border-amber-300 text-[#92400e] hover:bg-amber-100`
+const BTN_ICONO = `${BTN_BASE} px-2 bg-white border-transparent text-gray-400 hover:text-red-600 hover:bg-red-50`
+
 export default function OrdenesPropias({ onCambio }) {
   const permisos = usePermisos()
   const [ordenes, setOrdenes] = useState([])
@@ -867,118 +881,106 @@ export default function OrdenesPropias({ onCambio }) {
                     <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(o.creada_en)}</td>
                     <td className="px-3.5 py-1.5 text-xs">{o.cant_items ?? 0}</td>
                     <td className="px-3.5 py-1.5 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => {
-                          // Pestaña nueva de verdad (28/9/2026), no el panel
-                          // en esta misma pantalla. `?page=ocs` hace que
-                          // App.jsx arranque directo en esta sección y
-                          // `?orden=<id>` hace que OrdenesPropias se abra
-                          // sola en el detalle de esta orden (ver el efecto
-                          // de ordenIdDesdeURL más arriba).
-                          const url = `${window.location.origin}${window.location.pathname}?page=ocs&orden=${o.id}`
-                          window.open(url, '_blank', 'noopener')
-                        }}
-                        className="text-sm text-[var(--ind,#4338ca)] hover:underline mr-3"
-                      >
-                        Ver detalle ↗
-                      </button>
-                      <button onClick={() => imprimir(o)} className="text-sm text-gray-500 hover:text-[var(--ind,#4338ca)] hover:underline mr-3">
-                        PDF
-                      </button>
-                      <button
-                        onClick={() =>
-                          setModalCausa({ referenciaId: o.id, referenciaTexto: `Orden #${o.id} — ${o.proveedor_nombre}` })
-                        }
-                        className="text-sm text-gray-500 hover:text-[var(--ind,#4338ca)] hover:underline mr-3"
-                      >
-                        {causasPorOrden[String(o.id)] ? 'Causa' : 'Declarar causa'}
-                      </button>
-                      {filtro === 'activas' && o.estado === 'aprobada' && (
+                      {/* 30/9/2026: acciones como botones (antes eran links de texto
+                          sueltos). Izquierda: consulta (detalle, PDF, causa) en
+                          botones chicos neutros. Derecha: la acción que corresponde
+                          al estado de la orden, con color y relleno. */}
+                      <div className="inline-flex items-center justify-end gap-1.5">
                         <button
-                          disabled={enviandoWaId === o.id}
-                          onClick={() => enviarWhatsApp(o)}
-                          title={o.whatsapp_enviada_en ? `Ya se envió el ${formatoFecha(o.whatsapp_enviada_en)} — volver a enviar` : 'Descargar PDF y abrir WhatsApp'}
-                          className="text-sm text-green-600 hover:text-green-700 hover:underline mr-3 disabled:opacity-40"
+                          onClick={() => {
+                            // Pestaña nueva de verdad (28/9/2026), no el panel
+                            // en esta misma pantalla. `?page=ocs` hace que
+                            // App.jsx arranque directo en esta sección y
+                            // `?orden=<id>` hace que OrdenesPropias se abra
+                            // sola en el detalle de esta orden (ver el efecto
+                            // de ordenIdDesdeURL más arriba).
+                            const url = `${window.location.origin}${window.location.pathname}?page=ocs&orden=${o.id}`
+                            window.open(url, '_blank', 'noopener')
+                          }}
+                          title="Abrir el detalle en una pestaña nueva"
+                          className={BTN_SEC}
                         >
-                          {enviandoWaId === o.id ? 'Enviando…' : o.whatsapp_enviada_en ? '💬 Reenviar' : '💬 WhatsApp'}
+                          Detalle ↗
                         </button>
-                      )}
-                      {filtro === 'activas' && permisos.esAdmin && o.estado === 'pendiente' && (
-                        <>
-                          <button
-                            disabled={ocupado}
-                            onClick={() => pedirDecision(o, 'aprobada')}
-                            className="text-sm font-semibold text-[var(--grn)] hover:underline mr-3 disabled:opacity-40"
-                          >
-                            Aprobar
-                          </button>
-                          <button
-                            disabled={ocupado}
-                            onClick={() => pedirDecision(o, 'rechazada')}
-                            className="text-sm text-[var(--red)] hover:underline mr-3 disabled:opacity-40"
-                          >
-                            Rechazar
-                          </button>
-                        </>
-                      )}
-                      {filtro === 'activas' && !permisos.esAdmin && o.estado === 'borrador' && (
-                        <>
-                          <button
-                            disabled={ocupado}
-                            onClick={() => enviarAAprobacion(o)}
-                            className="text-sm font-semibold text-[var(--ind,#4338ca)] hover:underline mr-3 disabled:opacity-40"
-                          >
-                            Enviar
-                          </button>
-                          <button
-                            disabled={ocupado}
-                            onClick={() => pedirBorrar(o)}
-                            className="text-sm text-gray-400 hover:text-[var(--red)] disabled:opacity-40"
-                          >
-                            Eliminar
-                          </button>
-                        </>
-                      )}
-                      {/* 7/9/2026 (U-4): título aclara qué hace el botón, no solo
-                          por qué falló la primera vez. */}
-                      {filtro === 'activas' && permisos.esAdmin && o.estado === 'aprobada' && !o.yiqi_id_creado && (
+                        <button onClick={() => imprimir(o)} title="Ver e imprimir el PDF de la orden" className={BTN_SEC}>
+                          📄 PDF
+                        </button>
                         <button
-                          disabled={ocupado}
-                          onClick={() => reintentarEnvioYiqi(o)}
-                          title={`${o.yiqi_error || 'Todavía no se envió a YiQi.'} — Reintentar vuelve a mandar esta misma orden a YiQi con los mismos datos.`}
-                          className="text-sm font-semibold text-[#b45309] hover:underline mr-3 disabled:opacity-40"
+                          onClick={() =>
+                            setModalCausa({ referenciaId: o.id, referenciaTexto: `Orden #${o.id} — ${o.proveedor_nombre}` })
+                          }
+                          title={causasPorOrden[String(o.id)] ? 'Ver o editar la causa declarada' : 'Declarar una causa (demora, faltante, etc.)'}
+                          className={causasPorOrden[String(o.id)] ? `${BTN_SEC} border-amber-300 text-[#92400e] bg-amber-50` : BTN_SEC}
                         >
-                          Reintentar envío
+                          {causasPorOrden[String(o.id)] ? '📝 Causa' : '📝 Causa +'}
                         </button>
-                      )}
-                      {filtro === 'activas' && permisos.esAdmin && (
-                        <button
-                          disabled={ocupado}
-                          onClick={() => archivar(o)}
-                          title="Archivar (mover a la papelera)"
-                          className="text-sm text-gray-400 hover:text-[var(--red)] disabled:opacity-40"
-                        >
-                          🗑
-                        </button>
-                      )}
-                      {filtro === 'papelera' && (
-                        <>
+
+                        {(filtro === 'activas' || filtro === 'papelera') && <span className="w-px h-5 bg-gray-200 mx-1" aria-hidden="true" />}
+
+                        {filtro === 'activas' && o.estado === 'aprobada' && (
+                          <button
+                            disabled={enviandoWaId === o.id}
+                            onClick={() => enviarWhatsApp(o)}
+                            title={o.whatsapp_enviada_en ? `Ya se envió el ${formatoFecha(o.whatsapp_enviada_en)} — volver a enviar` : 'Descargar PDF y abrir WhatsApp'}
+                            className={o.whatsapp_enviada_en ? BTN_WA_OUT : BTN_WA}
+                          >
+                            {enviandoWaId === o.id ? 'Enviando…' : o.whatsapp_enviada_en ? '💬 Reenviar' : '💬 WhatsApp'}
+                          </button>
+                        )}
+                        {filtro === 'activas' && permisos.esAdmin && o.estado === 'pendiente' && (
+                          <>
+                            <button disabled={ocupado} onClick={() => pedirDecision(o, 'aprobada')} className={BTN_OK}>
+                              ✓ Aprobar
+                            </button>
+                            <button disabled={ocupado} onClick={() => pedirDecision(o, 'rechazada')} className={BTN_PELIGRO}>
+                              Rechazar
+                            </button>
+                          </>
+                        )}
+                        {filtro === 'activas' && !permisos.esAdmin && o.estado === 'borrador' && (
+                          <>
+                            <button disabled={ocupado} onClick={() => enviarAAprobacion(o)} className={BTN_PRIM}>
+                              Enviar a aprobación
+                            </button>
+                            <button disabled={ocupado} onClick={() => pedirBorrar(o)} className={BTN_PELIGRO}>
+                              Eliminar
+                            </button>
+                          </>
+                        )}
+                        {/* 7/9/2026 (U-4): título aclara qué hace el botón, no solo
+                            por qué falló la primera vez. */}
+                        {filtro === 'activas' && permisos.esAdmin && o.estado === 'aprobada' && !o.yiqi_id_creado && (
                           <button
                             disabled={ocupado}
-                            onClick={() => restaurar(o)}
-                            className="text-sm font-semibold text-[var(--ind,#4338ca)] hover:underline mr-3 disabled:opacity-40"
+                            onClick={() => reintentarEnvioYiqi(o)}
+                            title={`${o.yiqi_error || 'Todavía no se envió a YiQi.'} — Reintentar vuelve a mandar esta misma orden a YiQi con los mismos datos.`}
+                            className={BTN_AVISO}
                           >
-                            Restaurar
+                            ↻ Reintentar envío
                           </button>
+                        )}
+                        {filtro === 'activas' && permisos.esAdmin && (
                           <button
                             disabled={ocupado}
-                            onClick={() => pedirEliminarDefinitivo(o)}
-                            className="text-sm text-[var(--red)] hover:underline disabled:opacity-40"
+                            onClick={() => archivar(o)}
+                            title="Archivar (mover a la papelera)"
+                            aria-label="Archivar"
+                            className={BTN_ICONO}
                           >
-                            Eliminar definitivamente
+                            🗑
                           </button>
-                        </>
-                      )}
+                        )}
+                        {filtro === 'papelera' && (
+                          <>
+                            <button disabled={ocupado} onClick={() => restaurar(o)} className={BTN_PRIM}>
+                              Restaurar
+                            </button>
+                            <button disabled={ocupado} onClick={() => pedirEliminarDefinitivo(o)} className={BTN_PELIGRO}>
+                              Eliminar definitivamente
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

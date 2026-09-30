@@ -35,6 +35,19 @@ function moneda(n) {
   }).format(num)
 }
 
+// 30/9/2026: el precio unitario se muestra con 2 decimales, así que el
+// subtotal y el total se calculan con ESE precio redondeado. Antes se
+// multiplicaba el precio sin redondear y, si alguien controlaba a mano
+// (12 × $3.645,67), el subtotal no daba igual por centavos.
+function precioRedondeado(c) {
+  const n = Number(c)
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN
+}
+function subtotalLinea(i) {
+  const pu = precioRedondeado(i.costo_unitario)
+  return Number.isFinite(pu) ? Math.round(pu * Number(i.cantidad || 0) * 100) / 100 : 0
+}
+
 function numero(n) {
   if (n == null) return '—'
   const num = Number(n)
@@ -60,10 +73,7 @@ function esc(s) {
 
 export function generarPdfOrden({ orden, items, empresa, proveedor }) {
   const e = empresa ?? {}
-  const totalCalculado = items.reduce((acc, i) => {
-    const c = Number(i.costo_unitario)
-    return acc + (Number.isFinite(c) ? c * Number(i.cantidad || 0) : 0)
-  }, 0)
+  const totalCalculado = Math.round(items.reduce((acc, i) => acc + subtotalLinea(i), 0) * 100) / 100
   const sinCosto = items.filter((i) => !i.costo_unitario).length
 
   const filas = items.map((i) => `
@@ -71,8 +81,8 @@ export function generarPdfOrden({ orden, items, empresa, proveedor }) {
       <td class="mono">${esc(i.mate_codigo)}</td>
       <td>${esc(i.mate_nombre ?? '')}</td>
       <td class="num">${numero(i.cantidad)}</td>
-      <td class="num">${i.costo_unitario ? moneda(i.costo_unitario) : '<span class="gris">a confirmar</span>'}</td>
-      <td class="num">${i.costo_unitario ? moneda(Number(i.costo_unitario) * Number(i.cantidad || 0)) : '—'}</td>
+      <td class="num">${i.costo_unitario ? moneda(precioRedondeado(i.costo_unitario)) : '<span class="gris">a confirmar</span>'}</td>
+      <td class="num">${i.costo_unitario ? moneda(subtotalLinea(i)) : '—'}</td>
     </tr>`).join('')
 
   const html = `<!doctype html>
@@ -127,6 +137,17 @@ export function generarPdfOrden({ orden, items, empresa, proveedor }) {
                   padding: 6px 14px; font-weight: 600; cursor: pointer; font-size: 13px; }
   .cuerpo { margin-top: 46px; } /* fallback si por algo no corre el script de abajo */
   @media print { .cuerpo { margin-top: 0; } }
+  /* 30/9/2026: en pantalla la vista previa se ve como una hoja A4 centrada,
+     con los mismos márgenes que la impresión (antes el contenido iba pegado
+     a los bordes y se cortaba el lado derecho). Al imprimir no cambia nada:
+     el tamaño y los márgenes los pone @page. */
+  @media screen {
+    html { background: #e5e7eb; }
+    body { background: #e5e7eb; }
+    .cuerpo { max-width: 210mm; margin-left: auto; margin-right: auto;
+              margin-bottom: 24px; padding: 16mm 14mm; background: #fff;
+              box-shadow: 0 1px 4px rgba(0,0,0,.15); overflow-wrap: anywhere; }
+  }
 </style></head>
 <body>
 <div class="barra no-print">
@@ -251,10 +272,7 @@ function nombreArchivoOrden(orden) {
 // la persona quiere arrastrarlo a la conversación.
 export function generarPdfOrdenDescargable({ orden, items, empresa, proveedor }) {
   const e = empresa ?? {}
-  const totalCalculado = items.reduce((acc, i) => {
-    const c = Number(i.costo_unitario)
-    return acc + (Number.isFinite(c) ? c * Number(i.cantidad || 0) : 0)
-  }, 0)
+  const totalCalculado = Math.round(items.reduce((acc, i) => acc + subtotalLinea(i), 0) * 100) / 100
   const sinCosto = items.filter((i) => !i.costo_unitario).length
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
@@ -318,8 +336,8 @@ export function generarPdfOrdenDescargable({ orden, items, empresa, proveedor })
     i.mate_codigo ?? '',
     i.mate_nombre ?? '',
     numero(i.cantidad),
-    i.costo_unitario ? moneda(i.costo_unitario) : 'a confirmar',
-    i.costo_unitario ? moneda(Number(i.costo_unitario) * Number(i.cantidad || 0)) : '—',
+    i.costo_unitario ? moneda(precioRedondeado(i.costo_unitario)) : 'a confirmar',
+    i.costo_unitario ? moneda(subtotalLinea(i)) : '—',
   ])
 
   doc.autoTable({
