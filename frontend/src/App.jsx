@@ -151,10 +151,20 @@ function AppLogueada({ session, onLogout }) {
 
   // Clave derivada de los permisos: misma técnica que en las pantallas.
   // Evita recalcular los contadores en cada refresh de token de Supabase.
+  // Las cuentas de depósito no usan contadores ni estado de YiQi: con
+  // null no se dispara ninguna consulta de la app de compras (30/9/2026).
   const claveFiltro =
-    permisos.cargando || permisos.error
+    permisos.cargando || permisos.error || permisos.esDeposito
       ? null
       : `${permisos.esAdmin}|${permisos.codigos.join(',')}|${permisos.nombres.join(',')}`
+
+  // true recién cuando se sabe el rol por primera vez. Mientras tanto no
+  // se monta ninguna pantalla: antes se montaba Monitor de stock y
+  // disparaba las consultas de compras aunque el usuario fuera de
+  // depósito (el "flash" del sidebar). Solo la PRIMERA carga: si más
+  // adelante cargando vuelve a true, no se desmonta nada.
+  const rolConocidoRef = useRef(false)
+  if (!permisos.cargando) rolConocidoRef.current = true
 
   // Extraída con useCallback (y no declarada adentro del useEffect) para
   // poder pasarla como onCambioOrdenes a OrdenesCompra y NuevaOC: así el
@@ -194,6 +204,7 @@ function AppLogueada({ session, onLogout }) {
   // renovación del token. Mismo ciclo que cargarContadores: no hace
   // falta un intervalo aparte.
   const cargarYiqiEstado = useCallback(async () => {
+    if (claveFiltro === null) return
     const { data, error } = await supabase.rpc('yiqi_estado_actual')
     if (!vivoRef.current) return
     if (error) {
@@ -201,7 +212,7 @@ function AppLogueada({ session, onLogout }) {
       return
     }
     setYiqiEstado(Array.isArray(data) ? data[0] : data)
-  }, [])
+  }, [claveFiltro])
 
   useEffect(() => {
     cargarContadores()
@@ -214,6 +225,14 @@ function AppLogueada({ session, onLogout }) {
   // OC, Alertas ni el resto del sidebar de admin/operador. Se corta acá,
   // después de que ya corrieron todos los hooks de arriba (regla de los
   // hooks), antes de armar el resto del layout que no les corresponde.
+  if (!rolConocidoRef.current) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#f7f8fa] text-sm text-gray-400">
+        Cargando…
+      </div>
+    )
+  }
+
   if (permisos.esDeposito) {
     return <AppDeposito nombreUsuario={nombreUsuario} onLogout={onLogout} />
   }

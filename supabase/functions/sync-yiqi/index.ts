@@ -749,10 +749,26 @@ async function sincronizarVentasVendedor(
     config.bearer_token,
   );
 
-  const { planas, mesesDetectados, filasSinCodigo, filasSinVendedor } = mapearVentasVendedor(filas, columnas);
+  const mapeo = mapearVentasVendedor(filas, columnas);
+  const { mesesDetectados, filasSinCodigo, filasSinVendedor } = mapeo;
 
-  // Idempotente por (mate_codigo, vendedor, periodo) -- igual que
-  // ventas, partir en tandas es seguro.
+  // [30/9/2026] Sumar por clave ANTES de partir en tandas. La 2369 trae
+  // mas dimensiones que la clave (origen, canal, punto de venta), asi
+  // que un mismo (mate_codigo, vendedor, periodo) aparece en varias
+  // filas. El RPC suma dentro de cada tanda pero PISA entre tandas
+  // (ON CONFLICT DO UPDATE): si las filas de una clave caian en dos
+  // tandas distintas, quedaba guardada solo la suma de la ultima.
+  const sumadas = new Map<string, { mate_codigo: string; vendedor: string; periodo: string; cantidad: number }>();
+  for (const p of mapeo.planas) {
+    const clave = `${p.mate_codigo}\u0000${p.vendedor}\u0000${p.periodo}`;
+    const previa = sumadas.get(clave);
+    if (previa) previa.cantidad += p.cantidad;
+    else sumadas.set(clave, { ...p });
+  }
+  const planas = Array.from(sumadas.values());
+
+  // Idempotente por (mate_codigo, vendedor, periodo) y ahora sin claves
+  // repetidas entre tandas.
   let filasEscritas = 0;
   for (let i = 0; i < planas.length; i += TAMANIO_TANDA_VENTAS) {
     const tanda = planas.slice(i, i + TAMANIO_TANDA_VENTAS);

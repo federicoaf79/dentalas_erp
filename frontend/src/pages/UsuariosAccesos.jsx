@@ -182,12 +182,12 @@ function PanelAsignacion({ usuario, proveedores, onCambioOptimista }) {
 // ------------------------------------------------------------
 // Modal para restablecer la contraseña de un usuario (19/8/2026).
 // Mismo lenguaje visual que el resto de la app (rounded-xl, sin
-// window.prompt). Se precarga con la clave de las cuentas demo por
-// default (Dentalab2026!) porque hoy son cuentas internas chicas —
-// editable por si hace falta poner otra.
+// window.prompt). Desde el 30/9/2026 arranca vacío: la clave por
+// default ya no viaja en el código publicado. Cada usuario puede
+// cambiar la suya desde "Cambiar mi contraseña" (pie del menú).
 // ------------------------------------------------------------
 function ModalPassword({ usuario, onCerrar, onConfirmar, guardando }) {
-  const [password, setPassword] = useState('Dentalab2026!')
+  const [password, setPassword] = useState('')
   const invalida = password.trim().length < 8
 
   return (

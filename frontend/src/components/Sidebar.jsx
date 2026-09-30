@@ -1,3 +1,5 @@
+import CambiarMiPassword from './CambiarMiPassword'
+
 // ------------------------------------------------------------
 // Estructura de navegación — copiada 1:1 del prototipo v8 aprobado
 // por el cliente, reorganizada en MÓDULOS el 19/8/2026.
@@ -240,7 +242,7 @@ export default function Sidebar({
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold truncate capitalize">{nombreUsuario}</div>
-          <div className="text-[10px] text-[var(--sub)]">Sesión activa</div>
+          <CambiarMiPassword />
         </div>
         {onLogout && (
           <button

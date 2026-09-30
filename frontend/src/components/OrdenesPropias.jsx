@@ -123,10 +123,10 @@ export default function OrdenesPropias({ onCambio }) {
   // que sí tiene es_admin() OR ...). O sea: hoy, ni siquiera Aris puede
   // editar los ítems de una orden en borrador que armó Ivana -- cada
   // tabla tiene su propia policy independiente. Por eso el gate de abajo
-  // usa solo 'borrador', y por lo mismo NO se oculta el botón según
-  // quién creó la orden ni según el rol: si Postgres rechaza el intento
-  // (por ejemplo Aris editando un borrador ajeno), el error real de RLS
-  // se muestra tal cual en errorEdicionItems -- no se enmascara. Ver
+  // usa solo 'borrador'. [30/9/2026] Además se oculta el botón si quien
+  // mira no es quien creó el borrador (antes se mostraba y el guardado
+  // chocaba con la RLS). Si Postgres rechaza igual, el error real se
+  // muestra tal cual en errorEdicionItems -- no se enmascara. Ver
   // migración opcional al final de este archivo (comentario, no se
   // aplicó) si en algún momento se quiere sumar el bypass de admin y/o
   // 'pendiente' a estas policies.
@@ -137,11 +137,31 @@ export default function OrdenesPropias({ onCambio }) {
   // probado (mismo motivo por el que editar-oc-yiqi solo permite
   // AGREGAR líneas nuevas, nunca tocar las existentes). En 'borrador' no
   // hay YiQi de por medio todavía -- es 100% local.
+  // Solo quien creó el borrador puede editar sus ítems (la RLS de
+  // ordenes_propias_items no tiene bypass de admin). Desde el 30/9/2026
+  // el botón se oculta a los demás en vez de dejar que choquen con el
+  // error de RLS al guardar.
+  const [miUserId, setMiUserId] = useState(null)
+  useEffect(() => {
+    let vivo = true
+    supabase.auth.getUser().then(({ data }) => {
+      if (vivo) setMiUserId(data?.user?.id ?? null)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
   const [editandoItems, setEditandoItems] = useState(false)
   const [itemsEdit, setItemsEdit] = useState([])
   const [errorEdicionItems, setErrorEdicionItems] = useState(null)
   function puedeEditarItems(orden) {
-    return !!orden && !orden.archivada_en && orden.estado === 'borrador'
+    return (
+      !!orden &&
+      !orden.archivada_en &&
+      orden.estado === 'borrador' &&
+      !!miUserId &&
+      orden.creada_por === miUserId
+    )
   }
   function iniciarEdicionItems() {
     setItemsEdit(items.map((i) => ({ ...i, _cantidad: String(i.cantidad) })))
@@ -1064,9 +1084,7 @@ export default function OrdenesPropias({ onCambio }) {
               Solo aparece en 'borrador' (RLS real de ordenes_propias_items
               no admite 'pendiente' ni bypass de admin, ver comentario):
               en cualquier otro estado la tabla queda 100% de solo lectura,
-              como siempre. Si Postgres rechaza igual (por ejemplo, Aris
-              sobre un borrador que no creó ella), el error de RLS se
-              muestra tal cual más abajo. */}
+              como siempre. Solo lo ve quien creó el borrador (30/9/2026). */}
           {puedeEditarItems(abierta) && !editandoItems && (
             <div className="flex justify-end mb-2">
               <button

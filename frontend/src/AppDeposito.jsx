@@ -3,6 +3,7 @@ import SolicitudesParaPreparar from './pages/deposito/SolicitudesParaPreparar'
 import ConfirmarRecepcion from './pages/deposito/ConfirmarRecepcion'
 import PedirAlOtroDeposito from './pages/deposito/PedirAlOtroDeposito'
 import AyudaDeposito from './pages/deposito/AyudaDeposito'
+import CambiarMiPassword from './components/CambiarMiPassword'
 
 // ============================================================
 // AppDeposito.jsx — 7/9/2026, v2 14/9/2026
@@ -73,7 +74,7 @@ export default function AppDeposito({ nombreUsuario, onLogout }) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-semibold truncate capitalize">{nombreUsuario}</div>
-            <div className="text-[10px] text-[var(--sub)]">Sesión activa</div>
+            <CambiarMiPassword />
           </div>
           {onLogout && (
             <button

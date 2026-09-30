@@ -40,7 +40,9 @@ foreach ($fn in @('yiqi-connector?entidad=CLIENTE&pageDesde=1&pageHasta=1','admi
 Write-Host ""
 Write-Host "=== 3. Fase B: la RLS filtra de verdad? ===" -ForegroundColor Cyan
 Write-Host "    Se loguea como IVANA (operadora, ve solo sus proveedores) y compara contra anonimo." -ForegroundColor DarkGray
-$body = @{ email = 'ivana@dentalab-compras.demo'; password = 'Dentalab2026!' } | ConvertTo-Json
+# 30/9/2026: la clave ya no va escrita en el script. Se pide al correr.
+$passIvana = Read-Host -Prompt 'Clave de ivana@dentalab-compras.demo' -MaskInput
+$body = @{ email = 'ivana@dentalab-compras.demo'; password = $passIvana } | ConvertTo-Json
 try {
   $auth = Invoke-RestMethod -Uri "$URL/auth/v1/token?grant_type=password" -Headers @{apikey=$ANON} -Method POST -Body $body -ContentType 'application/json' -TimeoutSec 30
   $HI = @{ apikey = $ANON; Authorization = "Bearer $($auth.access_token)"; Prefer = 'count=exact' }

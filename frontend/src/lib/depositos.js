@@ -23,3 +23,14 @@ export const DEPOSITO_OTRO = {
 export function nombreDeposito(id) {
   return DEPOSITO_NOMBRES[id] ?? `Depósito ${id}`
 }
+
+// "a el Local" / "de el Local" no existen en castellano: se contraen
+// ("al Local", "del Local"). 30/9/2026, bug "Pedir a el Local".
+export function aDeposito(id) {
+  const n = nombreDeposito(id)
+  return n.startsWith('el ') ? `al ${n.slice(3)}` : `a ${n}`
+}
+export function deDeposito(id) {
+  const n = nombreDeposito(id)
+  return n.startsWith('el ') ? `del ${n.slice(3)}` : `de ${n}`
+}

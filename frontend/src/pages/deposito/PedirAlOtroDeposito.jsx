@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
-import { DEPOSITO_OTRO, nombreDeposito } from '../../lib/depositos'
+import { DEPOSITO_OTRO, nombreDeposito, aDeposito } from '../../lib/depositos'
 
 // ============================================================
 // pages/deposito/PedirAlOtroDeposito.jsx — 7/9/2026
@@ -92,7 +92,7 @@ export default function PedirAlOtroDeposito() {
       if (errRpc) throw errRpc
       setCarrito([])
       setAviso(
-        `Pedido enviado a ${nombreDeposito(otroDeposito)} — ${lineas.length} artículo${lineas.length === 1 ? '' : 's'}.`
+        `Pedido enviado ${aDeposito(otroDeposito)} — ${lineas.length} artículo${lineas.length === 1 ? '' : 's'}.`
       )
       setTimeout(() => setAviso(null), 5000)
     } catch (err) {
@@ -105,7 +105,7 @@ export default function PedirAlOtroDeposito() {
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
       <div className="px-6 py-4 border-b border-[var(--border)] bg-white">
-        <div className="text-[17px] font-bold">Pedir a {otroDeposito ? nombreDeposito(otroDeposito) : '…'}</div>
+        <div className="text-[17px] font-bold">Pedir {otroDeposito ? aDeposito(otroDeposito) : 'al otro depósito'}</div>
         <div className="text-[12px] text-[var(--sub)] mt-0.5">
           Armá el pedido puntual de artículos que necesitás — {otroDeposito ? nombreDeposito(otroDeposito) : 'el otro depósito'}{' '}
           lo va a ver en "Solicitudes para preparar".
@@ -207,7 +207,7 @@ export default function PedirAlOtroDeposito() {
           disabled={!carritoValido || enviando}
           className="mt-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--ind,#4338ca)] disabled:opacity-50"
         >
-          {enviando ? 'Enviando…' : `📤 Enviar pedido a ${otroDeposito ? nombreDeposito(otroDeposito) : ''}`}
+          {enviando ? 'Enviando…' : `📤 Enviar pedido ${otroDeposito ? aDeposito(otroDeposito) : ''}`}
         </button>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
-import { nombreDeposito } from '../../lib/depositos'
+import { deDeposito } from '../../lib/depositos'
 import { generarRemitoImprimible } from '../../lib/pdfRemito'
 
 // ============================================================
@@ -242,7 +242,7 @@ export default function ConfirmarRecepcion() {
                   <div>
                     <span className="font-bold text-sm">{s?.remito_numero ?? `Solicitud #${solicitudId}`}</span>
                     <span className="text-[11px] text-[var(--sub)] ml-2">
-                      de {nombreDeposito(s?.deposito_origen_id)} · {formatoFechaHora(s?.creada_en)}
+                      {deDeposito(s?.deposito_origen_id)} · {formatoFechaHora(s?.creada_en)}
                     </span>
                   </div>
                   <button
