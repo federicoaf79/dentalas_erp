@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
-import Aviso from './Aviso'
 import DeclararCausaModal from './DeclararCausaModal'
 import { ultimasCausasPorReferencia } from '../lib/causas'
-import { generarPdfOrden, generarPdfOrdenDescargable } from '../lib/pdfOrden'
+import { generarPdfOrden, generarPdfOrdenDescargable, subtotalLinea } from '../lib/pdfOrden'
+import { ESTADO_OC_PROPIA } from '../lib/estados'
+import Pastilla from './ui/Pastilla'
+import BloqueAccion from './ui/BloqueAccion'
+import BarraPasos from './ui/BarraPasos'
 import { renderTemplate } from '../pages/TemplatesMensajes'
 // ============================================================
 // OrdenesPropias.jsx
@@ -67,7 +70,10 @@ const BTN_WA_OUT = `${BTN_BASE} bg-white border-emerald-200 text-emerald-700 hov
 const BTN_AVISO = `${BTN_BASE} bg-amber-50 border-amber-300 text-[#92400e] hover:bg-amber-100`
 const BTN_ICONO = `${BTN_BASE} px-2 bg-white border-transparent text-gray-400 hover:text-red-600 hover:bg-red-50`
 
-export default function OrdenesPropias({ onCambio }) {
+// soloOrdenId (2/10/2026, feedback Ivana 12/19): cuando la pantalla se abre
+// con ?orden=N (pestaña nueva desde "Ver/Editar ↗"), se muestra SOLO esa
+// orden, con barra de pasos y bloque de acción, sin la lista.
+export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
   const permisos = usePermisos()
   const [ordenes, setOrdenes] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -80,6 +86,9 @@ export default function OrdenesPropias({ onCambio }) {
   const [filtro, setFiltro] = useState('activas')
   const [abierta, setAbierta] = useState(null)
   const [items, setItems] = useState([])
+  // Cruce con el espejo de YiQi por Asunto "Dentalab-Compras #<id>" (la única
+  // clave confiable, ver FEEDBACK_IVANA_2-10-2026 punto 22). null = no buscado.
+  const [ingresoYiqi, setIngresoYiqi] = useState(null)
   const [empresa, setEmpresa] = useState(null)
   // Modal propio para aprobar/rechazar/eliminar, en reemplazo de
   // window.prompt/window.confirm: esos diálogos nativos no se pueden
@@ -373,6 +382,21 @@ export default function OrdenesPropias({ onCambio }) {
       .order('id')
     if (error) setError(error.message)
     else setItems(data ?? [])
+    setIngresoYiqi(null)
+    if (orden.estado === 'aprobada' && orden.yiqi_id_creado) {
+      const { data: filasYiqi } = await supabase
+        .from('ordenes_yiqi')
+        .select('nro_oc, cantidad, cantidad_entregada, cantidad_pendiente')
+        .eq('asunto', `Dentalab-Compras #${orden.id}`)
+      const f = filasYiqi ?? []
+      setIngresoYiqi({
+        encontrada: f.length > 0,
+        nroOC: f[0]?.nro_oc ?? null,
+        cantidad: f.reduce((a, x) => a + Number(x.cantidad ?? 0), 0),
+        entregada: f.reduce((a, x) => a + Number(x.cantidad_entregada ?? 0), 0),
+        pendiente: f.reduce((a, x) => a + Math.max(0, Number(x.cantidad_pendiente ?? 0)), 0),
+      })
+    }
   }
   async function imprimir(orden) {
     let lista = items
@@ -769,6 +793,7 @@ export default function OrdenesPropias({ onCambio }) {
           <button onClick={() => setAviso(null)} className="opacity-60 hover:opacity-100 px-1">×</button>
         </div>
       )}
+      {!soloOrdenId && (<>
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
         <div>
           <div className="text-[15px] font-bold">
@@ -990,83 +1015,171 @@ export default function OrdenesPropias({ onCambio }) {
           </table>
         )}
       </div>
+      </>)}
+      {soloOrdenId && !cargando && !abierta && !ordenes.some((o) => o.id === soloOrdenId) && (
+        <div className="bloque bloque-gris text-[13px] mb-6">No se encontró la orden #{soloOrdenId} (o no tenés acceso).</div>
+      )}
       {/* Detalle */}
       {abierta && (
-        <div className="bg-white rounded-xl border border-[var(--border)] p-4 mb-6">
-          <div className="flex items-start justify-between mb-3 gap-3">
-            <div>
-              <div className="text-[15px] font-bold">
-                Orden #{abierta.id} — {abierta.proveedor_nombre}
+        <div className={`card card-${(ESTADO_OC_PROPIA[abierta.estado] ?? {}).tono ?? 'gris'} p-5 mb-6`}>
+          {/* Encabezado (feedback Ivana 19): número, estado, proveedor y total grande */}
+          <div className="flex items-start justify-between mb-4 gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[18px] font-bold text-[var(--ind)]">Orden #{abierta.id}</span>
+                <Pastilla tono={(ESTADO_OC_PROPIA[abierta.estado] ?? {}).tono}>
+                  {(ESTADO_OC_PROPIA[abierta.estado] ?? {}).label ?? abierta.estado}
+                </Pastilla>
+                {abierta.archivada_en && <Pastilla tono="gris">En papelera</Pastilla>}
               </div>
+              <div className="text-[15px] font-semibold text-gray-900 mt-1">{abierta.proveedor_nombre}</div>
               <div className="text-[12px] text-[var(--sub)] mt-0.5">
                 Creada {formatoFecha(abierta.creada_en)}
-                {abierta.total_estimado != null && ` · ${formatoMoneda(abierta.total_estimado)}`}
                 {abierta.items_sin_costo > 0 && ` · ${abierta.items_sin_costo} artículos sin costo cargado`}
               </div>
             </div>
-            <div className="flex items-center gap-3 whitespace-nowrap">
-              <button
-                onClick={() => imprimir(abierta)}
-                className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:border-[var(--ind,#4338ca)] hover:text-[var(--ind,#4338ca)]"
-              >
-                Descargar PDF
-              </button>
-              {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
-                <button
-                  onClick={() => abrirAgregarMercaderia(abierta)}
-                  className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--ind,#4338ca)] text-[var(--ind,#4338ca)] bg-white hover:bg-indigo-50"
-                >
-                  + Agregar mercadería
-                </button>
-              )}
-              {abierta.estado === 'aprobada' && (
-                <button
-                  disabled={enviandoWaId === abierta.id}
-                  onClick={() => enviarWhatsApp(abierta)}
-                  className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40"
-                >
-                  {enviandoWaId === abierta.id
-                    ? 'Enviando…'
-                    : abierta.whatsapp_enviada_en ? '💬 Reenviar por WhatsApp' : '💬 Enviar por WhatsApp'}
-                </button>
-              )}
-              <button
-                onClick={() => { setAbierta(null); setEditandoItems(false); setItemsEdit([]) }}
-                className="text-sm text-gray-500 hover:underline"
-              >
-                Cerrar
-              </button>
+            <div className="text-right flex-shrink-0">
+              <div className="text-[24px] font-bold text-gray-900 tabular-nums leading-none">
+                {abierta.total_estimado != null ? formatoMoneda(abierta.total_estimado) : '—'}
+              </div>
+              <div className="text-[11px] text-[var(--sub)] mt-1">total estimado</div>
             </div>
           </div>
-          {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
-            <Aviso tipo="filtro" className="mb-3">
-              Vinculada a YiQi (OC #{abierta.yiqi_id_creado}) el {formatoFecha(abierta.yiqi_enviada_en)}.
-            </Aviso>
+
+          {/* Barra de pasos */}
+          {(() => {
+            const e = abierta.estado
+            const aprobada = e === 'aprobada'
+            const enYiqi = aprobada && !!abierta.yiqi_id_creado
+            const enviadaProv = !!abierta.whatsapp_enviada_en
+            const ing = ingresoYiqi
+            const pasos = [
+              { rotulo: 'Borrador', fecha: formatoFecha(abierta.creada_en), estado: e === 'borrador' ? 'actual' : 'hecho' },
+              {
+                rotulo: e === 'rechazada' ? 'Rechazada' : 'Aprobación',
+                fecha: abierta.decidida_en ? formatoFecha(abierta.decidida_en) : null,
+                estado: e === 'pendiente' ? 'espera' : e === 'rechazada' ? 'alerta' : aprobada ? 'hecho' : 'pend',
+              },
+              {
+                rotulo: 'Cargada en YiQi',
+                fecha: enYiqi ? formatoFecha(abierta.yiqi_enviada_en) : null,
+                estado: enYiqi ? 'hecho' : aprobada ? 'alerta' : 'pend',
+              },
+              {
+                rotulo: 'Enviada al proveedor',
+                fecha: enviadaProv ? formatoFecha(abierta.whatsapp_enviada_en) : null,
+                estado: enviadaProv ? 'hecho' : enYiqi ? 'actual' : 'pend',
+              },
+              {
+                rotulo: ing?.encontrada && ing.entregada > 0 && ing.pendiente > 0
+                  ? `Recibida ${ing.entregada} de ${ing.cantidad} u`
+                  : 'Mercadería recibida',
+                estado: ing?.encontrada && ing.cantidad > 0 && ing.pendiente === 0 && ing.entregada > 0
+                  ? 'hecho'
+                  : ing?.encontrada && ing.entregada > 0 ? 'actual' : 'pend',
+              },
+            ]
+            const sigue = {
+              borrador: 'Sigue: enviarla a aprobación.',
+              pendiente: 'Sigue: que Aris la apruebe o la rechace.',
+              rechazada: 'La orden fue rechazada.',
+            }[e] ?? (
+              !enYiqi ? 'Sigue: cargarla en YiQi (reintentar envío).'
+              : !enviadaProv ? 'Sigue: mandarla al proveedor por WhatsApp.'
+              : ing?.encontrada && ing.pendiente === 0 && ing.entregada > 0 ? 'Recibida completa.'
+              : 'Sigue: esperar la mercadería.'
+            )
+            return <div className="mb-4"><BarraPasos pasos={pasos} sigue={sigue} /></div>
+          })()}
+
+          {/* Bloque de acción según el estado (código de color único) */}
+          {abierta.estado === 'borrador' && (
+            <BloqueAccion
+              tono="amarillo"
+              className="mb-3"
+              titulo="Borrador — todavía no se mandó a aprobación"
+              acciones={!permisos.esAdmin && !abierta.archivada_en && (
+                <>
+                  <button disabled={ocupado} onClick={() => enviarAAprobacion(abierta)} className="btn btn-sm btn-pri">
+                    Enviar a aprobación
+                  </button>
+                  <button disabled={ocupado} onClick={() => pedirBorrar(abierta)} className="btn btn-sm btn-peligro">
+                    Eliminar
+                  </button>
+                </>
+              )}
+            >
+              Revisá cantidades y artículos antes de enviarla.
+            </BloqueAccion>
           )}
-          {abierta.whatsapp_enviada_en && (
-            <Aviso tipo="filtro" className="mb-3">
-              💬 Enviada por WhatsApp el {formatoFecha(abierta.whatsapp_enviada_en)}.
-            </Aviso>
+          {abierta.estado === 'pendiente' && (
+            <BloqueAccion
+              tono="azul"
+              className="mb-3"
+              titulo="Esperando aprobación de Aris"
+              acciones={permisos.esAdmin && !abierta.archivada_en && (
+                <>
+                  <button disabled={ocupado} onClick={() => pedirDecision(abierta, 'rechazada')} className="btn btn-sm btn-peligro">
+                    Rechazar
+                  </button>
+                  <button disabled={ocupado} onClick={() => pedirDecision(abierta, 'aprobada')} className="btn btn-sm btn-ok">
+                    ✓ Aprobar orden
+                  </button>
+                </>
+              )}
+            >
+              {abierta.enviada_en ? `Enviada a aprobación el ${formatoFecha(abierta.enviada_en)}.` : 'Enviada a aprobación.'}
+            </BloqueAccion>
+          )}
+          {abierta.estado === 'rechazada' && (
+            <BloqueAccion tono="rojo" className="mb-3" titulo="Orden rechazada">
+              {abierta.comentario_decision || 'Sin comentario.'}
+            </BloqueAccion>
           )}
           {abierta.estado === 'aprobada' && !abierta.yiqi_id_creado && (
-            <div className="border border-[#fde68a] bg-[#fffbeb] text-[#92400e] rounded-lg px-3.5 py-2.5 text-[13px] mb-3 flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <div className="font-semibold">⚠ Error de vinculación a YiQi</div>
-                <div className="mt-0.5 opacity-90">
-                  {abierta.yiqi_error || 'Todavía no se pudo enviar esta orden a YiQi.'}
-                </div>
-              </div>
-              {permisos.esAdmin && (
+            <BloqueAccion
+              tono="rojo"
+              className="mb-3"
+              titulo="⚠ No se pudo cargar en YiQi"
+              acciones={permisos.esAdmin && (
                 <button
                   disabled={ocupado}
                   onClick={() => reintentarEnvioYiqi(abierta)}
                   title="Vuelve a mandar esta misma orden a YiQi con los mismos datos."
-                  className="shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[#b45309] text-white hover:opacity-90 disabled:opacity-40"
+                  className="btn btn-sm btn-peligro"
                 >
-                  {ocupado ? 'Reintentando…' : 'Reintentar envío'}
+                  {ocupado ? 'Reintentando…' : '↻ Reintentar envío'}
                 </button>
               )}
-            </div>
+            >
+              {abierta.yiqi_error || 'Todavía no se pudo enviar esta orden a YiQi.'}
+            </BloqueAccion>
+          )}
+          {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
+            <BloqueAccion
+              tono={abierta.whatsapp_enviada_en ? 'verde' : 'amarillo'}
+              className="mb-3"
+              titulo={abierta.whatsapp_enviada_en
+                ? `Enviada al proveedor el ${formatoFecha(abierta.whatsapp_enviada_en)}`
+                : 'Lista para enviar al proveedor'}
+              acciones={
+                <>
+                  <button onClick={() => imprimir(abierta)} className="btn btn-sm">📄 PDF</button>
+                  <button
+                    disabled={enviandoWaId === abierta.id}
+                    onClick={() => enviarWhatsApp(abierta)}
+                    className={`btn btn-sm ${abierta.whatsapp_enviada_en ? '' : 'btn-ok'}`}
+                  >
+                    {enviandoWaId === abierta.id
+                      ? 'Enviando…'
+                      : abierta.whatsapp_enviada_en ? '💬 Reenviar' : '💬 Enviar por WhatsApp'}
+                  </button>
+                </>
+              }
+            >
+              Cargada en YiQi (OC #{abierta.yiqi_id_creado}) el {formatoFecha(abierta.yiqi_enviada_en)}.
+              {ingresoYiqi && !ingresoYiqi.encontrada && ' Todavía no figura en el reporte de OC de YiQi.'}
+            </BloqueAccion>
           )}
           {abierta.notas && (
             <div className="border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
@@ -1074,11 +1187,9 @@ export default function OrdenesPropias({ onCambio }) {
               {abierta.notas}
             </div>
           )}
-          {abierta.comentario_decision && (
+          {abierta.comentario_decision && abierta.estado !== 'rechazada' && (
             <div className="border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
-              <span className="text-[10px] uppercase text-gray-400 block mb-0.5">
-                Comentario de {abierta.estado === 'rechazada' ? 'rechazo' : 'aprobación'}
-              </span>
+              <span className="text-[10px] uppercase text-gray-400 block mb-0.5">Comentario de aprobación</span>
               {abierta.comentario_decision}
             </div>
           )}
@@ -1093,7 +1204,7 @@ export default function OrdenesPropias({ onCambio }) {
               <button
                 type="button"
                 onClick={iniciarEdicionItems}
-                className="text-[13px] font-semibold text-[var(--ind,#4338ca)] hover:underline"
+                className="btn btn-sm btn-pri"
               >
                 ✏ Editar cantidades / quitar ítems
               </button>
@@ -1104,17 +1215,15 @@ export default function OrdenesPropias({ onCambio }) {
               {errorEdicionItems}
             </div>
           )}
-          <div className="border border-[var(--border)] rounded-lg overflow-hidden mb-3">
-            <table className="w-full border-collapse">
+          <div className="tw mb-3">
+            <table className="tabla">
               <thead>
-                <tr className="bg-gray-50 border-b border-[var(--border)]">
+                <tr>
                   {[
-                    'SKU', 'Producto', 'Cantidad', 'Costo unit.', 'Stock al armar', 'Prom./mes',
+                    'SKU', 'Producto', 'Cantidad', 'Costo unit.', 'Subtotal', 'Stock al armar', 'Prom./mes',
                     ...(editandoItems ? [''] : []),
                   ].map((h, idx) => (
-                    <th key={`${h}-${idx}`} className="text-left px-3.5 py-2 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
-                      {h}
-                    </th>
+                    <th key={`${h}-${idx}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1140,6 +1249,11 @@ export default function OrdenesPropias({ onCambio }) {
                     </td>
                     <td className="px-3.5 py-2 text-sm tabular-nums">
                       {i.costo_unitario ? formatoMoneda(i.costo_unitario) : '—'}
+                    </td>
+                    <td className="px-3.5 py-2 text-sm tabular-nums font-semibold">
+                      {i.costo_unitario
+                        ? formatoMoneda(subtotalLinea(editandoItems ? { ...i, cantidad: i._cantidad } : i))
+                        : '—'}
                     </td>
                     <td className="px-3.5 py-2 text-gray-400 text-sm">{formatoNumero(i.stock_al_momento)}</td>
                     <td className="px-3.5 py-2 text-gray-400 text-sm">{formatoNumero(i.promedio_mensual)}</td>
@@ -1181,24 +1295,33 @@ export default function OrdenesPropias({ onCambio }) {
               </button>
             </div>
           )}
-          {permisos.esAdmin && abierta.estado === 'pendiente' && !abierta.archivada_en && (
-            <div className="flex items-center justify-end gap-2">
+          {/* Fila de acciones al pie (feedback Ivana 19) */}
+          <div className="flex items-center justify-between gap-2 flex-wrap pt-3 mt-1 border-t border-gray-100">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => imprimir(abierta)} className="btn btn-sm">📄 PDF de la orden</button>
+              {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
+                <button onClick={() => abrirAgregarMercaderia(abierta)} className="btn btn-sm">+ Agregar mercadería</button>
+              )}
               <button
-                disabled={ocupado}
-                onClick={() => pedirDecision(abierta, 'rechazada')}
-                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] text-[var(--red)] bg-white hover:bg-red-50 disabled:opacity-40"
+                onClick={() =>
+                  setModalCausa({ referenciaId: abierta.id, referenciaTexto: `Orden #${abierta.id} — ${abierta.proveedor_nombre}` })
+                }
+                className="btn btn-sm"
               >
-                Rechazar
-              </button>
-              <button
-                disabled={ocupado}
-                onClick={() => pedirDecision(abierta, 'aprobada')}
-                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--grn,#3d9970)] text-white hover:opacity-90 disabled:opacity-40"
-              >
-                Aprobar orden
+                📝 {causasPorOrden[String(abierta.id)] ? 'Ver causa' : 'Declarar causa'}
               </button>
             </div>
-          )}
+            {soloOrdenId ? (
+              <a href="?page=ocs" className="btn btn-sm">← Todas las órdenes</a>
+            ) : (
+              <button
+                onClick={() => { setAbierta(null); setEditandoItems(false); setItemsEdit([]) }}
+                className="btn btn-sm"
+              >
+                Cerrar
+              </button>
+            )}
+          </div>
         </div>
       )}
       {/* Modal de aprobar / rechazar / eliminar — reemplaza a

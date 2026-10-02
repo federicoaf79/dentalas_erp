@@ -111,6 +111,7 @@ body {
 .bloque-verde    { background: var(--grn-bg); border-color: var(--grn-bd); color: #14532d; }
 .bloque-amarillo { background: var(--yel-bg); border-color: var(--yel);    color: #78350f; }
 .bloque-azul     { background: var(--blu-bg); border-color: #bfdbfe;       color: #1e3a8a; }
+.bloque-gris     { background: #f9fafb; border-color: var(--border); color: #374151; }
 .bloque-rojo     { background: var(--red-bg); border-color: var(--red-bd); color: var(--red); }
 .bloque-titulo { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
 .bloque-texto { font-size: 12px; }

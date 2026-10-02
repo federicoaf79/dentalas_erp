@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import OrdenesPropias from '../components/OrdenesPropias'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 // ============================================================
 // OrdenesCompra.jsx — v3
 // v2: leia de la tabla propia ordenes_yiqi en vez de YiQi en vivo.
@@ -139,6 +140,14 @@ function DetalleOrden({ orden }) {
 }
 export default function OrdenesCompra({ onCambioOrdenes }) {
   const permisos = usePermisos()
+  const [ordenSola] = useState(() => {
+    try {
+      const n = Number(new URLSearchParams(window.location.search).get('orden'))
+      return Number.isFinite(n) && n > 0 ? n : null
+    } catch {
+      return null
+    }
+  })
   const [ordenes, setOrdenes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -189,6 +198,18 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
   )
   const cargandoAlgo = loading || permisos.cargando
   const vistaFiltrada = !permisos.cargando && !permisos.error && !permisos.esAdmin
+  // 2/10/2026 (feedback Ivana 12): con ?orden=N se muestra SOLO esa orden.
+  if (ordenSola) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
+        <EncabezadoPagina titulo={`Orden #${ordenSola}`} bajada="Detalle de una orden generada desde el sistema">
+          <a href="?page=ocs" className="btn btn-sm">← Todas las órdenes</a>
+        </EncabezadoPagina>
+        <OrdenesPropias onCambio={onCambioOrdenes} soloOrdenId={ordenSola} />
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
       {/* Header */}

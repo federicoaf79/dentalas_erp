@@ -39,11 +39,11 @@ function moneda(n) {
 // subtotal y el total se calculan con ESE precio redondeado. Antes se
 // multiplicaba el precio sin redondear y, si alguien controlaba a mano
 // (12 × $3.645,67), el subtotal no daba igual por centavos.
-function precioRedondeado(c) {
+export function precioRedondeado(c) {
   const n = Number(c)
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN
 }
-function subtotalLinea(i) {
+export function subtotalLinea(i) {
   const pu = precioRedondeado(i.costo_unitario)
   return Number.isFinite(pu) ? Math.round(pu * Number(i.cantidad || 0) * 100) / 100 : 0
 }
