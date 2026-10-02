@@ -28,11 +28,22 @@ import { renderTemplate } from '../pages/TemplatesMensajes'
 // que cambie cuantas ordenes estan "esperando aprobacion". Sin esto el
 // badge quedaba desactualizado hasta que alguien recargaba la pagina.
 // ============================================================
-const ESTADOS = {
-  borrador:  { label: 'Borrador',             clase: 'bg-gray-100 text-gray-600' },
-  pendiente: { label: 'Esperando aprobación', clase: 'bg-blue-50 text-[#1d4ed8]' },
-  aprobada:  { label: 'Aprobada',             clase: 'bg-[var(--grn-bg)] text-[var(--grn)]' },
-  rechazada: { label: 'Rechazada',            clase: 'bg-[var(--red-bg)] text-[var(--red)]' },
+// Semáforo de la tarjeta (feedback Ivana 17/21): el tono sale del estado y,
+// para las aprobadas, de dónde quedaron (YiQi / WhatsApp).
+function vistaEstadoOrden(o) {
+  if (o.estado === 'aprobada') {
+    if (!o.yiqi_id_creado) return { tono: 'rojo', label: 'No se pudo cargar en YiQi' }
+    if (!o.whatsapp_enviada_en) return { tono: 'amarillo', label: 'Lista para enviar' }
+    return { tono: 'verde', label: 'Enviada al proveedor' }
+  }
+  if (o.estado === 'borrador') return { tono: 'amarillo', label: 'Borrador' }
+  const e = ESTADO_OC_PROPIA[o.estado]
+  return e ? { tono: e.tono, label: e.label } : { tono: 'gris', label: o.estado }
+}
+const SEM_DE_TONO = { verde: 'sg', amarillo: 'sy', rojo: 'sr', azul: 'sb', gris: 'bg-gray-300' }
+const COLOR_TOTAL = {
+  verde: 'text-[var(--grn)]', amarillo: 'text-[#92400e]', rojo: 'text-[var(--red)]',
+  azul: 'text-[var(--blu)]', gris: 'text-gray-900',
 }
 function formatoMoneda(n) {
   const num = Number(n)
@@ -836,96 +847,59 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
             <button
               key={f.key}
               onClick={() => setFiltro(f.key)}
-              className={`px-3 py-1.5 rounded-full text-sm border ${
-                filtro === f.key
-                  ? 'bg-[var(--ind,#4338ca)] text-white border-[var(--ind,#4338ca)]'
-                  : 'bg-white text-gray-600 border-gray-200'
-              }`}
+              className={`chip ${filtro === f.key ? 'chip-on' : ''}`}
             >
               {f.label}
             </button>
           ))}
         </div>
       </div>
-      <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden mb-6">
+      {/* 2/10/2026 (feedback Ivana 17, prototipo v7): tarjetas con semáforo en
+          vez de tabla. Mismas acciones y reglas que antes; solo cambia la forma. */}
+      {filtro === 'activas' && !cargando && visibles.length > 0 && (
+        <div className="flex items-center gap-5 flex-wrap px-4 py-2.5 mb-3 bg-white border border-[var(--border)] rounded-xl text-[12px]">
+          <span className="font-bold text-[11px] uppercase tracking-wide text-[var(--sub)]">Qué hay que hacer:</span>
+          <span className="flex items-center gap-2"><span className="sem sb" /> <b className="text-[var(--blu)]">Aprobar</b> <span className="text-[var(--sub)]">— espera a Aris</span></span>
+          <span className="flex items-center gap-2"><span className="sem sy" /> <b className="text-[#92400e]">Completar o enviar</b> <span className="text-[var(--sub)]">— borrador o lista para mandar al proveedor</span></span>
+          <span className="flex items-center gap-2"><span className="sem sr" /> <b className="text-[var(--red)]">Problema</b> <span className="text-[var(--sub)]">— rechazada o no se pudo cargar en YiQi</span></span>
+          <span className="flex items-center gap-2"><span className="sem sg" /> <b className="text-[var(--grn)]">Listo</b> <span className="text-[var(--sub)]">— enviada al proveedor</span></span>
+        </div>
+      )}
+      <div className="mb-6">
         {cargando ? (
-          <div className="p-6 text-center text-[var(--sub)] text-sm">Cargando…</div>
+          <div className="card p-6 text-center text-[var(--sub)] text-sm">Cargando…</div>
         ) : visibles.length === 0 ? (
-          <div className="p-6 text-center text-[var(--sub)] text-sm">
+          <div className="card p-6 text-center text-[var(--sub)] text-sm">
             {filtro === 'papelera' ? 'La papelera está vacía.' : 'No hay órdenes.'}
           </div>
         ) : (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['#', 'Proveedor', 'Creada por', 'Estado', 'Total', 'Creada', 'Ítems', ''].map((h) => (
-                  <th key={h} className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {visibles.map((o) => {
-                const est = ESTADOS[o.estado] ?? ESTADOS.borrador
-                return (
-                  <tr key={o.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td className="px-3.5 py-1.5 font-mono text-xs">#{o.id}</td>
-                    <td className="px-3.5 py-1.5 font-semibold">{o.proveedor_nombre}</td>
-                    <td className="px-3.5 py-1.5 text-[13px] text-[var(--sub)]">
-                      {o.creador_nombre ?? '—'}
-                    </td>
-                    <td className="px-3.5 py-1.5">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${est.clase}`}>
-                        {est.label}
-                      </span>
-                      {/* 7/9/2026 (auditoría de usabilidad, U-4): el motivo real
-                          (o.yiqi_error) ya llegaba desde el backend, pero solo se
-                          veía al pasar el mouse por encima (title) — nada visible
-                          explicaba la causa ni qué hacía "Reintentar envío". Se
-                          muestra el motivo en texto, no solo en el tooltip. */}
-                      {o.estado === 'aprobada' && !o.yiqi_id_creado && (
-                        <div className="mt-1">
-                          <span
-                            title={o.yiqi_error || 'Todavía no se envió a YiQi.'}
-                            className="text-[10px] font-semibold text-[#b45309]"
-                          >
-                            ⚠ Error de vinculación a YiQi
-                          </span>
-                          {o.yiqi_error && (
-                            <div
-                              className="text-[10px] text-gray-400 max-w-[220px] leading-snug"
-                              title={o.yiqi_error}
-                            >
-                              {o.yiqi_error}
-                            </div>
-                          )}
-                        </div>
+          <div className="space-y-3">
+            {visibles.map((o) => {
+              const vista = vistaEstadoOrden(o)
+              const causa = causasPorOrden[String(o.id)]
+              return (
+                <div key={o.id} className={`card card-${vista.tono}`}>
+                  <div className="px-5 py-3.5 flex items-center gap-4">
+                    <span className={`sem ${SEM_DE_TONO[vista.tono]}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[15px] font-bold text-gray-900 truncate">{o.proveedor_nombre}</div>
+                      <div className="text-[12px] text-[var(--sub)] mt-0.5">
+                        Orden #{o.id} · {o.creador_nombre ?? '—'} · {formatoDia(o.creada_en)} · {o.cant_items ?? 0} {(o.cant_items ?? 0) === 1 ? 'ítem' : 'ítems'}
+                        {o.items_sin_costo > 0 && <span className="text-[#92400e]"> · {o.items_sin_costo} sin costo</span>}
+                      </div>
+                      {o.estado === 'aprobada' && !o.yiqi_id_creado && o.yiqi_error && (
+                        <div className="text-[11px] text-[var(--red)] mt-1 truncate" title={o.yiqi_error}>⚠ {o.yiqi_error}</div>
                       )}
-                      {causasPorOrden[String(o.id)] && (
-                        <span
-                          className="block mt-1 text-[10px] text-gray-400"
-                          title={causasPorOrden[String(o.id)].nota ?? ''}
-                        >
-                          {causasPorOrden[String(o.id)].causa_rotulo}
-                        </span>
+                      {causa && (
+                        <div className="text-[11px] text-gray-500 mt-1 truncate" title={causa.nota ?? ''}>📝 {causa.causa_rotulo}</div>
                       )}
-                    </td>
-                    <td className="px-3.5 py-1.5 font-semibold tabular-nums text-[13px]">
+                    </div>
+                    <Pastilla tono={vista.tono}>{vista.label}</Pastilla>
+                    <div className={`text-[18px] font-bold tabular-nums min-w-[130px] text-right ${COLOR_TOTAL[vista.tono]}`}>
                       {o.total_estimado != null ? formatoMoneda(o.total_estimado) : '—'}
-                      {o.items_sin_costo > 0 && (
-                        <span className="block text-[10px] text-[#92400e] font-normal">
-                          {o.items_sin_costo} sin costo
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(o.creada_en)}</td>
-                    <td className="px-3.5 py-1.5 text-xs">{o.cant_items ?? 0}</td>
-                    <td className="px-3.5 py-1.5 text-right whitespace-nowrap">
-                      {/* 30/9/2026: acciones como botones (antes eran links de texto
-                          sueltos). Izquierda: consulta (detalle, PDF, causa) en
-                          botones chicos neutros. Derecha: la acción que corresponde
-                          al estado de la orden, con color y relleno. */}
+                    </div>
+                  </div>
+                  <div className="px-5 py-2.5 bg-[#fafafa] border-t border-[var(--border)] flex items-center justify-end">
                       <div className="inline-flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => {
@@ -1023,12 +997,11 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                           </>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
       </>)}
