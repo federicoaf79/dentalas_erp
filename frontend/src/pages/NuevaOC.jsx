@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import BloqueAccion from '../components/ui/BloqueAccion'
 import { renderTemplate } from './TemplatesMensajes'
 import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
 
@@ -1090,6 +1091,18 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
+  // 2/10/2026 — órdenes duplicadas (#6/#7, #12/#13, #16/#17, todas iguales y
+  // con ~1 minuto de diferencia). Tres defensas:
+  //  1) guardandoRef: un doble clic rápido no puede disparar dos inserts
+  //     (el estado `ocupado` tarda un render en deshabilitar el botón);
+  //  2) la confirmación queda arriba, en verde, con link a la orden creada,
+  //     y la pantalla sube para que se vea (antes se guardaba desde el pie
+  //     de una tabla larga y el aviso quedaba fuera de la vista);
+  //  3) al elegir proveedor se avisa si ya hay borradores / pendientes suyos.
+  const guardandoRef = useRef(false)
+  const raizRef = useRef(null)
+  const [ordenGuardadaId, setOrdenGuardadaId] = useState(null)
+  const [abiertasDelProveedor, setAbiertasDelProveedor] = useState([])
 
   const claveFiltro =
     permisos.cargando || permisos.error
@@ -1133,6 +1146,16 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
     setProveedorElegido(nombre)
     setVista('armar')
     setCargandoSub(true)
+    setAbiertasDelProveedor([])
+    supabase
+      .from('ordenes_propias')
+      .select('id, estado, creada_en, total_estimado')
+      .eq('proveedor_nombre', nombre)
+      .in('estado', ['borrador', 'pendiente'])
+      .is('archivada_en', null)
+      .order('creada_en', { ascending: false })
+      .limit(5)
+      .then(({ data }) => setAbiertasDelProveedor(data ?? []))
     try {
       // Sugerencias y condiciones comerciales en paralelo: la funcion
       // condiciones_proveedor() ya devuelve el limite resuelto (propio
@@ -1195,6 +1218,8 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
         return
       }
     }
+    if (guardandoRef.current) return
+    guardandoRef.current = true
     setOcupado(true)
     setError(null)
     try {
@@ -1273,7 +1298,9 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
               : `Orden #${cab.id} confirmada: está dentro del límite de aprobación automática.`
             : `Borrador #${cab.id} guardado.`
       )
+      setOrdenGuardadaId(cab.id)
       setVista('lista')
+      if (raizRef.current) raizRef.current.scrollTop = 0
       await cargarOrdenes()
       // Solo puede haber cambiado el badge si NO quedo en borrador
       // (paso a pendiente, o quedo aprobada directo por estar dentro
@@ -1284,12 +1311,13 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
     } catch (e) {
       setError(e.message)
     } finally {
+      guardandoRef.current = false
       setOcupado(false)
     }
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
+    <div ref={raizRef} className="flex-1 overflow-y-auto bg-[#f7f8fa]">
       <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
         <div>
           <div className="text-[17px] font-bold">Nueva OC</div>
@@ -1314,10 +1342,45 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
       )}
 
       {aviso && (
-        <div className="mx-4 mt-4 bg-[var(--grn-bg,#dcfce7)] border border-green-200 text-[var(--grn,#3d9970)] rounded-lg px-4 py-2.5 text-[13px] flex items-center justify-between">
-          <span>{aviso}</span>
-          <button onClick={() => setAviso(null)} className="opacity-60 hover:opacity-100 px-1">×</button>
-        </div>
+        <BloqueAccion
+          tono="verde"
+          className="mx-4 mt-4"
+          titulo={`✓ ${aviso}`}
+          acciones={
+            <>
+              {ordenGuardadaId && (
+                <a
+                  href={`?page=ocs&orden=${ordenGuardadaId}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="btn btn-sm"
+                >
+                  Ver orden #{ordenGuardadaId} ↗
+                </a>
+              )}
+              <button onClick={() => { setAviso(null); setOrdenGuardadaId(null) }} className="btn btn-sm">×</button>
+            </>
+          }
+        >
+          Ya quedó guardada. No hace falta volver a armarla.
+        </BloqueAccion>
+      )}
+      {vista === 'armar' && abiertasDelProveedor.length > 0 && (
+        <BloqueAccion
+          tono="amarillo"
+          className="mx-4 mt-4"
+          titulo={`Ya hay ${abiertasDelProveedor.length === 1 ? 'una orden abierta' : `${abiertasDelProveedor.length} órdenes abiertas`} de ${proveedorElegido}`}
+          acciones={abiertasDelProveedor.slice(0, 3).map((o) => (
+            <a key={o.id} href={`?page=ocs&orden=${o.id}`} target="_blank" rel="noopener" className="btn btn-sm">
+              #{o.id} ↗
+            </a>
+          ))}
+        >
+          {abiertasDelProveedor
+            .map((o) => `#${o.id} ${o.estado === 'pendiente' ? 'esperando aprobación' : 'borrador'} del ${new Date(o.creada_en).toLocaleDateString('es-AR')}`)
+            .join(' · ')}
+          . Revisá que no estés armando la misma orden otra vez.
+        </BloqueAccion>
       )}
 
       {cargando ? (
