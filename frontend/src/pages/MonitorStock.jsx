@@ -8,6 +8,7 @@ import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
 import { aplicarFiltroProveedor, FILTRO_PROVEEDOR_INICIAL } from '../lib/filtroProveedor'
 import { TONO_DE_COLOR } from '../lib/estados'
 import FiltroProveedor from '../components/FiltroProveedor'
+import BarraMinStockMax from '../components/BarraMinStockMax'
 
 // ============================================================
 // MonitorStock.jsx — v7
@@ -609,10 +610,15 @@ export default function MonitorStock() {
                 return (
                   <tr key={a.yiqi_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                     <td className="px-3.5 py-1.5 font-mono text-xs">{a.mate_codigo}</td>
-                    <td className="px-3.5 py-1.5 font-semibold">{a.mate_nombre}</td>
+                    <td className="px-3.5 py-1.5 font-semibold"><div className="min-w-[240px]">{a.mate_nombre}</div></td>
                     <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
                     <td className="px-3.5 py-1.5">
-                      <div className="font-bold">{a.mate_stock_disponible ?? 0}</div>
+                      {/* 2/10/2026 (feedback Ivana 17/20): barra Stock vs Mín./Máx., igual que Alertas */}
+                      <BarraMinStockMax
+                        stock={a.mate_stock_disponible}
+                        min={a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : a.mate_stock_seguridad}
+                        max={a.mate_punto_pedido_max}
+                      />
                       {(() => {
                         const desglose = textoDesgloseStock(stockPorSku[a.mate_codigo])
                         if (!desglose) return null

@@ -779,7 +779,7 @@ export default function Alertas({ onArmarOC }) {
                   {filasPaginadas.map((a) => (
                     <tr key={a.yiqi_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                       <td className="px-3.5 py-1.5 font-mono text-xs">{a.mate_codigo}</td>
-                      <td className="px-3.5 py-1.5 font-semibold">{a.mate_nombre}</td>
+                      <td className="px-3.5 py-1.5 font-semibold"><div className="min-w-[240px]">{a.mate_nombre}</div></td>
                       <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
                       {/* Punto 3 (28/9/2026): gráfico en vez de 3 columnas numéricas
                           sueltas (Stock/Mín./Máx.) -- ver components/BarraMinStockMax.jsx.

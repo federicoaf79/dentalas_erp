@@ -63,6 +63,19 @@ function esMultiploDeBulto(cantidad, bulto) {
   return Math.abs(cociente - Math.round(cociente)) < 1e-6
 }
 
+// 2/10/2026 (feedback Ivana, punto 20): botones − / + al lado de la cantidad
+// que saltan de a bulto (o de a 1 si el proveedor no tiene bulto cargado).
+// "+" lleva al próximo múltiplo; "−" al múltiplo anterior, nunca bajo 0.
+function pasoCantidad(actual, bulto, signo) {
+  const paso = Number(bulto) > 0 ? Number(bulto) : 1
+  const n = Number(actual) || 0
+  const sig = signo > 0
+    ? Math.floor(n / paso + 1e-9) * paso + paso
+    : Math.max(0, Math.ceil(n / paso - 1e-9) * paso - paso)
+  return String(Math.round(sig * 1000) / 1000)
+}
+const BTN_PASO = 'w-7 h-7 rounded-md border border-[var(--border)] bg-white text-gray-600 font-bold leading-none hover:bg-gray-50 hover:text-[var(--ind)]'
+
 function formatoFecha(f) {
   if (!f) return '—'
   try {
@@ -913,6 +926,27 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         : <span className="text-[11px] text-gray-400 italic">sin costo</span>}
                     </td>
                     <td className="px-3 py-2">
+                      {(() => {
+                        const alCambiar = (valor) => {
+                          setCantidades((prev) => ({ ...prev, [s.mate_codigo]: valor }))
+                          const num = Number(valor)
+                          if (valor !== '' && Number.isFinite(num) && num > 0) {
+                            setSeleccion((prev) =>
+                              prev.has(s.mate_codigo) ? prev : new Set(prev).add(s.mate_codigo)
+                            )
+                          }
+                        }
+                        const paso = Number(s.unidades_por_bulto) > 0 ? Number(s.unidades_por_bulto) : 1
+                        return (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              className={BTN_PASO}
+                              title={`Restar ${paso}`}
+                              onClick={() => alCambiar(pasoCantidad(cantidades[s.mate_codigo], s.unidades_por_bulto, -1))}
+                            >
+                              −
+                            </button>
                       <input
                         type="number"
                         min="0"
@@ -937,10 +971,21 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                             )
                           }
                         }}
-                        className={`w-24 border rounded-lg px-2 py-1 text-sm text-right ${
+                        className={`w-20 border rounded-lg px-2 py-1 text-sm text-right ${
                           sinBase ? 'border-dashed border-gray-300 placeholder:text-[11px]' : 'border-[var(--border)]'
                         }`}
                       />
+                            <button
+                              type="button"
+                              className={BTN_PASO}
+                              title={`Sumar ${paso}`}
+                              onClick={() => alCambiar(pasoCantidad(cantidades[s.mate_codigo], s.unidades_por_bulto, 1))}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )
+                      })()}
                       {s.topeada && (
                         <div
                           className="text-[10px] text-[#92400e] mt-0.5"
