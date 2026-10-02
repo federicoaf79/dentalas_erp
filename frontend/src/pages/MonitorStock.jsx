@@ -6,6 +6,7 @@ import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposi
 import { traerRotacionPorSku, calcularCobertura } from '../lib/rotacionPorSku'
 import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
 import { aplicarFiltroProveedor, FILTRO_PROVEEDOR_INICIAL } from '../lib/filtroProveedor'
+import { TONO_DE_COLOR } from '../lib/estados'
 import FiltroProveedor from '../components/FiltroProveedor'
 
 // ============================================================
@@ -47,13 +48,6 @@ import FiltroProveedor from '../components/FiltroProveedor'
 //     bajó la alerta. Reemplaza el workaround manual de Ivana (escribir
 //     "Listo- dsps borrar contenido" en el Asunto de la OC en YiQi).
 // ============================================================
-
-const COLOR_CLASSES = {
-  red: 'bg-[var(--red-bg)] text-[var(--red)]',
-  yel: 'bg-[var(--yel-bg)] text-[#92400e]',
-  grn: 'bg-[var(--grn-bg)] text-[var(--grn)]',
-  gray: 'bg-gray-100 text-gray-500',
-}
 
 const TAMANIO_LOTE = 1000 // limite por request de Supabase/PostgREST
 
@@ -579,7 +573,7 @@ export default function MonitorStock() {
               : 'No hay artículos con alerta en este momento (o no coinciden con la búsqueda).'}
           </div>
         ) : (
-          <table className="w-full border-collapse">
+          <table className="tabla">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
                 {[
@@ -645,8 +639,11 @@ export default function MonitorStock() {
                       {a.mate_punto_de_pedido > 0 ? (
                         a.mate_punto_de_pedido
                       ) : (
-                        <span title="No hay Punto de pedido cargado para este artículo: la alerta usa Stock Seguridad como respaldo (ver columna de al lado).">
-                          — (usa Stock Seguridad →)
+                        <span
+                          className="text-gray-300 cursor-help"
+                          title="No hay Punto de pedido cargado para este artículo: la alerta usa Stock Seguridad como respaldo (columna de al lado, marcada con ●)."
+                        >
+                          —
                         </span>
                       )}
                     </td>
@@ -702,7 +699,7 @@ export default function MonitorStock() {
                     </td>
                     <td className="px-3.5 py-1.5">
                       <span
-                        className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${COLOR_CLASSES[alerta.color]}`}
+                        className={`pill pill-${TONO_DE_COLOR[alerta.color] ?? 'gris'}`}
                       >
                         {alerta.label}
                       </span>

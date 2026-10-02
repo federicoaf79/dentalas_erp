@@ -31,3 +31,6 @@ export const ESTADO_OC_PROPIA = {
 export function tonoSeguro(tono) {
   return TONOS.includes(tono) ? tono : 'gris'
 }
+
+// Colores viejos de calcularAlerta() (red/yel/grn/gray) → tono único.
+export const TONO_DE_COLOR = { red: 'rojo', yel: 'amarillo', grn: 'verde', gray: 'gris' }

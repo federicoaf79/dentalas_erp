@@ -121,8 +121,6 @@ body {
 .tabla { width: 100%; border-collapse: collapse; }
 .tabla th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700; color: var(--sub); border-bottom: 1px solid var(--border); background: #fafafa; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
 .tabla td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid #f1f2f4; vertical-align: middle; }
-.tabla tbody tr:nth-child(even) td { background: #fbfbfc; }
-.tabla tbody tr:hover td { background: #f5f6ff; }
 .tabla tr:last-child td { border-bottom: none; }
 .sku { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #374151; }
 .sub-linea { font-size: 11px; color: var(--sub); margin-top: 2px; }
@@ -149,3 +147,11 @@ body {
 .metrica-rot { font-size: 10px; color: var(--sub); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
 .metrica-val { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
 .metrica-sub { font-size: 11px; color: #9ca3af; margin-top: 5px; }
+
+/* Zebra y hover en capa "components": cualquier color propio de una fila
+   (seleccionada, crítica, etc.) puesto con utilidades de Tailwind gana. */
+@layer components {
+  .tabla tbody tr:nth-child(even) { background-color: #fbfbfc; }
+  .tabla tbody tr:hover { background-color: #f5f6ff; }
+}
+.tabla td.font-mono, .tabla td.sku { font-size: 12px; }

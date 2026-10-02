@@ -7,6 +7,7 @@ import { ultimasCausasPorReferencia } from '../lib/causas'
 import { traerRotacionPorSku, calcularCobertura } from '../lib/rotacionPorSku'
 import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
 import { aplicarFiltroProveedor, FILTRO_PROVEEDOR_INICIAL } from '../lib/filtroProveedor'
+import { TONO_DE_COLOR } from '../lib/estados'
 import FiltroProveedor from '../components/FiltroProveedor'
 import BarraMinStockMax from '../components/BarraMinStockMax'
 
@@ -47,11 +48,6 @@ import BarraMinStockMax from '../components/BarraMinStockMax'
 //     Ivana (escribir "Listo- dsps borrar contenido" en el Asunto de
 //     la OC en YiQi).
 // ============================================================
-
-const COLOR_CLASSES = {
-  red: 'bg-[var(--red-bg)] text-[var(--red)]',
-  yel: 'bg-[var(--yel-bg)] text-[#92400e]',
-}
 
 const TAMANIO_LOTE = 1000
 
@@ -748,7 +744,7 @@ export default function Alertas({ onArmarOC }) {
                 No hay artículos en alerta que coincidan con los filtros. 🎉
               </div>
             ) : (
-              <table className="w-full border-collapse">
+              <table className="tabla">
                 <thead>
                   <tr className="bg-gray-50 border-b border-[var(--border)]">
                     {[
@@ -847,7 +843,7 @@ export default function Alertas({ onArmarOC }) {
                       </td>
                       <td className="px-3.5 py-1.5">
                         <span
-                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${COLOR_CLASSES[a._alerta.color]}`}
+                          className={`pill pill-${TONO_DE_COLOR[a._alerta.color] ?? 'gris'}`}
                         >
                           {a._alerta.label}
                         </span>
@@ -954,7 +950,7 @@ export default function Alertas({ onArmarOC }) {
               No hay artículos excluidos permanentemente de las alertas.
             </div>
           ) : (
-            <table className="w-full border-collapse">
+            <table className="tabla">
               <thead>
                 <tr className="bg-gray-50 border-b border-[var(--border)]">
                   {['SKU', 'Producto', 'Proveedor', 'Motivo', 'Excluido por', 'Excluido el', ''].map((h) => (
@@ -1001,7 +997,7 @@ export default function Alertas({ onArmarOC }) {
           {pausadas.length === 0 ? (
             <div className="p-8 text-center text-[var(--sub)] text-sm">No hay alertas pausadas.</div>
           ) : (
-            <table className="w-full border-collapse">
+            <table className="tabla">
               <thead>
                 <tr className="bg-gray-50 border-b border-[var(--border)]">
                   {['SKU', 'Producto', 'Proveedor', 'Motivo', 'Pausada por', 'Pausada el', 'Reactiva el', ''].map((h) => (

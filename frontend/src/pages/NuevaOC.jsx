@@ -159,7 +159,7 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
             No hay proveedores con artículos para reponer.
           </div>
         ) : (
-          <table className="w-full border-collapse">
+          <table className="tabla">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
                 <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">#</th>
@@ -759,7 +759,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
           <div className="px-3.5 py-2 text-[11px] font-bold text-[var(--ind,#4338ca)] uppercase tracking-wide bg-indigo-50 border-b border-indigo-100">
             Ya seleccionados ({filasSeleccionadas.length})
           </div>
-          <table className="w-full border-collapse">
+          <table className="tabla">
             <tbody>
               {filasSeleccionadas.map((s) => (
                 <tr key={`sel-${s.mate_codigo}`} className="border-b border-indigo-100 last:border-0">
@@ -824,7 +824,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
               : 'Ningún artículo coincide con el filtro.'}
           </div>
         ) : (
-          <table className="w-full border-collapse">
+          <table className="tabla">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
                 <th className="px-3 py-1.5 w-10">

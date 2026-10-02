@@ -41,6 +41,22 @@ function formatoMoneda(n) {
     style: 'currency', currency: 'ARS', maximumFractionDigits: 0,
   }).format(num)
 }
+// Precio unitario con 2 decimales (igual que el PDF): con 0 decimales
+// "48 × $398" no daba el subtotal "$19.114" (el costo real es $398,21).
+function formatoMoneda2(n) {
+  const num = Number(n)
+  if (!Number.isFinite(num)) return '—'
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2,
+  }).format(num)
+}
+// Fecha corta (sin hora) para la barra de pasos.
+function formatoDia(f) {
+  if (!f) return null
+  try {
+    return new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  } catch { return null }
+}
 function formatoNumero(n) {
   if (n == null) return '—'
   const num = Number(n)
@@ -1054,20 +1070,20 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
             const enviadaProv = !!abierta.whatsapp_enviada_en
             const ing = ingresoYiqi
             const pasos = [
-              { rotulo: 'Borrador', fecha: formatoFecha(abierta.creada_en), estado: e === 'borrador' ? 'actual' : 'hecho' },
+              { rotulo: 'Borrador', fecha: formatoDia(abierta.creada_en), estado: e === 'borrador' ? 'actual' : 'hecho' },
               {
                 rotulo: e === 'rechazada' ? 'Rechazada' : 'Aprobación',
-                fecha: abierta.decidida_en ? formatoFecha(abierta.decidida_en) : null,
+                fecha: formatoDia(abierta.decidida_en),
                 estado: e === 'pendiente' ? 'espera' : e === 'rechazada' ? 'alerta' : aprobada ? 'hecho' : 'pend',
               },
               {
                 rotulo: 'Cargada en YiQi',
-                fecha: enYiqi ? formatoFecha(abierta.yiqi_enviada_en) : null,
+                fecha: enYiqi ? formatoDia(abierta.yiqi_enviada_en) : null,
                 estado: enYiqi ? 'hecho' : aprobada ? 'alerta' : 'pend',
               },
               {
                 rotulo: 'Enviada al proveedor',
-                fecha: enviadaProv ? formatoFecha(abierta.whatsapp_enviada_en) : null,
+                fecha: enviadaProv ? formatoDia(abierta.whatsapp_enviada_en) : null,
                 estado: enviadaProv ? 'hecho' : enYiqi ? 'actual' : 'pend',
               },
               {
@@ -1128,7 +1144,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 </>
               )}
             >
-              {abierta.enviada_en ? `Enviada a aprobación el ${formatoFecha(abierta.enviada_en)}.` : 'Enviada a aprobación.'}
+              {abierta.enviada_en ? `Enviada a aprobación el ${formatoDia(abierta.enviada_en)}.` : 'Enviada a aprobación.'}
             </BloqueAccion>
           )}
           {abierta.estado === 'rechazada' && (
@@ -1177,7 +1193,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 </>
               }
             >
-              Cargada en YiQi (OC #{abierta.yiqi_id_creado}) el {formatoFecha(abierta.yiqi_enviada_en)}.
+              Cargada en YiQi (OC #{abierta.yiqi_id_creado}) el {formatoDia(abierta.yiqi_enviada_en)}.
               {ingresoYiqi && !ingresoYiqi.encontrada && ' Todavía no figura en el reporte de OC de YiQi.'}
             </BloqueAccion>
           )}
@@ -1248,11 +1264,11 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                       )}
                     </td>
                     <td className="px-3.5 py-2 text-sm tabular-nums">
-                      {i.costo_unitario ? formatoMoneda(i.costo_unitario) : '—'}
+                      {i.costo_unitario ? formatoMoneda2(i.costo_unitario) : '—'}
                     </td>
                     <td className="px-3.5 py-2 text-sm tabular-nums font-semibold">
                       {i.costo_unitario
-                        ? formatoMoneda(subtotalLinea(editandoItems ? { ...i, cantidad: i._cantidad } : i))
+                        ? formatoMoneda2(subtotalLinea(editandoItems ? { ...i, cantidad: i._cantidad } : i))
                         : '—'}
                     </td>
                     <td className="px-3.5 py-2 text-gray-400 text-sm">{formatoNumero(i.stock_al_momento)}</td>
@@ -1311,9 +1327,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 📝 {causasPorOrden[String(abierta.id)] ? 'Ver causa' : 'Declarar causa'}
               </button>
             </div>
-            {soloOrdenId ? (
-              <a href="?page=ocs" className="btn btn-sm">← Todas las órdenes</a>
-            ) : (
+            {soloOrdenId ? null : (
               <button
                 onClick={() => { setAbierta(null); setEditandoItems(false); setItemsEdit([]) }}
                 className="btn btn-sm"
