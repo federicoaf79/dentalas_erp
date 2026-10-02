@@ -249,7 +249,16 @@ function AppLogueada({ session, onLogout }) {
         onLogout={onLogout}
       />
 
-      {currentPage === 'stock' && <MonitorStock />}
+      {currentPage === 'stock' && (
+        <MonitorStock
+          contadores={contadores}
+          onIrA={setCurrentPage}
+          onArmarOC={(articulo) => {
+            setPreseleccionOC({ proveedor: articulo.clie_nombre, sku: articulo.mate_codigo })
+            setCurrentPage('nueva-oc')
+          }}
+        />
+      )}
       {currentPage === 'reposicion-central-local' && <ReposicionCentralLocal />}
       {currentPage === 'seguimiento' && <SeguimientoOC />}
       {currentPage === 'proveedores' && (

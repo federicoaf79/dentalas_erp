@@ -849,13 +849,8 @@ export default function Alertas({ onArmarOC }) {
                         </span>
                       </td>
                       <td className="px-3.5 py-1.5">
-                        <div className="flex flex-col gap-0.5">
-                          <span
-                            className={causasPorSku[a.mate_codigo] ? 'text-gray-600 text-xs' : 'text-gray-300 text-xs'}
-                            title={causasPorSku[a.mate_codigo]?.nota ?? ''}
-                          >
-                            {causasPorSku[a.mate_codigo]?.causa_rotulo ?? '—'}
-                          </span>
+                        {/* 2/10/2026: sin causa = solo un botón chico (antes "— / Declarar causa" en 3 líneas) */}
+                        {causasPorSku[a.mate_codigo] ? (
                           <button
                             onClick={() =>
                               setModalCausa({
@@ -863,11 +858,25 @@ export default function Alertas({ onArmarOC }) {
                                 referenciaTexto: `${a.mate_codigo} — ${a.mate_nombre}`,
                               })
                             }
-                            className="text-[11px] text-[var(--ind)] hover:underline text-left"
+                            title={causasPorSku[a.mate_codigo]?.nota ?? 'Ver o cambiar la causa declarada'}
+                            className="pill pill-amarillo max-w-[160px] truncate"
                           >
-                            {causasPorSku[a.mate_codigo] ? 'Ver / declarar' : 'Declarar causa'}
+                            📝 {causasPorSku[a.mate_codigo].causa_rotulo}
                           </button>
-                        </div>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              setModalCausa({
+                                referenciaId: a.mate_codigo,
+                                referenciaTexto: `${a.mate_codigo} — ${a.mate_nombre}`,
+                              })
+                            }
+                            className="btn btn-sm whitespace-nowrap"
+                            title="Declarar por qué falta este artículo"
+                          >
+                            📝 Causa
+                          </button>
+                        )}
                       </td>
                       <td className="px-3.5 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">

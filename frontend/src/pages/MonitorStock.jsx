@@ -234,7 +234,10 @@ function FlechaOrden({ activa, dir }) {
   return <span className="text-[var(--ind,#4338ca)] ml-0.5">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
-export default function MonitorStock() {
+// 2/10/2026 (feedback Ivana 17, prototipo v7): KPIs accionables arriba,
+// "Nueva OC" en el encabezado y "+ OC" / "OC urgente" por fila.
+// contadores = los mismos del sidebar (App.jsx); onArmarOC / onIrA vienen de App.
+export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
   const permisos = usePermisos()
 
   const [articulos, setArticulos] = useState([])
@@ -432,13 +435,14 @@ export default function MonitorStock() {
               : `Datos sincronizados · última actualización de YiQi: ${formatoFechaHora(ultimaSync)}`}
           </div>
         </div>
-        <button
-          onClick={cargarDatos}
-          disabled={cargandoAlgo}
-          className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
-        >
-          {cargandoAlgo ? 'Actualizando…' : '↻ Actualizar'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={cargarDatos} disabled={cargandoAlgo} className="btn btn-sm">
+            {cargandoAlgo ? 'Actualizando…' : '↻ Actualizar'}
+          </button>
+          {onIrA && (
+            <button onClick={() => onIrA('nueva-oc')} className="btn btn-sm btn-pri">+ Nueva OC</button>
+          )}
+        </div>
       </div>
 
       {/* Error de permisos: falla cerrado, no se muestra ningun dato */}
@@ -477,42 +481,37 @@ export default function MonitorStock() {
         </Aviso>
       )}
 
-      {/* Métricas */}
-      <div className="grid grid-cols-4 gap-2.5 p-4">
-        <div className="bg-white rounded-xl p-4 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Alertas activas</div>
-          <div className="flex items-center gap-2 text-[18px]">
-            <span className="text-[var(--red)] font-extrabold">{criticas}</span>
+      {/* Métricas (prototipo v7): lo que pide acción, no texto de contexto */}
+      <div className="metricas px-4 pt-4 pb-3">
+        <div className="metrica" title="Punto de pedido manual si existe; si no, Stock Seguridad como respaldo (provisorio).">
+          <div className="metrica-rot">Alertas activas</div>
+          <div className="flex items-baseline gap-2">
+            <span className="metrica-val text-[var(--red)]">{criticas}</span>
             <span className="text-gray-400 text-xs">crít.</span>
-            <span className="text-[#92400e] font-extrabold">{preventivas}</span>
+            <span className="metrica-val text-[#b8860b]">{preventivas}</span>
             <span className="text-gray-400 text-xs">prev.</span>
           </div>
+          <div className="metrica-sub">productos bajo nivel de alerta</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">
-            {vistaFiltrada ? 'Artículos visibles' : 'Artículos totales'}
-          </div>
-          <div className="text-2xl font-bold">{articulos.length}</div>
-          <div className="text-[11px] text-gray-400 mt-1">
-            {cargandoAlgo
-              ? 'cargando…'
-              : vistaFiltrada
-              ? 'de tus proveedores asignados'
-              : 'catálogo completo (base propia)'}
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Origen de datos</div>
-          <div className="text-2xl font-bold text-[var(--grn)]">
-            {error ? '⚠ Error' : cargandoAlgo ? '…' : '✓ Sincronizado'}
+        <button type="button" className="metrica text-left hover:border-[var(--ind)]" onClick={() => onIrA?.('ocs')}>
+          <div className="metrica-rot">OC en curso</div>
+          <div className="metrica-val text-[var(--ind)]">{contadores.ocsActivas ?? '—'}</div>
+          <div className="metrica-sub">enviadas, todavía sin recibir completas</div>
+        </button>
+        <div className="metrica">
+          <div className="metrica-rot">{vistaFiltrada ? 'Artículos visibles' : 'Artículos'}</div>
+          <div className="metrica-val">{articulos.length}</div>
+          <div className="metrica-sub">
+            {error ? '⚠ error al sincronizar' : cargandoAlgo ? 'cargando…' : vistaFiltrada ? 'de tus proveedores asignados' : 'sincronizados con YiQi'}
           </div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Criterio de alerta</div>
-          <div className="text-[12px] text-gray-500 leading-tight mt-1">
-            Punto de pedido manual si existe, o Stock Seguridad como respaldo (provisorio)
+        <button type="button" className="metrica text-left hover:border-[var(--ind)]" onClick={() => onIrA?.('ocs')}>
+          <div className="metrica-rot">Requieren aprobación</div>
+          <div className={`metrica-val ${contadores.aprobacionPendiente ? 'text-[var(--blu)]' : 'text-gray-400'}`}>
+            {contadores.aprobacionPendiente ?? 0}
           </div>
-        </div>
+          <div className="metrica-sub">órdenes esperando a Aris</div>
+        </button>
       </div>
 
       {/* Buscador, filtro de proveedor y toggle ver todos */}
@@ -589,6 +588,7 @@ export default function MonitorStock() {
                   { label: 'Estado OC', columna: 'estadoOC' },
                   { label: 'Notas', columna: null },
                   { label: 'Estado', columna: 'estado' },
+                  ...(onArmarOC ? [{ label: '', columna: null }] : []),
                 ].map(({ label, columna }) => (
                   <th
                     key={label}
@@ -710,6 +710,19 @@ export default function MonitorStock() {
                         {alerta.label}
                       </span>
                     </td>
+                    {onArmarOC && (
+                      <td className="text-right whitespace-nowrap">
+                        {a.clie_nombre && (alerta.color === 'red' || alerta.color === 'yel') && (
+                          <button
+                            onClick={() => onArmarOC(a)}
+                            title={`Armar OC a ${a.clie_nombre} con este artículo`}
+                            className="btn btn-sm"
+                          >
+                            + OC
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}
