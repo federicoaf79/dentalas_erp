@@ -722,6 +722,7 @@ export default function Alertas({ onArmarOC }) {
                 proveedoresDisponibles={proveedoresDisponibles}
                 valor={filtroProveedor}
                 onChange={setFiltroProveedor}
+                permitirSinProveedor={false}
               />
             </div>
             <label className="flex items-center gap-2 text-sm text-gray-500">

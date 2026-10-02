@@ -351,6 +351,8 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   // un checkbox y un input controlado.
   const [busqueda, setBusqueda] = useState('')
   const [ocultarSinHistorial, setOcultarSinHistorial] = useState(false)
+  // Feedback Ivana 2/10 (punto 15): ocultar artículos sin mínimo (0 o vacío).
+  const [ocultarSinMinimo, setOcultarSinMinimo] = useState(false)
   const [paginaActual, setPaginaActual] = useState(1)
   const [filasPorPagina, setFilasPorPagina] = useState(50)
 
@@ -362,6 +364,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   const filtradas = useMemo(() => {
     let out = filas
     if (ocultarSinHistorial) out = out.filter((s) => s.cantidad_sugerida != null)
+    if (ocultarSinMinimo) out = out.filter((s) => Number(s.umbral) > 0)
     if (busqueda) {
       const t = busqueda.toLowerCase()
       out = out.filter(
@@ -371,11 +374,11 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
       )
     }
     return out
-  }, [filas, busqueda, ocultarSinHistorial])
+  }, [filas, busqueda, ocultarSinHistorial, ocultarSinMinimo])
 
   useEffect(() => {
     setPaginaActual(1)
-  }, [busqueda, ocultarSinHistorial, filasPorPagina])
+  }, [busqueda, ocultarSinHistorial, ocultarSinMinimo, filasPorPagina])
 
   const totalFilas = filtradas.length
   const totalPaginas = Math.max(1, Math.ceil(totalFilas / filasPorPagina))
@@ -385,6 +388,10 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
 
   const sinHistorialTotal = useMemo(
     () => filas.filter((s) => s.cantidad_sugerida == null).length,
+    [filas]
+  )
+  const sinMinimoTotal = useMemo(
+    () => filas.filter((s) => !(Number(s.umbral) > 0)).length,
     [filas]
   )
 
@@ -714,6 +721,16 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                 onChange={(e) => setOcultarSinHistorial(e.target.checked)}
               />
               Ocultar sin historial ({sinHistorialTotal})
+            </label>
+          )}
+          {sinMinimoTotal > 0 && (
+            <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer" title="Artículos con mínimo en 0 o sin mínimo cargado en YiQi">
+              <input
+                type="checkbox"
+                checked={ocultarSinMinimo}
+                onChange={(e) => setOcultarSinMinimo(e.target.checked)}
+              />
+              Ocultar con mínimo en 0 ({sinMinimoTotal})
             </label>
           )}
         </div>

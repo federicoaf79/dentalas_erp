@@ -897,10 +897,11 @@ export default function OrdenesPropias({ onCambio }) {
                             const url = `${window.location.origin}${window.location.pathname}?page=ocs&orden=${o.id}`
                             window.open(url, '_blank', 'noopener')
                           }}
-                          title="Abrir el detalle en una pestaña nueva"
+                          title={puedeEditarItems(o) ? 'Abrir la orden para editarla (pestaña nueva)' : 'Ver la orden (pestaña nueva)'}
                           className={BTN_SEC}
                         >
-                          Detalle ↗
+                          {/* Feedback Ivana 2/10 (punto 13): "Editar" solo cuando se puede editar de verdad. */}
+                          {puedeEditarItems(o) ? '✏️ Editar ↗' : 'Ver ↗'}
                         </button>
                         <button onClick={() => imprimir(o)} title="Ver e imprimir el PDF de la orden" className={BTN_SEC}>
                           📄 PDF

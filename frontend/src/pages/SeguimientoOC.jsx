@@ -132,7 +132,11 @@ function calcularEstado(orden) {
 }
 
 function etiquetaEstado(e) {
-  if (e.key === 'parcial') return `Ingreso parcial · ${e.totalPendiente} u pendientes`
+  if (e.key === 'parcial') {
+    // YiQi puede registrar más de lo pedido (pendiente negativo): no mostrar "-3 u pendientes".
+    if (e.totalPendiente < 0) return `Ingreso con exceso · +${-e.totalPendiente} u`
+    return `Ingreso parcial · ${e.totalPendiente} u pendientes`
+  }
   return e.label
 }
 
@@ -156,7 +160,9 @@ function pasosDeOrden(orden) {
         { rotulo: `Ingreso parcial (${e.totalEntregado} de ${e.totalCantidad} u)`, estado: 'actual' },
         { rotulo: 'Recibida completa', estado: 'pend' },
       ],
-      sigue: `Faltan ${e.totalPendiente} u por recibir.`,
+      sigue: e.totalPendiente < 0
+        ? `Se recibieron ${-e.totalPendiente} u más de lo pedido.`
+        : `Faltan ${e.totalPendiente} u por recibir.`,
     }
   }
   return {
@@ -331,8 +337,12 @@ export default function SeguimientoOC() {
     return porMes
   }, [ordenesFiltradas])
 
+  // Más recientes primero (antes salían en el orden en que venían de la base).
   const noCompletadas = useMemo(
-    () => ordenesFiltradas.filter((o) => o._estado.key !== 'completada'),
+    () =>
+      ordenesFiltradas
+        .filter((o) => o._estado.key !== 'completada')
+        .sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? '') || String(b.nroOC).localeCompare(String(a.nroOC), undefined, { numeric: true })),
     [ordenesFiltradas]
   )
 
@@ -426,7 +436,11 @@ export default function SeguimientoOC() {
             }
           >
             {parciales.length === 1
-              ? `Ingresaron ${parciales[0]._estado.totalEntregado} de ${parciales[0]._estado.totalCantidad} u. Quedan ${parciales[0]._estado.totalPendiente} u pendientes de entrega.`
+              ? `Ingresaron ${parciales[0]._estado.totalEntregado} de ${parciales[0]._estado.totalCantidad} u. ${
+                  parciales[0]._estado.totalPendiente < 0
+                    ? `Se recibieron ${-parciales[0]._estado.totalPendiente} u más de lo pedido.`
+                    : `Quedan ${parciales[0]._estado.totalPendiente} u pendientes de entrega.`
+                }`
               : 'Llegó parte de la mercadería y todavía faltan unidades por recibir.'}
           </BloqueAccion>
         )}

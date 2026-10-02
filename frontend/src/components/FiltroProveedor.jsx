@@ -7,7 +7,11 @@ import { useMemo, useState } from 'react'
 // para la lógica de filtrado en sí y el criterio de scope). Compartido
 // entre MonitorStock.jsx y Alertas.jsx.
 // ============================================================
-export default function FiltroProveedor({ proveedoresDisponibles, valor, onChange }) {
+// 2/10/2026 (feedback Ivana, punto 16): "Es vacío" se leía como "vaciar el
+// filtro" y dejaba la lista en blanco. Ahora se llama "Sin proveedor asignado",
+// se puede ocultar donde nunca trae nada (Alertas: todo lo comprable tiene
+// proveedor) y hay un "✕ Limpiar" visible al lado del botón.
+export default function FiltroProveedor({ proveedoresDisponibles, valor, onChange, permitirSinProveedor = true }) {
   const [abierto, setAbierto] = useState(false)
   const [excluirTexto, setExcluirTexto] = useState('')
 
@@ -32,7 +36,7 @@ export default function FiltroProveedor({ proveedoresDisponibles, valor, onChang
   }
 
   return (
-    <div className="relative">
+    <div className="relative flex items-center gap-1.5">
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
@@ -44,19 +48,29 @@ export default function FiltroProveedor({ proveedoresDisponibles, valor, onChang
       >
         Proveedor{filtroActivo ? ' ●' : ''} ▾
       </button>
+      {filtroActivo && (
+        <button
+          type="button"
+          onClick={() => onChange({ modo: 'todos', proveedor: '', excluidos: [] })}
+          className="px-2 py-2 rounded-lg text-[12px] text-gray-500 hover:text-[var(--red)] hover:bg-gray-50"
+          title="Quitar el filtro de proveedor"
+        >
+          ✕ Limpiar
+        </button>
+      )}
       {abierto && (
         <>
           {/* Backdrop invisible para cerrar al clickear afuera, mismo
               patrón que el buscador de "Agregar artículo" en NuevaOC.jsx. */}
           <div className="fixed inset-0 z-10" onClick={() => setAbierto(false)} />
-          <div className="absolute z-20 mt-1 w-80 bg-white border border-[var(--border)] rounded-lg shadow-lg p-3">
+          <div className="absolute z-20 top-full left-0 mt-1 w-80 bg-white border border-[var(--border)] rounded-lg shadow-lg p-3">
             <div className="text-[11px] uppercase text-gray-400 font-semibold mb-1.5">Condición</div>
             <div className="flex items-center gap-1.5 mb-2 flex-wrap">
               {[
                 { key: 'todos', label: 'Todos' },
                 { key: 'es', label: 'Es' },
                 { key: 'no_es', label: 'No es' },
-                { key: 'vacio', label: 'Es vacío' },
+                ...(permitirSinProveedor ? [{ key: 'vacio', label: 'Sin proveedor asignado' }] : []),
               ].map((m) => (
                 <button
                   key={m.key}
