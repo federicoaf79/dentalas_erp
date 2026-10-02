@@ -699,7 +699,7 @@ export default function Alertas({ onArmarOC }) {
                 onClick={() => setFiltroNivel(f.key)}
                 className={`px-3 py-1.5 rounded-full text-sm border ${
                   filtroNivel === f.key
-                    ? 'bg-[var(--indigo,#4338ca)] text-white border-[var(--indigo,#4338ca)]'
+                    ? 'bg-[var(--ind)] text-white border-[var(--ind)]'
                     : 'bg-white text-gray-600 border-gray-200'
                 }`}
               >
@@ -866,7 +866,7 @@ export default function Alertas({ onArmarOC }) {
                                 referenciaTexto: `${a.mate_codigo} — ${a.mate_nombre}`,
                               })
                             }
-                            className="text-[11px] text-[var(--indigo,#4338ca)] hover:underline text-left"
+                            className="text-[11px] text-[var(--ind)] hover:underline text-left"
                           >
                             {causasPorSku[a.mate_codigo] ? 'Ver / declarar' : 'Declarar causa'}
                           </button>

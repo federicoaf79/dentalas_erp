@@ -4,9 +4,17 @@ import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import DeclararCausaModal from '../components/DeclararCausaModal'
 import { ultimasCausasPorReferencia } from '../lib/causas'
+import { ESTADO_OC_YIQI } from '../lib/estados'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
+import Pastilla from '../components/ui/Pastilla'
+import BloqueAccion from '../components/ui/BloqueAccion'
+import BarraPasos from '../components/ui/BarraPasos'
 
 // ============================================================
-// SeguimientoOC.jsx — v4
+// SeguimientoOC.jsx — v5
+// v5 (2/10/2026, feedback Ivana 17/19/21): estilo prototipo v7 —
+// encabezado blanco, tarjetas con borde de color por estado, barra de
+// pasos al desplegar y código de color único (lib/estados.js).
 // v3: leia de la tabla propia ordenes_yiqi en vez de YiQi en vivo.
 // v4: aplica el filtro de proveedores asignados al usuario logueado.
 //
@@ -112,46 +120,135 @@ function calcularEstado(orden) {
   const totalCantidad = orden.lineas.reduce((acc, l) => acc + l.cantidad, 0)
   const totalEntregado = orden.lineas.reduce((acc, l) => acc + l.entregada, 0)
   const totalPendiente = orden.lineas.reduce((acc, l) => acc + l.pendiente, 0)
+  const base = { totalCantidad, totalEntregado, totalPendiente }
 
   if (totalCantidad > 0 && totalPendiente === 0) {
-    return { key: 'completada', label: 'Completada', clase: 'bg-[var(--grn-bg)] text-[var(--grn)]' }
+    return { key: 'completada', ...ESTADO_OC_YIQI.completada, ...base }
   }
   if (totalEntregado > 0) {
-    return { key: 'parcial', label: 'Ingreso parcial', clase: 'bg-[var(--yel-bg)] text-[#92400e]' }
+    return { key: 'parcial', ...ESTADO_OC_YIQI.parcial, ...base }
   }
-  return { key: 'enviada', label: 'Enviada', clase: 'bg-gray-100 text-gray-600' }
+  return { key: 'enviada', ...ESTADO_OC_YIQI.enviada, ...base }
+}
+
+function etiquetaEstado(e) {
+  if (e.key === 'parcial') return `Ingreso parcial · ${e.totalPendiente} u pendientes`
+  return e.label
+}
+
+function pasosDeOrden(orden) {
+  const e = orden._estado
+  const fecha = formatoFecha(orden.fecha)
+  if (e.key === 'completada') {
+    return {
+      pasos: [
+        { rotulo: 'Enviada al proveedor', fecha, estado: 'hecho' },
+        { rotulo: 'Ingreso de mercadería', estado: 'hecho' },
+        { rotulo: 'Recibida completa', estado: 'hecho' },
+      ],
+      sigue: 'Recibida completa. No queda nada pendiente.',
+    }
+  }
+  if (e.key === 'parcial') {
+    return {
+      pasos: [
+        { rotulo: 'Enviada al proveedor', fecha, estado: 'hecho' },
+        { rotulo: `Ingreso parcial (${e.totalEntregado} de ${e.totalCantidad} u)`, estado: 'actual' },
+        { rotulo: 'Recibida completa', estado: 'pend' },
+      ],
+      sigue: `Faltan ${e.totalPendiente} u por recibir.`,
+    }
+  }
+  return {
+    pasos: [
+      { rotulo: 'Enviada al proveedor', fecha, estado: 'hecho' },
+      { rotulo: 'Ingreso de mercadería', estado: 'espera' },
+      { rotulo: 'Recibida completa', estado: 'pend' },
+    ],
+    sigue: 'Esperando que llegue la mercadería.',
+  }
 }
 
 function DetalleOrden({ orden }) {
+  const { pasos, sigue } = pasosDeOrden(orden)
   return (
-    <div className="mt-3 border-t border-gray-100 pt-3">
-      <table className="w-full text-[13px]">
-        <thead>
-          <tr className="text-left text-gray-400 text-[11px] uppercase">
-            <th className="py-1.5">SKU</th>
-            <th className="py-1.5">Artículo</th>
-            <th className="py-1.5">Cantidad</th>
-            <th className="py-1.5">Entregado</th>
-            <th className="py-1.5">Pendiente</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orden.lineas.map((l, i) => {
-            const pend = l.pendiente ?? 0
-            return (
-              <tr key={i} className={pend > 0 ? 'bg-yellow-50' : ''}>
-                <td className="py-1.5 font-mono text-xs">{l.sku ?? '—'}</td>
-                <td className="py-1.5 font-medium text-gray-700">{l.nombreArticulo ?? '—'}</td>
-                <td className="py-1.5">{l.cantidad}</td>
-                <td className="py-1.5 text-[var(--grn)] font-semibold">{l.entregada}</td>
-                <td className={`py-1.5 font-semibold ${pend > 0 ? 'text-[var(--red)]' : 'text-gray-300'}`}>
-                  {pend > 0 ? pend : '—'}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+    <div className="border-t border-gray-100 px-6 py-5 bg-white">
+      <BarraPasos pasos={pasos} sigue={sigue} />
+      <div className="tw mt-5">
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Artículo</th>
+              <th className="text-right">Pedido</th>
+              <th className="text-right">Entregado</th>
+              <th className="text-right">Pendiente</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orden.lineas.map((l, i) => {
+              const pend = l.pendiente ?? 0
+              return (
+                <tr key={i}>
+                  <td className="sku">{l.sku ?? '—'}</td>
+                  <td className="font-medium text-gray-800">{l.nombreArticulo ?? '—'}</td>
+                  <td className="text-right tabular-nums">{l.cantidad}</td>
+                  <td className="text-right tabular-nums text-[var(--grn)] font-semibold">{l.entregada}</td>
+                  <td className="text-right tabular-nums">
+                    {pend > 0 ? <Pastilla tono="amarillo">{pend} u</Pastilla> : <span className="text-gray-300">—</span>}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function TarjetaOrden({ o, abierta, onToggle, causa, onCausa, compacta = false }) {
+  const e = o._estado
+  const articulos = o.lineas.length
+  return (
+    <div className={`card card-${e.tono}`}>
+      <div
+        className={`flex items-center gap-4 cursor-pointer hover:bg-gray-50 ${compacta ? 'px-4 py-3' : 'px-5 py-4'}`}
+        onClick={onToggle}
+      >
+        <div className="min-w-[96px]">
+          <div className="text-[14px] font-bold text-[var(--ind)]">OC #{o.nroOC}</div>
+          <div className="text-[11px] text-[var(--sub)] mt-0.5">{formatoFecha(o.fecha)}</div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14px] font-semibold text-gray-900 truncate">{o.proveedor || '—'}</div>
+          <div className="text-[12px] text-[var(--sub)] mt-0.5 truncate">
+            {articulos} {articulos === 1 ? 'artículo' : 'artículos'}
+            {/* El asunto es la nota manual de Ivana en YiQi (U-2, 7/9/2026). */}
+            {o.asunto && <> · <span className="text-gray-400">Asunto:</span> {o.asunto}</>}
+          </div>
+        </div>
+        {causa && (
+          <span className="text-[11px] text-gray-500 max-w-[160px] truncate" title={causa.nota ?? ''}>
+            {causa.causa_rotulo}
+          </span>
+        )}
+        <button
+          onClick={(ev) => { ev.stopPropagation(); onCausa() }}
+          className="btn btn-sm"
+          title="Registrar por qué se demora o qué pasó con esta OC"
+        >
+          📝 {causa ? 'Ver causa' : 'Causa'}
+        </button>
+        <div className="text-[14px] font-bold text-gray-900 min-w-[96px] text-right tabular-nums">
+          {formatoMoneda(o.total)}
+        </div>
+        <div className="min-w-[200px] text-right">
+          <Pastilla tono={e.tono}>{etiquetaEstado(e)}</Pastilla>
+        </div>
+        <span className="text-gray-400 text-[12px] w-3">{abierta ? '▾' : '▸'}</span>
+      </div>
+      {abierta && <DetalleOrden orden={o} />}
     </div>
   )
 }
@@ -291,186 +388,139 @@ export default function SeguimientoOC() {
     )
   }
 
+  const parciales = noCompletadas.filter((o) => o._estado.key === 'parcial')
+  const abrirCausa = (o) =>
+    setModalCausa({ referenciaId: o.nroOC, referenciaTexto: `OC #${o.nroOC} — ${o.proveedor}` })
+  const toggle = (nro) => setFilaExpandida(filaExpandida === nro ? null : nro)
+
   return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">Seguimiento de OC</h1>
-        <button onClick={cargar} className="text-sm text-[var(--indigo)] hover:underline">
-          Actualizar
-        </button>
-      </div>
+    <div className="flex-1 overflow-y-auto">
+      <EncabezadoPagina
+        titulo="Seguimiento de OC"
+        bajada={`OC enviadas a proveedores, según YiQi · ${contadores.enviada + contadores.parcial} en curso`}
+      >
+        <button onClick={cargar} className="btn btn-sm">↻ Actualizar</button>
+      </EncabezadoPagina>
 
-      {/* Aviso de vista filtrada (solo operadores) */}
-      {vistaFiltrada && (
-        <Aviso tipo="filtro" autoCerrarEn={15} className="mb-4">
-          Vista filtrada: solo se muestran las OC de tus {permisos.nombres.length} proveedores asignados. Si un
-          proveedor tuyo no tiene ninguna OC cargada, simplemente no aparece acá.
-        </Aviso>
-      )}
+      <div className="pad">
+        {/* Aviso de vista filtrada (solo operadores) */}
+        {vistaFiltrada && (
+          <Aviso tipo="filtro" autoCerrarEn={15} className="mb-4">
+            Vista filtrada: solo se muestran las OC de tus {permisos.nombres.length} proveedores asignados. Si un
+            proveedor tuyo no tiene ninguna OC cargada, simplemente no aparece acá.
+          </Aviso>
+        )}
 
-      {/* Filtros por estado */}
-      <div className="flex gap-2 mb-4">
-        {[
-          { key: 'todas', label: `Todas (${contadores.todas})` },
-          { key: 'enviada', label: `Enviadas (${contadores.enviada})` },
-          { key: 'parcial', label: `Ingreso parcial (${contadores.parcial})` },
-          { key: 'completada', label: `Completadas (${contadores.completada})` },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFiltroEstado(f.key)}
-            className={`px-3 py-1.5 rounded-full text-sm border ${
-              filtroEstado === f.key
-                ? 'bg-[var(--indigo)] text-white border-[var(--indigo)]'
-                : 'bg-white text-gray-600 border-gray-200'
-            }`}
+        {/* Banner de ingreso parcial (prototipo v7) */}
+        {parciales.length > 0 && filtroEstado !== 'parcial' && (
+          <BloqueAccion
+            tono="amarillo"
+            className="mb-4"
+            titulo={
+              parciales.length === 1
+                ? `Ingreso parcial — OC #${parciales[0].nroOC} · ${parciales[0].proveedor}`
+                : `Ingreso parcial en ${parciales.length} OC`
+            }
+            acciones={
+              <button className="btn btn-sm" onClick={() => setFiltroEstado('parcial')}>Ver</button>
+            }
           >
-            {f.label}
-          </button>
-        ))}
-      </div>
+            {parciales.length === 1
+              ? `Ingresaron ${parciales[0]._estado.totalEntregado} de ${parciales[0]._estado.totalCantidad} u. Quedan ${parciales[0]._estado.totalPendiente} u pendientes de entrega.`
+              : 'Llegó parte de la mercadería y todavía faltan unidades por recibir.'}
+          </BloqueAccion>
+        )}
 
-      {/* Filtro de fechas */}
-      <div className="flex gap-3 mb-6 text-sm">
-        <label className="flex items-center gap-2 text-gray-500">
-          Desde
-          <input
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="border border-gray-200 rounded px-2 py-1"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-gray-500">
-          Hasta
-          <input
-            type="date"
-            value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="border border-gray-200 rounded px-2 py-1"
-          />
-        </label>
-      </div>
-
-      {/* OC no completadas: enviadas y parciales, sueltas */}
-      <div className="space-y-3 mb-6">
-        {noCompletadas.map((o) => (
-          <div key={o.nroOC} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-            <div
-              className="flex items-center justify-between cursor-pointer"
-              onClick={() => setFilaExpandida(filaExpandida === o.nroOC ? null : o.nroOC)}
+        {/* Filtros por estado + fechas */}
+        <div className="flex flex-wrap items-center gap-2 mb-5">
+          {[
+            { key: 'todas', label: `Todas (${contadores.todas})` },
+            { key: 'enviada', label: `Enviadas (${contadores.enviada})` },
+            { key: 'parcial', label: `Ingreso parcial (${contadores.parcial})` },
+            { key: 'completada', label: `Completadas (${contadores.completada})` },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFiltroEstado(f.key)}
+              className={`chip ${filtroEstado === f.key ? 'chip-on' : ''}`}
             >
-              <div>
-                <p className="font-semibold text-gray-800">
-                  OC #{o.nroOC} — {o.proveedor}
-                </p>
-                {/* 7/9/2026 (auditoría de usabilidad, U-2): "asunto" es el
-                    campo de texto libre de YiQi que Ivana usa a mano como
-                    marca de su propio flujo (ver ítem 12 de pendientes,
-                    ej. "Listo- dsps borrar contenido") — en Órdenes de
-                    compra e Historial de OC va en una columna rotulada
-                    "Asunto", pero acá se mostraba pelado, como si fuera un
-                    estado generado por el sistema. Se agrega el mismo
-                    rótulo para que quede claro que es una nota manual. */}
-                <p className="text-sm text-gray-500">
-                  {o.asunto && <span className="text-gray-400">Asunto: </span>}
-                  {o.asunto}
-                  {o.asunto ? ' · ' : ''}
-                  {formatoFecha(o.fecha)}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                {causasPorOC[o.nroOC] && (
-                  <span className="text-[11px] text-gray-500 max-w-[160px] truncate" title={causasPorOC[o.nroOC].nota ?? ''}>
-                    {causasPorOC[o.nroOC].causa_rotulo}
-                  </span>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setModalCausa({ referenciaId: o.nroOC, referenciaTexto: `OC #${o.nroOC} — ${o.proveedor}` })
-                  }}
-                  className="text-[11px] text-[var(--indigo)] hover:underline"
-                >
-                  {causasPorOC[o.nroOC] ? 'Ver / declarar' : 'Declarar causa'}
-                </button>
-                <span className="font-semibold text-gray-700">{formatoMoneda(o.total)}</span>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${o._estado.clase}`}>
-                  {o._estado.label}
-                </span>
-              </div>
-            </div>
-            {filaExpandida === o.nroOC && <DetalleOrden orden={o} />}
+              {f.label}
+            </button>
+          ))}
+          <div className="flex gap-3 text-[13px] ml-auto">
+            <label className="flex items-center gap-2 text-gray-500">
+              Desde
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={(e) => setFechaDesde(e.target.value)}
+                className="border border-[var(--border)] rounded-lg px-2 py-1 bg-white"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-gray-500">
+              Hasta
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={(e) => setFechaHasta(e.target.value)}
+                className="border border-[var(--border)] rounded-lg px-2 py-1 bg-white"
+              />
+            </label>
           </div>
-        ))}
-        {noCompletadas.length === 0 && (
-          <p className="text-sm text-gray-400">No hay órdenes enviadas o con ingreso parcial en este filtro.</p>
+        </div>
+
+        {/* OC en curso: enviadas y parciales */}
+        <div className="space-y-3 mb-8">
+          {noCompletadas.map((o) => (
+            <TarjetaOrden
+              key={o.nroOC}
+              o={o}
+              abierta={filaExpandida === o.nroOC}
+              onToggle={() => toggle(o.nroOC)}
+              causa={causasPorOC[o.nroOC]}
+              onCausa={() => abrirCausa(o)}
+            />
+          ))}
+          {noCompletadas.length === 0 && (
+            <p className="text-[13px] text-gray-400">No hay órdenes enviadas o con ingreso parcial en este filtro.</p>
+          )}
+        </div>
+
+        {/* OC completadas: agrupadas por mes > día (colapsables) */}
+        {Object.keys(completadasAgrupadas).length > 0 && (
+          <div>
+            <div className="text-[12px] font-bold text-[var(--sub)] uppercase tracking-wide mb-2">Recibidas completas</div>
+            {Object.entries(completadasAgrupadas).map(([mes, dias]) => (
+              <div key={mes} className="mb-2">
+                <button
+                  onClick={() => toggleCarpeta(mes)}
+                  className="w-full text-left px-4 py-2.5 bg-white border border-[var(--border)] rounded-lg text-[13px] font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  {carpetasAbiertas[mes] ? '▾' : '▸'} {mes}{' '}
+                  <span className="text-[var(--sub)] font-normal">({Object.values(dias).flat().length})</span>
+                </button>
+                {carpetasAbiertas[mes] &&
+                  Object.entries(dias).map(([dia, ocs]) => (
+                    <div key={dia} className="ml-4 mt-2 space-y-2">
+                      <p className="text-[11px] text-gray-400">{dia}</p>
+                      {ocs.map((o) => (
+                        <TarjetaOrden
+                          key={o.nroOC}
+                          o={o}
+                          compacta
+                          abierta={filaExpandida === o.nroOC}
+                          onToggle={() => toggle(o.nroOC)}
+                          causa={causasPorOC[o.nroOC]}
+                          onCausa={() => abrirCausa(o)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            ))}
+          </div>
         )}
       </div>
-
-      {/* OC completadas: agrupadas por mes > dia (colapsables) */}
-      {Object.keys(completadasAgrupadas).length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-500 mb-2">Historial de completadas</h2>
-          {Object.entries(completadasAgrupadas).map(([mes, dias]) => (
-            <div key={mes} className="mb-2">
-              <button
-                onClick={() => toggleCarpeta(mes)}
-                className="w-full text-left px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium text-gray-600"
-              >
-                {carpetasAbiertas[mes] ? '▾' : '▸'} {mes} ({Object.values(dias).flat().length})
-              </button>
-              {carpetasAbiertas[mes] &&
-                Object.entries(dias).map(([dia, ocs]) => (
-                  <div key={dia} className="ml-4 mt-2 space-y-2">
-                    <p className="text-xs text-gray-400">{dia}</p>
-                    {ocs.map((o) => (
-                      <div key={o.nroOC} className="bg-white border border-gray-100 rounded-lg p-3">
-                        <div
-                          className="flex items-center justify-between cursor-pointer"
-                          onClick={() => setFilaExpandida(filaExpandida === o.nroOC ? null : o.nroOC)}
-                        >
-                          <div>
-                            <p className="font-medium text-gray-700 text-sm">
-                              OC #{o.nroOC} — {o.proveedor}
-                            </p>
-                            {/* 7/9/2026 (U-2): mismo rótulo que en la fila de arriba */}
-                            {o.asunto && (
-                              <p className="text-xs text-gray-400">
-                                <span className="text-gray-300">Asunto: </span>
-                                {o.asunto}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {causasPorOC[o.nroOC] && (
-                              <span className="text-[11px] text-gray-500 max-w-[140px] truncate" title={causasPorOC[o.nroOC].nota ?? ''}>
-                                {causasPorOC[o.nroOC].causa_rotulo}
-                              </span>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setModalCausa({ referenciaId: o.nroOC, referenciaTexto: `OC #${o.nroOC} — ${o.proveedor}` })
-                              }}
-                              className="text-[11px] text-[var(--indigo)] hover:underline"
-                            >
-                              {causasPorOC[o.nroOC] ? 'Ver / declarar' : 'Declarar causa'}
-                            </button>
-                            <span className="text-sm font-semibold text-gray-600">
-                              {formatoMoneda(o.total)}
-                            </span>
-                          </div>
-                        </div>
-                        {filaExpandida === o.nroOC && <DetalleOrden orden={o} />}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-            </div>
-          ))}
-        </div>
-      )}
 
       {modalCausa && (
         <DeclararCausaModal

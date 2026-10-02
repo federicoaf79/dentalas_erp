@@ -561,7 +561,7 @@ export default function MonitorStock() {
           </label>
           <button
             onClick={() => setVerTodos((v) => !v)}
-            className="text-sm text-[var(--indigo,#4338ca)] hover:underline whitespace-nowrap"
+            className="text-sm text-[var(--ind)] hover:underline whitespace-nowrap"
           >
             {verTodos ? 'Ver solo con alerta' : `Ver todos (${articulosConProveedor.length})`}
           </button>

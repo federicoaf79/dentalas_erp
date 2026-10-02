@@ -361,7 +361,7 @@ export default function HistorialOC() {
 
         <button
           onClick={limpiarFiltros}
-          className="text-sm text-[var(--indigo,#4338ca)] hover:underline ml-auto"
+          className="text-sm text-[var(--ind)] hover:underline ml-auto"
         >
           Limpiar filtros
         </button>

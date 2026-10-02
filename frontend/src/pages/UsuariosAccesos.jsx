@@ -218,7 +218,7 @@ function ModalPassword({ usuario, onCerrar, onConfirmar, guardando }) {
           <button
             onClick={() => onConfirmar(password.trim())}
             disabled={guardando || invalida}
-            className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--indigo,#4338ca)] disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--ind)] disabled:opacity-50"
           >
             {guardando ? 'Guardando…' : 'Restablecer'}
           </button>
@@ -412,7 +412,7 @@ export default function UsuariosAccesos() {
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => toggleUsuario(u.id)}
-                          className="text-sm text-[var(--indigo,#4338ca)] hover:underline"
+                          className="text-sm text-[var(--ind)] hover:underline"
                         >
                           {usuarioExpandido === u.id ? 'Cerrar' : 'Gestionar accesos'}
                         </button>

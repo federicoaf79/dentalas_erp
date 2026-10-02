@@ -91,7 +91,7 @@ export default function CambiarMiPassword() {
                 <div className="flex justify-end mt-4">
                   <button
                     onClick={cerrar}
-                    className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--indigo,#4338ca)]"
+                    className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--ind)]"
                   >
                     Cerrar
                   </button>
@@ -136,7 +136,7 @@ export default function CambiarMiPassword() {
                   <button
                     onClick={guardar}
                     disabled={guardando || invalida}
-                    className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--indigo,#4338ca)] disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-[var(--ind)] disabled:opacity-50"
                   >
                     {guardando ? 'Guardando…' : 'Cambiar'}
                   </button>

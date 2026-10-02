@@ -497,7 +497,7 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
             <button
               onClick={() => setVista('lista')}
               className={`px-3 py-1.5 text-[13px] font-semibold ${
-                vista === 'lista' ? 'bg-[var(--indigo,#4338ca)] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                vista === 'lista' ? 'bg-[var(--ind)] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
               Lista
@@ -505,7 +505,7 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
             <button
               onClick={() => setVista('remitos')}
               className={`px-3 py-1.5 text-[13px] font-semibold border-l border-[var(--border)] ${
-                vista === 'remitos' ? 'bg-[var(--indigo,#4338ca)] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                vista === 'remitos' ? 'bg-[var(--ind)] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
               Remitos {remitos.length > 0 ? `(${remitos.length})` : ''}
@@ -569,7 +569,7 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
           onClick={() => setFiltroPrioridad('todas')}
           className={`px-3 py-1.5 rounded-full text-sm border ${
             filtroPrioridad === 'todas'
-              ? 'bg-[var(--indigo,#4338ca)] text-white border-[var(--indigo,#4338ca)]'
+              ? 'bg-[var(--ind)] text-white border-[var(--ind)]'
               : 'bg-white text-gray-600 border-gray-200'
           }`}
         >
@@ -583,7 +583,7 @@ export default function ReposicionInterna({ onPedirAProveedor }) {
               onClick={() => setFiltroPrioridad(String(p))}
               className={`px-3 py-1.5 rounded-full text-sm border ${
                 filtroPrioridad === String(p)
-                  ? 'bg-[var(--indigo,#4338ca)] text-white border-[var(--indigo,#4338ca)]'
+                  ? 'bg-[var(--ind)] text-white border-[var(--ind)]'
                   : 'bg-white text-gray-600 border-gray-200'
               }`}
             >

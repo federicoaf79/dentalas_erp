@@ -308,7 +308,7 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
                         {o._estado.label}
                       </span>
                     </td>
-                    <td className="px-3.5 py-1.5 text-sm text-[var(--indigo,#4338ca)]">Ver detalle</td>
+                    <td className="px-3.5 py-1.5 text-sm text-[var(--ind)]">Ver detalle</td>
                   </tr>
                   {ordenExpandida === o.nroOC && (
                     <tr>
