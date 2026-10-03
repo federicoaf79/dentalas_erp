@@ -204,11 +204,15 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
   const [editandoItems, setEditandoItems] = useState(false)
   const [itemsEdit, setItemsEdit] = useState([])
   const [errorEdicionItems, setErrorEdicionItems] = useState(null)
+  // 3/10/2026 (punto 14, decisión de Federico): la creadora edita en
+  // borrador o esperando aprobación; Aris (admin) en cualquier estado que no
+  // sea aprobada. Misma regla que la RLS de 20261003100000. Si la creadora
+  // toca una pendiente, la base la devuelve a borrador (trigger).
   function puedeEditarItems(orden) {
+    if (!orden || orden.archivada_en) return false
+    if (permisos.esAdmin) return orden.estado !== 'aprobada'
     return (
-      !!orden &&
-      !orden.archivada_en &&
-      orden.estado === 'borrador' &&
+      ['borrador', 'pendiente'].includes(orden.estado) &&
       !!miUserId &&
       orden.creada_por === miUserId
     )
@@ -216,7 +220,67 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
   function iniciarEdicionItems() {
     setItemsEdit(items.map((i) => ({ ...i, _cantidad: String(i.cantidad) })))
     setErrorEdicionItems(null)
+    setBuscarEdit('')
+    setResultadosEdit([])
     setEditandoItems(true)
+  }
+  // Buscador de artículos del proveedor dentro de la edición (punto 14:
+  // "editar con el aspecto de Nueva OC"). Mismo RPC que Nueva OC.
+  const [buscarEdit, setBuscarEdit] = useState('')
+  const [resultadosEdit, setResultadosEdit] = useState([])
+  const [buscandoEdit, setBuscandoEdit] = useState(false)
+  useEffect(() => {
+    const texto = buscarEdit.trim()
+    if (!editandoItems || !abierta || texto.length < 2) {
+      setResultadosEdit([])
+      setBuscandoEdit(false)
+      return
+    }
+    setBuscandoEdit(true)
+    const id = setTimeout(() => {
+      supabase
+        .rpc('buscar_articulos_proveedor', { p_proveedor: abierta.proveedor_nombre, p_busqueda: texto, p_limite: 15 })
+        .then(({ data, error }) => {
+          if (!error) setResultadosEdit(data ?? [])
+          setBuscandoEdit(false)
+        })
+    }, 350)
+    return () => clearTimeout(id)
+  }, [buscarEdit, editandoItems, abierta])
+  function agregarItemEdit(r) {
+    setItemsEdit((prev) => {
+      if (prev.some((i) => i.mate_codigo === r.mate_codigo)) return prev
+      const paso = Number(r.unidades_por_bulto) > 0 ? Number(r.unidades_por_bulto) : 1
+      return [
+        ...prev,
+        {
+          id: `nuevo-${r.mate_codigo}`,
+          _nuevo: true,
+          mate_codigo: r.mate_codigo,
+          mate_nombre: r.mate_nombre,
+          _cantidad: String(paso),
+          costo_unitario: r.costo_unitario ?? null,
+          stock_al_momento: r.stock ?? null,
+          promedio_mensual: r.promedio ?? null,
+          unidades_por_bulto: r.unidades_por_bulto ?? null,
+        },
+      ]
+    })
+    setBuscarEdit('')
+    setResultadosEdit([])
+  }
+  function pasoEdit(id, signo) {
+    setItemsEdit((prev) =>
+      prev.map((i) => {
+        if (i.id !== id) return i
+        const paso = Number(i.unidades_por_bulto) > 0 ? Number(i.unidades_por_bulto) : 1
+        const n = Number(i._cantidad) || 0
+        const sig = signo > 0
+          ? Math.floor(n / paso + 1e-9) * paso + paso
+          : Math.max(paso, Math.ceil(n / paso - 1e-9) * paso - paso)
+        return { ...i, _cantidad: String(Math.round(sig * 1000) / 1000) }
+      })
+    )
   }
   function cancelarEdicionItems() {
     setEditandoItems(false)
@@ -249,6 +313,22 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
         const original = items.find((o) => o.id === i.id)
         return original && Number(original.cantidad) !== Number(i._cantidad)
       })
+      const nuevos = itemsEdit.filter((i) => i._nuevo)
+      if (nuevos.length > 0) {
+        const { error } = await supabase.from('ordenes_propias_items').insert(
+          nuevos.map((i) => ({
+            orden_id: abierta.id,
+            mate_codigo: i.mate_codigo,
+            mate_nombre: i.mate_nombre,
+            cantidad: Number(i._cantidad),
+            costo_unitario: i.costo_unitario,
+            stock_al_momento: i.stock_al_momento,
+            promedio_mensual: i.promedio_mensual,
+            unidades_por_bulto: i.unidades_por_bulto,
+          }))
+        )
+        if (error) throw new Error(error.message)
+      }
       if (idsEliminados.length > 0) {
         const { error } = await supabase.from('ordenes_propias_items').delete().in('id', idsEliminados)
         if (error) throw new Error(error.message)
@@ -265,7 +345,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
       // columnas quedan desactualizadas si no se tocan acá también (la
       // segunda además es la que bloquea la aprobación si queda mal).
       const nuevoTotal = itemsEdit.reduce(
-        (acc, i) => acc + (Number(i.costo_unitario) || 0) * Number(i._cantidad), 0
+        (acc, i) => acc + subtotalLinea({ ...i, cantidad: Number(i._cantidad) }), 0
       )
       const nuevoSinCosto = itemsEdit.filter((i) => !(Number(i.costo_unitario) > 0)).length
       const { error: errTotal } = await supabase
@@ -274,11 +354,18 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
         .eq('id', abierta.id)
       if (errTotal) throw new Error(errTotal.message)
 
-      setAviso(`Ítems de la orden #${abierta.id} actualizados.`)
+      const volvioABorrador = abierta.estado === 'pendiente' && !permisos.esAdmin
+      setAviso(
+        volvioABorrador
+          ? `Orden #${abierta.id} actualizada. Volvió a borrador: enviala a aprobación de nuevo.`
+          : `Ítems de la orden #${abierta.id} actualizados.`
+      )
       setEditandoItems(false)
       setItemsEdit([])
       await cargar()
-      await abrir(abierta)
+      // La orden puede haber cambiado de estado (trigger de la base): se relee.
+      const { data: fresca } = await supabase.from('ordenes_propias').select('*').eq('id', abierta.id).single()
+      await abrir(fresca ? { ...abierta, ...fresca } : abierta)
       avisarCambio()
     } catch (e) {
       setErrorEdicionItems(e.message)
@@ -1184,10 +1271,9 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
           )}
           {/* Editar cantidades / quitar líneas (28/9/2026) -- ver el bloque
               de comentario junto a los estados de arriba (editandoItems).
-              Solo aparece en 'borrador' (RLS real de ordenes_propias_items
-              no admite 'pendiente' ni bypass de admin, ver comentario):
-              en cualquier otro estado la tabla queda 100% de solo lectura,
-              como siempre. Solo lo ve quien creó el borrador (30/9/2026). */}
+              3/10/2026 (punto 14): creadora en borrador/pendiente, Aris en
+              cualquier estado no aprobado — ver puedeEditarItems() y la
+              migración 20261003100000_editar_ordenes_pendientes.sql. */}
           {puedeEditarItems(abierta) && !editandoItems && (
             <div className="flex justify-end mb-2">
               <button
@@ -1195,8 +1281,59 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 onClick={iniciarEdicionItems}
                 className="btn btn-sm btn-pri"
               >
-                ✏ Editar cantidades / quitar ítems
+                ✏ Editar orden (cantidades, quitar o agregar artículos)
               </button>
+            </div>
+          )}
+          {editandoItems && (
+            <div className="mb-3 space-y-2">
+              {abierta.estado === 'pendiente' && !permisos.esAdmin && (
+                <BloqueAccion tono="amarillo" titulo="Esta orden está esperando aprobación">
+                  Si guardás cambios, vuelve a borrador y hay que enviarla a aprobación de nuevo.
+                </BloqueAccion>
+              )}
+              <div className="relative">
+                <label className="block text-[12px] font-semibold text-[var(--sub)] mb-1">
+                  Agregar artículo de {abierta.proveedor_nombre}
+                </label>
+                <input
+                  type="text"
+                  value={buscarEdit}
+                  onChange={(e) => setBuscarEdit(e.target.value)}
+                  placeholder="Buscar por SKU o nombre en el catálogo del proveedor…"
+                  className="w-full max-w-md border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+                />
+                {buscarEdit.trim().length >= 2 && (
+                  <div className="absolute z-10 mt-1 w-full max-w-md bg-white border border-[var(--border)] rounded-lg shadow-lg max-h-72 overflow-y-auto">
+                    {buscandoEdit ? (
+                      <div className="px-3 py-2.5 text-sm text-[var(--sub)]">Buscando…</div>
+                    ) : resultadosEdit.length === 0 ? (
+                      <div className="px-3 py-2.5 text-sm text-[var(--sub)]">Sin resultados.</div>
+                    ) : (
+                      resultadosEdit.map((r) => {
+                        const ya = itemsEdit.some((i) => i.mate_codigo === r.mate_codigo)
+                        return (
+                          <button
+                            type="button"
+                            key={r.mate_codigo}
+                            disabled={ya}
+                            onClick={() => agregarItemEdit(r)}
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0 flex items-center justify-between gap-2 disabled:opacity-60"
+                          >
+                            <span className="min-w-0 flex items-baseline gap-2">
+                              <span className="font-mono text-xs text-gray-400 whitespace-nowrap">{r.mate_codigo}</span>
+                              <span className="text-[13px] font-medium truncate">{r.mate_nombre ?? '—'}</span>
+                            </span>
+                            <span className="text-[11px] font-semibold whitespace-nowrap">
+                              {ya ? <span className="text-[var(--grn)]">Ya está ✓</span> : <span className="text-[var(--ind)]">+ Agregar</span>}
+                            </span>
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {errorEdicionItems && (
@@ -1223,15 +1360,24 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                     <td className="px-3.5 py-2 text-[13px] font-medium">{i.mate_nombre ?? '—'}</td>
                     <td className="px-3.5 py-2 font-bold">
                       {editandoItems ? (
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={i._cantidad}
-                          onChange={(e) => actualizarCantidadEdit(i.id, e.target.value)}
-                          disabled={ocupado}
-                          className="w-20 border border-[var(--border)] rounded-lg px-2 py-1 text-[13px] disabled:opacity-60"
-                        />
+                        <div className="flex items-center gap-1">
+                          <button type="button" disabled={ocupado} onClick={() => pasoEdit(i.id, -1)}
+                            className="w-7 h-7 rounded-md border border-[var(--border)] bg-white text-gray-600 font-bold hover:bg-gray-50"
+                            title={`Restar ${Number(i.unidades_por_bulto) > 0 ? i.unidades_por_bulto : 1}`}>−</button>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={i._cantidad}
+                            onChange={(e) => actualizarCantidadEdit(i.id, e.target.value)}
+                            disabled={ocupado}
+                            className="w-20 border border-[var(--border)] rounded-lg px-2 py-1 text-[13px] text-right disabled:opacity-60"
+                          />
+                          <button type="button" disabled={ocupado} onClick={() => pasoEdit(i.id, 1)}
+                            className="w-7 h-7 rounded-md border border-[var(--border)] bg-white text-gray-600 font-bold hover:bg-gray-50"
+                            title={`Sumar ${Number(i.unidades_por_bulto) > 0 ? i.unidades_por_bulto : 1}`}>+</button>
+                          {i._nuevo && <span className="pill pill-azul ml-1">nuevo</span>}
+                        </div>
                       ) : (
                         formatoNumero(i.cantidad)
                       )}
