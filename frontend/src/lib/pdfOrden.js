@@ -18,14 +18,18 @@
 // ============================================================
 
 import { jsPDF } from 'jspdf'
-// Import de efecto (no default): jspdf-autotable v3 se registra solo como
+// Import nombrado (no default): en v3 se usaba un import de efecto que registraba
 // jsPDF.API.autoTable al importarse. El import default (`import autoTable
 // from ...`) + llamarlo como función funcionaba en dev pero rompía en el
 // build de producción de Vite/Rollup con "(0 , UI.default) is not a
 // function" — problema de interop CJS/ESM de este paquete, no del código.
 // Encontrado probando en vivo tras el primer deploy; este es el patrón
 // documentado por la librería para máxima compatibilidad entre bundlers.
-import 'jspdf-autotable'
+import { applyPlugin } from 'jspdf-autotable'
+
+// jspdf-autotable v5 ya no se registra solo al importarse: se aplica a mano
+// sobre jsPDF para mantener el uso doc.autoTable(...) / doc.lastAutoTable.
+applyPlugin(jsPDF)
 
 function moneda(n) {
   const num = Number(n)
