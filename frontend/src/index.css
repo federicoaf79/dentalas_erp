@@ -117,10 +117,10 @@ body {
 .bloque-texto { font-size: 12px; }
 
 /* Tabla aireada con filas separadas */
-.tw { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+.tw { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; }
 .tabla { width: 100%; border-collapse: collapse; }
-.tabla th { padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 700; color: var(--sub); border-bottom: 1px solid var(--border); background: #fafafa; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
-.tabla td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f1f2f4; vertical-align: middle; }
+.tabla th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700; color: var(--sub); border-bottom: 1px solid var(--border); background: #fafafa; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.tabla td { padding: 12px 14px; font-size: 13px; border-bottom: 1px solid #f1f2f4; vertical-align: middle; }
 .tabla tr:last-child td { border-bottom: none; }
 .sku { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #374151; }
 .sub-linea { font-size: 11px; color: var(--sub); margin-top: 2px; }
@@ -155,3 +155,23 @@ body {
   .tabla tbody tr:hover { background-color: #f5f6ff; }
 }
 .tabla td.font-mono, .tabla td.sku { font-size: 12px; }
+
+/* ============================================================
+   5/10/2026 — ajuste fino al prototipo v7 (medidas tomadas de su CSS)
+   ============================================================ */
+/* Íconos Tabler dentro de botones, igual que el prototipo */
+.btn .ti { font-size: 15px; line-height: 1; }
+.btn-sm .ti { font-size: 14px; }
+/* Badge chico (prototipo .badge / .cc) */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+/* Tarjeta de sección con título (prototipo .card-title dentro de tarjeta blanca) */
+.seccion { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; }
+.seccion-titulo { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+.titulo-tabla { font-size: 13px; font-weight: 700; color: var(--text); }
+/* Contenedor estándar de página (prototipo .pad + .metrics) */
+.pagina { padding: 20px 28px 32px; }
+/* "ⓘ" de ayuda en el encabezado (reemplaza los carteles azules) */
+.info-ayuda { position: relative; display: inline-flex; align-items: center; color: #9ca3af; cursor: help; margin-left: 6px; vertical-align: middle; }
+.info-ayuda:hover, .info-ayuda:focus { color: var(--ind); outline: none; }
+.info-ayuda .info-pop { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: 360px; max-width: 70vw; background: #fff; color: #374151; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.08); padding: 12px 14px; font-size: 12px; line-height: 1.5; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.info-ayuda:hover .info-pop, .info-ayuda:focus .info-pop, .info-ayuda:focus-within .info-pop { display: block; }

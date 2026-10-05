@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 
 // ============================================================
 // PredictorDemanda.jsx — v1
@@ -61,21 +62,18 @@ function ColorCobertura({ meses }) {
   if (meses == null) {
     return <span className="text-gray-300 text-xs">—</span>
   }
-  let clase = 'bg-[var(--grn-bg)] text-[var(--grn)]'
+  let clase = 'pill-verde'
   const texto = meses <= 0 ? 'Sin stock' : `${meses.toFixed(1)} meses`
   const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
 
   if (meses < 1) {
-    clase = 'bg-[var(--red-bg)] text-[var(--red)]'
+    clase = 'pill-rojo'
   } else if (meses < 2) {
-    clase = 'bg-[var(--yel-bg)] text-[#92400e]'
+    clase = 'pill-amarillo'
   }
 
   return (
-    <span
-      title={tooltip}
-      className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${clase}`}
-    >
+    <span title={tooltip} className={`pill ${clase}`}>
       {texto}
     </span>
   )
@@ -161,185 +159,182 @@ export default function PredictorDemanda() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[17px] font-bold">Predictor de demanda</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5">
-            {cargandoAlgo
-              ? 'Cargando…'
-              : `${totales.skus} artículos con ventas en los últimos ${CANT_MESES} meses`}
-          </div>
-        </div>
-        <button
-          onClick={cargarDatos}
-          disabled={cargandoAlgo}
-          className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
-        >
-          {cargandoAlgo ? 'Actualizando…' : '↻ Actualizar'}
+      <EncabezadoPagina
+        titulo="Predictor de demanda"
+        bajada={
+          cargandoAlgo
+            ? 'Cargando…'
+            : `${totales.skus} artículos con ventas en los últimos ${CANT_MESES} meses`
+        }
+        info={
+          <>
+            Historial real de ventas sincronizado desde YiQi. El promedio mensual se calcula sobre los últimos{' '}
+            {CANT_MESES} meses completos —el mes en curso se excluye porque todavía está abierto— y contempla
+            devoluciones y notas de crédito (venta neta). La cobertura es el stock actual dividido ese promedio.
+          </>
+        }
+      >
+        <button onClick={cargarDatos} disabled={cargandoAlgo} className="btn btn-sm">
+          <i className="ti ti-refresh" aria-hidden="true" />
+          {cargandoAlgo ? 'Actualizando…' : 'Actualizar'}
         </button>
-      </div>
+      </EncabezadoPagina>
 
-      {permisos.error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
-          <p className="font-semibold">No se pudieron determinar tus permisos</p>
-          <p className="text-sm mt-1">{permisos.error}</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
-          <p className="font-semibold">No se pudo cargar el historial de ventas</p>
-          <p className="text-sm mt-1">{error}</p>
-          <button onClick={cargarDatos} className="mt-2 text-sm underline">Reintentar</button>
-        </div>
-      )}
-
-      {/* Nota metodologica — honestidad sobre como se calcula */}
-      <Aviso tipo="info" id="predictor-metodologia" className="mx-4 mt-4">
-        Historial real de ventas sincronizado desde YiQi. El promedio mensual se calcula sobre los últimos{' '}
-        {CANT_MESES} meses completos —el mes en curso se excluye porque todavía está abierto— y contempla
-        devoluciones y notas de crédito (venta neta). La cobertura es el stock actual dividido ese promedio.
-      </Aviso>
-
-      {vistaFiltrada && (
-        <Aviso tipo="filtro" autoCerrarEn={15} className="mx-4 mt-2">
-          Vista filtrada: solo se muestran los artículos de tus {permisos.nombres.length} proveedores asignados.
-        </Aviso>
-      )}
-
-      {/* Métricas */}
-      <div className="grid grid-cols-3 gap-2.5 p-4">
-        <div className="bg-white rounded-xl p-4 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Artículos con movimiento</div>
-          <div className="text-2xl font-bold">{totales.skus}</div>
-          <div className="text-[11px] text-gray-400 mt-1">últimos {CANT_MESES} meses</div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Unidades vendidas</div>
-          <div className="text-2xl font-bold">{formatoNumero(totales.unidades)}</div>
-          <div className="text-[11px] text-gray-400 mt-1">neto de devoluciones</div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Cobertura menor a 1 mes</div>
-          <div className="text-2xl font-bold text-[var(--red)]">{totales.criticos}</div>
-          <div className="text-[11px] text-gray-400 mt-1">según consumo histórico</div>
-        </div>
-      </div>
-
-      {/* Buscador */}
-      <div className="px-4 pb-2 flex items-center justify-between gap-3 flex-wrap">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por SKU, nombre o proveedor…"
-          className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
-        />
-        <label className="flex items-center gap-2 text-sm text-gray-500">
-          Filas por página
-          <select
-            value={filasPorPagina}
-            onChange={(e) => setFilasPorPagina(Number(e.target.value))}
-            className="border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm"
-          >
-            {[25, 50, 100, 200].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {/* Tabla */}
-      <div className="mx-4 mb-2 bg-white rounded-xl border border-[var(--border)] overflow-x-auto">
-        {cargandoAlgo && filas.length === 0 ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">Cargando historial de ventas…</div>
-        ) : paginadas.length === 0 ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">
-            No hay artículos con ventas que coincidan con la búsqueda.
+      <div className="pagina">
+        {permisos.error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
+            <p className="font-semibold">No se pudieron determinar tus permisos</p>
+            <p className="text-sm mt-1">{permisos.error}</p>
           </div>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-[var(--border)]">
-                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide sticky left-0 bg-gray-50">SKU</th>
-                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Producto</th>
-                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Proveedor</th>
-                {/* Lo accionable va ANTES del detalle mensual: en una pantalla
-                    normal se ve sin scrollear, y los meses quedan de respaldo. */}
-                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Stock</th>
-                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap">Prom./mes</th>
-                <th className="text-left px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Cobertura</th>
-                {meses.map((m) => (
-                  <th key={m.clave} className="text-right px-2 py-1.5 text-[10px] font-bold text-gray-400 tracking-wide whitespace-nowrap">
-                    {m.label}
-                  </th>
-                ))}
-                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginadas.map((f) => {
-                const cobertura = calcularCobertura(f.stock_actual, f.promedio)
-                return (
-                  <tr key={f.mate_codigo} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td className="px-3.5 py-1.5 font-mono text-xs sticky left-0 bg-white">{f.mate_codigo}</td>
-                    <td className="px-3.5 py-1.5 font-semibold text-[13px] max-w-[280px] truncate" title={f.mate_nombre ?? ''}>
-                      {f.mate_nombre ?? '—'}
-                    </td>
-                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs whitespace-nowrap">{f.proveedor ?? '—'}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{formatoNumero(f.stock_actual)}</td>
-                    <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-[var(--ind,#4338ca)]">
-                      {formatoNumero(f.promedio)}
-                    </td>
-                    <td className="px-3 py-1.5"><ColorCobertura meses={cobertura} /></td>
-                    {meses.map((m) => {
-                      const valor = f.meses?.[m.clave]
-                      return (
-                        <td
-                          key={m.clave}
-                          className={`px-2 py-2.5 text-right text-xs tabular-nums ${
-                            valor == null ? 'text-gray-200' : Number(valor) < 0 ? 'text-[var(--red)]' : 'text-gray-600'
-                          }`}
-                        >
-                          {valor == null ? '·' : formatoNumero(valor)}
-                        </td>
-                      )
-                    })}
-                    <td className="px-3 py-1.5 text-right font-bold tabular-nums">{formatoNumero(f.total)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        )}
+
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
+            <p className="font-semibold">No se pudo cargar el historial de ventas</p>
+            <p className="text-sm mt-1">{error}</p>
+            <button onClick={cargarDatos} className="mt-2 text-sm underline">Reintentar</button>
+          </div>
+        )}
+
+        {vistaFiltrada && (
+          <Aviso tipo="filtro" autoCerrarEn={15} className="mb-4">
+            Vista filtrada: solo se muestran los artículos de tus {permisos.nombres.length} proveedores asignados.
+          </Aviso>
+        )}
+
+        {/* Métricas */}
+        <div className="metricas mb-5">
+          <div className="metrica">
+            <div className="metrica-rot">Artículos con movimiento</div>
+            <div className="metrica-val">{totales.skus}</div>
+            <div className="metrica-sub">últimos {CANT_MESES} meses</div>
+          </div>
+          <div className="metrica">
+            <div className="metrica-rot">Unidades vendidas</div>
+            <div className="metrica-val">{formatoNumero(totales.unidades)}</div>
+            <div className="metrica-sub">neto de devoluciones</div>
+          </div>
+          <div className="metrica">
+            <div className="metrica-rot">Cobertura menor a 1 mes</div>
+            <div className="metrica-val text-[var(--red)]">{totales.criticos}</div>
+            <div className="metrica-sub">según consumo histórico</div>
+          </div>
+        </div>
+
+        {/* Buscador */}
+        <div className="mb-3.5 flex items-center justify-between gap-3 flex-wrap">
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por SKU, nombre o proveedor…"
+            className="w-[320px] max-w-full px-3 py-[7px] border border-[#d1d5db] rounded-lg text-[13px] bg-[#f9fafb] outline-none focus:border-[var(--ind)] focus:bg-white"
+          />
+          <label className="flex items-center gap-2 text-[12px] text-[var(--sub)]">
+            Filas por página
+            <select
+              value={filasPorPagina}
+              onChange={(e) => setFilasPorPagina(Number(e.target.value))}
+              className="border border-[#d1d5db] rounded-lg px-2 py-1.5 text-[13px] bg-white"
+            >
+              {[25, 50, 100, 200].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {/* Tabla */}
+        <div className="tw overflow-x-auto!">
+          {cargandoAlgo && filas.length === 0 ? (
+            <div className="p-8 text-center text-[var(--sub)] text-[13px]">Cargando historial de ventas…</div>
+          ) : paginadas.length === 0 ? (
+            <div className="p-8 text-center text-[var(--sub)] text-[13px]">
+              No hay artículos con ventas que coincidan con la búsqueda.
+            </div>
+          ) : (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-[1]">SKU</th>
+                  <th>Producto</th>
+                  <th>Proveedor</th>
+                  {/* Lo accionable va ANTES del detalle mensual: en una pantalla
+                      normal se ve sin scrollear, y los meses quedan de respaldo. */}
+                  <th className="text-right!">Stock</th>
+                  <th className="text-right!">Prom./mes</th>
+                  <th>Cobertura</th>
+                  {meses.map((m) => (
+                    <th key={m.clave} className="text-right! px-2.5! text-gray-400!">
+                      {m.label}
+                    </th>
+                  ))}
+                  <th className="text-right!">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginadas.map((f) => {
+                  const cobertura = calcularCobertura(f.stock_actual, f.promedio)
+                  return (
+                    <tr key={f.mate_codigo}>
+                      <td className="sku sticky left-0 bg-white">{f.mate_codigo}</td>
+                      <td className="font-semibold max-w-[280px] truncate" title={f.mate_nombre ?? ''}>
+                        {f.mate_nombre ?? '—'}
+                      </td>
+                      <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap">{f.proveedor ?? '—'}</td>
+                      <td className="text-right tabular-nums font-semibold">{formatoNumero(f.stock_actual)}</td>
+                      <td className="text-right font-semibold tabular-nums text-[var(--ind,#4338ca)]">
+                        {formatoNumero(f.promedio)}
+                      </td>
+                      <td><ColorCobertura meses={cobertura} /></td>
+                      {meses.map((m) => {
+                        const valor = f.meses?.[m.clave]
+                        return (
+                          <td
+                            key={m.clave}
+                            className={`px-2.5! text-right text-[12px]! tabular-nums ${
+                              valor == null ? 'text-gray-200' : Number(valor) < 0 ? 'text-[var(--red)]' : 'text-gray-600'
+                            }`}
+                          >
+                            {valor == null ? '·' : formatoNumero(valor)}
+                          </td>
+                        )
+                      })}
+                      <td className="text-right font-bold tabular-nums">{formatoNumero(f.total)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Paginador */}
+        {filtradas.length > 0 && (
+          <div className="mt-3 flex items-center justify-between text-[12px] text-[var(--sub)] px-1">
+            <span>
+              Mostrando {inicio + 1}–{Math.min(inicio + filasPorPagina, totalFilas)} de {totalFilas}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+                disabled={paginaSegura <= 1}
+                className="btn btn-sm"
+              >
+                ‹ Anterior
+              </button>
+              <span className="text-[11px] text-gray-400">Página {paginaSegura} de {totalPaginas}</span>
+              <button
+                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+                disabled={paginaSegura >= totalPaginas}
+                className="btn btn-sm"
+              >
+                Siguiente ›
+              </button>
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Paginador */}
-      {filtradas.length > 0 && (
-        <div className="mx-4 mb-6 flex items-center justify-between text-sm text-gray-500 px-1">
-          <span>
-            Mostrando {inicio + 1}–{Math.min(inicio + filasPorPagina, totalFilas)} de {totalFilas}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
-              disabled={paginaSegura <= 1}
-              className="px-2.5 py-1 rounded border border-[var(--border)] disabled:opacity-40"
-            >
-              ‹ Anterior
-            </button>
-            <span className="text-xs text-gray-400">Página {paginaSegura} de {totalPaginas}</span>
-            <button
-              onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
-              disabled={paginaSegura >= totalPaginas}
-              className="px-2.5 py-1 rounded border border-[var(--border)] disabled:opacity-40"
-            >
-              Siguiente ›
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

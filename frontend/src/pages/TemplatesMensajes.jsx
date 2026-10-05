@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
-import Aviso from '../components/Aviso'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 
 // ============================================================
 // TemplatesMensajes.jsx
@@ -46,6 +46,11 @@ const VARIABLES = [
   { v: 'notas',      d: 'Notas de la orden' },
   { v: 'contacto',   d: 'Quién la envía' },
 ]
+
+// Estilo de campo del prototipo v7 (.fl rótulo, .fi input, .fta textarea).
+const ROTULO = 'text-[11px] text-[var(--sub)] uppercase tracking-[.04em] font-semibold mb-[5px]'
+const INPUT =
+  'px-3 py-2 border border-[#d1d5db] rounded-lg text-[13px] bg-[#f9fafb] outline-none focus:border-[var(--ind)] w-full disabled:text-gray-400 disabled:cursor-not-allowed'
 
 export function renderTemplate(texto, datos) {
   return String(texto ?? '').replace(/\{\{(\w+)\}\}/g, (coincidencia, clave) =>
@@ -151,61 +156,55 @@ export default function TemplatesMensajes() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[17px] font-bold">Templates de mensajes</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5">
-            Textos con los que se le envía la orden al proveedor
-          </div>
-        </div>
+      <EncabezadoPagina
+        titulo="Templates de mensajes"
+        bajada="Textos con los que se le envía la orden al proveedor"
+        info="La plantilla de WhatsApp ya se usa sola desde el botón 💬 de una orden aprobada (Órdenes de compra) y desde Nueva OC: abre WhatsApp con este texto completado. Queda un paso manual — arrastrar el PDF de la orden a la conversación — porque WhatsApp no permite adjuntar un archivo por link. El envío automático por email todavía no está implementado."
+      >
         {esAdmin && sel && (
           <button
             onClick={guardar}
             disabled={guardando || !huboCambios}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+            className="btn btn-sm btn-pri"
           >
+            <i className="ti ti-device-floppy" />
             {guardando ? 'Guardando…' : 'Guardar cambios'}
           </button>
         )}
-      </div>
+      </EncabezadoPagina>
 
-      {error && (
-        <div className="mx-4 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg px-4 py-2.5 text-[13px]">
-          {error}
+      {(error || aviso) && (
+        <div className="px-7 pt-5 flex flex-col gap-2.5">
+          {error && <div className="bloque bloque-rojo text-[13px]">{error}</div>}
+          {aviso && (
+            <div className="bloque bloque-verde text-[13px] flex items-center justify-between gap-3">
+              <span>{aviso}</span>
+              <button onClick={() => setAviso(null)} className="opacity-60 hover:opacity-100 px-1" aria-label="Cerrar">
+                <i className="ti ti-x" />
+              </button>
+            </div>
+          )}
         </div>
       )}
-      {aviso && (
-        <div className="mx-4 mt-4 bg-[var(--grn-bg,#dcfce7)] border border-green-200 text-[var(--grn,#3d9970)] rounded-lg px-4 py-2.5 text-[13px] flex items-center justify-between">
-          <span>{aviso}</span>
-          <button onClick={() => setAviso(null)} className="opacity-60 hover:opacity-100 px-1">×</button>
-        </div>
-      )}
-
-      <Aviso tipo="info" id="templates-alcance" className="mx-4 mt-4">
-        La plantilla de WhatsApp ya se usa sola desde el botón 💬 de una orden aprobada (Órdenes de
-        compra) y desde Nueva OC: abre WhatsApp con este texto completado. Queda un paso manual —
-        arrastrar el PDF de la orden a la conversación — porque WhatsApp no permite adjuntar un archivo
-        por link. El envío automático por email todavía no está implementado.
-      </Aviso>
 
       {cargando ? (
-        <div className="p-10 text-center text-[var(--sub)] text-sm">Cargando plantillas…</div>
+        <div className="p-10 text-center text-[var(--sub)] text-[13px]">Cargando plantillas…</div>
       ) : (
-        <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+        <div className="pagina grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Editor */}
-          <div className="bg-white rounded-xl border border-[var(--border)] p-4">
-            <div className="flex gap-2 mb-3 flex-wrap">
+          <div className="seccion">
+            <div className="seccion-titulo flex items-center gap-2">
+              <i className={`ti ${sel?.canal === 'whatsapp' ? 'ti-brand-whatsapp text-[var(--grn)]' : 'ti-mail text-[var(--ind)]'} text-[15px]`} />
+              {sel ? `Template de ${sel.canal === 'whatsapp' ? 'WhatsApp' : 'email'}` : 'Plantilla'}
+            </div>
+            <div className="flex gap-2 mb-3.5 flex-wrap">
               {templates.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => elegir(t)}
-                  className={`px-3 py-1.5 rounded-full text-sm border ${
-                    selId === t.id
-                      ? 'bg-[var(--ind,#4338ca)] text-white border-[var(--ind,#4338ca)]'
-                      : 'bg-white text-gray-600 border-gray-200'
-                  }`}
+                  className={`chip inline-flex items-center gap-1.5 ${selId === t.id ? 'chip-on' : ''}`}
                 >
-                  {t.canal === 'email' ? '✉️' : '💬'} {t.nombre}
+                  <i className={`ti ${t.canal === 'email' ? 'ti-mail' : 'ti-brand-whatsapp'} text-[14px]`} /> {t.nombre}
                 </button>
               ))}
             </div>
@@ -219,47 +218,48 @@ export default function TemplatesMensajes() {
                   // ningún indicio acá adentro de que este editor no manda nada
                   // solo. Este aviso vive DENTRO del editor, no se puede cerrar,
                   // para que no desaparezca justo donde más hace falta.
-                  <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 text-[12px]">
-                    ⚠ Esta plantilla todavía no se envía sola por email — hoy solo sirve para ver el
-                    formato. El envío automático no está construido.
+                  <div className="bloque bloque-amarillo mb-3 text-[12px] flex items-start gap-2">
+                    <i className="ti ti-alert-triangle text-[14px] mt-px" />
+                    <span>Esta plantilla todavía no se envía sola por email — hoy solo sirve para ver el
+                    formato. El envío automático no está construido.</span>
                   </div>
                 )}
                 <label className="block mb-3">
-                  <div className="text-[11px] text-gray-400 uppercase mb-1">Nombre de la plantilla</div>
+                  <div className={ROTULO}>Nombre de la plantilla</div>
                   <input
                     value={form.nombre}
                     disabled={!esAdmin}
                     onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-                    className="border border-[var(--border)] rounded-lg px-3 py-2 text-sm w-full disabled:bg-gray-50 disabled:text-gray-400"
+                    className={INPUT}
                   />
                 </label>
 
                 {sel.canal === 'email' && (
                   <label className="block mb-3">
-                    <div className="text-[11px] text-gray-400 uppercase mb-1">Asunto</div>
+                    <div className={ROTULO}>Asunto</div>
                     <input
                       value={form.asunto}
                       disabled={!esAdmin}
                       onChange={(e) => setForm((f) => ({ ...f, asunto: e.target.value }))}
-                      className="border border-[var(--border)] rounded-lg px-3 py-2 text-sm w-full disabled:bg-gray-50 disabled:text-gray-400"
+                      className={INPUT}
                     />
                   </label>
                 )}
 
                 <label className="block">
-                  <div className="text-[11px] text-gray-400 uppercase mb-1">Mensaje</div>
+                  <div className={ROTULO}>Mensaje</div>
                   <textarea
                     value={form.cuerpo}
                     disabled={!esAdmin}
                     rows={14}
                     onChange={(e) => setForm((f) => ({ ...f, cuerpo: e.target.value }))}
-                    className="border border-[var(--border)] rounded-lg px-3 py-2 text-[13px] w-full font-mono leading-relaxed disabled:bg-gray-50 disabled:text-gray-400"
+                    className={`${INPUT} font-mono leading-relaxed resize-y min-h-[100px]`}
                   />
                 </label>
 
                 {esAdmin && (
                   <div className="mt-3">
-                    <div className="text-[11px] text-gray-400 uppercase mb-1.5">
+                    <div className="text-[11px] text-[var(--sub)] mb-1.5">
                       Variables disponibles — click para insertar
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -268,7 +268,7 @@ export default function TemplatesMensajes() {
                           key={v.v}
                           onClick={() => insertarVariable(v.v)}
                           title={v.d}
-                          className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 hover:border-[var(--ind,#4338ca)] hover:text-[var(--ind,#4338ca)] text-[11px] font-mono"
+                          className="px-[7px] py-0.5 rounded-[10px] bg-[var(--ind-bg)] text-[var(--ind)] text-[11px] font-semibold hover:bg-[var(--ind-lt)]"
                         >
                           {'{{'}{v.v}{'}}'}
                         </button>
@@ -281,16 +281,14 @@ export default function TemplatesMensajes() {
           </div>
 
           {/* Vista previa */}
-          <div className="bg-white rounded-xl border border-[var(--border)] p-4">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="text-[11px] text-gray-400 uppercase">
+          <div className="seccion">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="seccion-titulo flex items-center gap-2" style={{ marginBottom: 0 }}>
+                <i className="ti ti-eye text-[var(--ind)] text-[15px]" />
                 Vista previa {sel?.canal === 'whatsapp' ? '· WhatsApp' : '· Email'}
               </div>
-              <button
-                onClick={copiar}
-                className="text-[12px] text-[var(--ind,#4338ca)] hover:underline"
-              >
-                Copiar texto
+              <button onClick={copiar} className="btn btn-sm">
+                <i className="ti ti-copy" /> Copiar texto
               </button>
             </div>
 
@@ -301,20 +299,20 @@ export default function TemplatesMensajes() {
                 </div>
               </div>
             ) : (
-              <div className="border border-gray-200 rounded-lg overflow-hidden min-h-[320px]">
-                <div className="bg-gray-50 border-b border-gray-200 px-3 py-2">
+              <div className="border border-[var(--grn-bd)] rounded-[10px] overflow-hidden min-h-[320px]">
+                <div className="bg-[#f9fafb] border-b border-[var(--grn-bd)] px-3.5 py-2">
                   <div className="text-[10px] text-gray-400 uppercase">Asunto</div>
                   <div className="text-[13px] font-semibold">
                     {previewAsunto || <span className="text-gray-400 italic font-normal">Sin asunto</span>}
                   </div>
                 </div>
-                <div className="p-3 text-[13px] whitespace-pre-line leading-relaxed">
+                <div className="bg-[var(--grn-bg)] p-3.5 text-[13px] text-[#1a4a2e] whitespace-pre-line leading-[1.7]">
                   {previewCuerpo || <span className="text-gray-400 italic">Escribí el mensaje…</span>}
                 </div>
               </div>
             )}
 
-            <div className="text-[11px] text-gray-400 mt-2.5">
+            <div className="text-[11px] text-[var(--sub)] mt-2">
               Los datos de la vista previa son de ejemplo. Al usar la plantilla se reemplazan por los de la
               orden real.
             </div>

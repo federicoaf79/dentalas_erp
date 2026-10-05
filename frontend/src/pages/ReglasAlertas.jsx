@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
-import Aviso from '../components/Aviso'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 
 // ============================================================
 // ReglasAlertas.jsx
@@ -13,12 +13,16 @@ import Aviso from '../components/Aviso'
 // forzara el update desde la consola, Postgres lo rechaza.
 // ============================================================
 
+// Estilo de campo del prototipo v7 (.fl rótulo 11 px mayúscula, .fi input).
+const ROTULO = 'text-[11px] text-[var(--sub)] uppercase tracking-[.04em] font-semibold'
+const INPUT =
+  'px-3 py-2 border border-[#d1d5db] rounded-lg text-[13px] bg-[#f9fafb] outline-none focus:border-[var(--ind)] disabled:text-gray-400 disabled:cursor-not-allowed'
+
 function Campo({ label, ayuda, valor, onChange, sufijo, disabled, min = 0, step = 'any' }) {
   return (
-    <div className="bg-white rounded-xl border border-[var(--border)] p-4">
+    <div className="seccion">
       <label className="block">
-        <div className="text-[13px] font-semibold mb-1">{label}</div>
-        <div className="text-[12px] text-[var(--sub)] mb-2.5 leading-snug">{ayuda}</div>
+        <div className={`${ROTULO} mb-2`}>{label}</div>
         <div className="flex items-center gap-2">
           <input
             type="number"
@@ -27,10 +31,11 @@ function Campo({ label, ayuda, valor, onChange, sufijo, disabled, min = 0, step 
             value={valor}
             disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
-            className="border border-[var(--border)] rounded-lg px-3 py-2 text-sm w-44 text-right disabled:bg-gray-50 disabled:text-gray-400"
+            className={`${INPUT} w-44 text-right font-bold`}
           />
-          {sufijo && <span className="text-[13px] text-gray-500">{sufijo}</span>}
+          {sufijo && <span className="text-[12px] text-[var(--sub)]">{sufijo}</span>}
         </div>
+        <div className="text-[11px] text-[#9ca3af] mt-1.5 leading-snug">{ayuda}</div>
       </label>
     </div>
   )
@@ -127,53 +132,52 @@ export default function ReglasAlertas() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
-        <div>
-          {/* 7/9/2026 (U-3): rótulo alineado con el del sidebar — ver
-              comentario en Sidebar.jsx sobre por qué se sacó "alertas"
-              del nombre. */}
-          <div className="text-[17px] font-bold">Reglas de compra y aprobación</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5">
-            Parámetros que usa el sistema para sugerir cantidades y decidir qué requiere aprobación
-          </div>
-        </div>
+      {/* 7/9/2026 (U-3): rótulo alineado con el del sidebar — ver
+          comentario en Sidebar.jsx sobre por qué se sacó "alertas"
+          del nombre. */}
+      <EncabezadoPagina
+        titulo="Reglas de compra y aprobación"
+        bajada="Parámetros que usa el sistema para sugerir cantidades y decidir qué requiere aprobación"
+        info={
+          !esAdmin && !permisos.cargando
+            ? 'Estas reglas las configura Aris. Podés verlas para saber con qué criterio el sistema arma las sugerencias, pero no editarlas.'
+            : undefined
+        }
+      >
         {esAdmin && (
           <button
             onClick={guardar}
             disabled={guardando || !huboCambios || hayCampoInvalido}
             title={hayCampoInvalido ? 'Completá los tres campos con un número válido antes de guardar' : undefined}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+            className="btn btn-sm btn-pri"
           >
+            <i className="ti ti-device-floppy" />
             {guardando ? 'Guardando…' : 'Guardar cambios'}
           </button>
         )}
-      </div>
+      </EncabezadoPagina>
 
+      <div className="pagina flex flex-col gap-3.5">
       {error && (
-        <div className="mx-4 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg px-4 py-2.5 text-[13px]">
+        <div className="bloque bloque-rojo text-[13px]">
           {error}
         </div>
       )}
 
       {aviso && (
-        <div className="mx-4 mt-4 bg-[var(--grn-bg,#dcfce7)] border border-green-200 text-[var(--grn,#3d9970)] rounded-lg px-4 py-2.5 text-[13px] flex items-center justify-between">
+        <div className="bloque bloque-verde text-[13px] flex items-center justify-between gap-3">
           <span>{aviso}</span>
-          <button onClick={() => setAviso(null)} className="opacity-60 hover:opacity-100 px-1">×</button>
+          <button onClick={() => setAviso(null)} className="opacity-60 hover:opacity-100 px-1" aria-label="Cerrar">
+            <i className="ti ti-x" />
+          </button>
         </div>
       )}
 
-      {!esAdmin && !permisos.cargando && (
-        <Aviso tipo="info" id="reglas-solo-lectura" className="mx-4 mt-4">
-          Estas reglas las configura Aris. Podés verlas para saber con qué criterio el sistema arma las
-          sugerencias, pero no editarlas.
-        </Aviso>
-      )}
-
       {cargando ? (
-        <div className="p-10 text-center text-[var(--sub)] text-sm">Cargando reglas…</div>
+        <div className="p-10 text-center text-[var(--sub)] text-[13px]">Cargando reglas…</div>
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
             <Campo
               label="Límite de aprobación automática"
               ayuda="Si el total de una orden supera este monto, tiene que aprobarla Aris. Por debajo, quien la arma la confirma directamente."
@@ -203,8 +207,11 @@ export default function ReglasAlertas() {
             />
           </div>
 
-          <div className="mx-4 mb-4 bg-white rounded-xl border border-[var(--border)] p-4">
-            <div className="text-[13px] font-semibold mb-2">Cómo se combinan</div>
+          <div className="seccion">
+            <div className="seccion-titulo flex items-center gap-2">
+              <i className="ti ti-shield-check text-[var(--ind)] text-[15px]" />
+              Cómo se combinan
+            </div>
             <ol className="text-[13px] text-gray-600 space-y-1.5 list-decimal list-inside leading-relaxed">
               <li>
                 Se listan los artículos cuyo stock está por debajo del punto de pedido (o del stock de
@@ -235,12 +242,13 @@ export default function ReglasAlertas() {
           </div>
 
           {reglas?.actualizado_en && (
-            <div className="mx-4 mb-6 text-[11px] text-gray-400">
+            <div className="text-[11px] text-gray-400">
               Última modificación: {new Date(reglas.actualizado_en).toLocaleString('es-AR')}
             </div>
           )}
         </>
       )}
+      </div>
     </div>
   )
 }

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
+import Pastilla from '../components/ui/Pastilla'
 import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
 import { traerRotacionPorSku, calcularCobertura } from '../lib/rotacionPorSku'
 import { traerEstadoOCPorSku } from '../lib/estadoOCPorSku'
@@ -425,339 +427,346 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[17px] font-bold">Monitor de stock</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5">
-            {cargandoAlgo
-              ? 'Cargando…'
-              : `Datos sincronizados · última actualización de YiQi: ${formatoFechaHora(ultimaSync)}`}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={cargarDatos} disabled={cargandoAlgo} className="btn btn-sm">
-            {cargandoAlgo ? 'Actualizando…' : '↻ Actualizar'}
-          </button>
-          {onIrA && (
-            <button onClick={() => onIrA('nueva-oc')} className="btn btn-sm btn-pri">+ Nueva OC</button>
-          )}
-        </div>
-      </div>
-
-      {/* Error de permisos: falla cerrado, no se muestra ningun dato */}
-      {permisos.error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
-          <p className="font-semibold">No se pudieron determinar tus permisos</p>
-          <p className="text-sm mt-1">{permisos.error}</p>
-          <p className="text-xs mt-2 text-gray-500">
-            Por seguridad no se muestra ningún dato hasta resolverlo.
-          </p>
-        </div>
-      )}
-
-      {/* Error de datos */}
-      {error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
-          <p className="font-semibold">No se pudo cargar Monitor de Stock</p>
-          <p className="text-sm mt-1">{error}</p>
-          <button onClick={cargarDatos} className="mt-2 text-sm underline">
-            Reintentar
-          </button>
-        </div>
-      )}
-
-      {/* Nota de arquitectura (transparencia) */}
-      <Aviso tipo="info" id="monitor-arquitectura" className="mx-4 mt-4">
-        Estos datos vienen de nuestra propia base, sincronizada automáticamente desde YiQi cada 15 minutos —
-        no es en vivo al 100%, pero sí prácticamente actualizado.
-      </Aviso>
-
-      {/* Aviso de vista filtrada (solo operadores) */}
-      {vistaFiltrada && (
-        <Aviso tipo="filtro" autoCerrarEn={15} className="mx-4 mt-2">
-          Vista filtrada: estás viendo únicamente los {permisos.nombres.length} proveedores asignados a tu
-          usuario. Si falta alguno, pedile a Aris que te lo asigne en “Usuarios y accesos”.
-        </Aviso>
-      )}
-
-      {/* Métricas (prototipo v7): lo que pide acción, no texto de contexto */}
-      <div className="metricas px-4 pt-4 pb-3">
-        <div className="metrica" title="Punto de pedido manual si existe; si no, Stock Seguridad como respaldo (provisorio).">
-          <div className="metrica-rot">Alertas activas</div>
-          <div className="flex items-baseline gap-2">
-            <span className="metrica-val text-[var(--red)]">{criticas}</span>
-            <span className="text-gray-400 text-xs">crít.</span>
-            <span className="metrica-val text-[#b8860b]">{preventivas}</span>
-            <span className="text-gray-400 text-xs">prev.</span>
-          </div>
-          <div className="metrica-sub">productos bajo nivel de alerta</div>
-        </div>
-        <button type="button" className="metrica text-left hover:border-[var(--ind)]" onClick={() => onIrA?.('ocs')}>
-          <div className="metrica-rot">OC en curso</div>
-          <div className="metrica-val text-[var(--ind)]">{contadores.ocsActivas ?? '—'}</div>
-          <div className="metrica-sub">enviadas, todavía sin recibir completas</div>
+      {/* Encabezado (prototipo v7 .ph). El cartel azul de arquitectura pasó al "ⓘ". */}
+      <EncabezadoPagina
+        titulo="Monitor de stock"
+        bajada={
+          cargandoAlgo
+            ? 'Cargando…'
+            : `Datos sincronizados · última actualización de YiQi: ${formatoFechaHora(ultimaSync)}`
+        }
+        info={
+          <>
+            Estos datos vienen de nuestra propia base, sincronizada automáticamente desde YiQi cada 15 minutos —
+            no es en vivo al 100%, pero sí prácticamente actualizado.
+          </>
+        }
+      >
+        <button onClick={cargarDatos} disabled={cargandoAlgo} className="btn btn-sm">
+          <i className="ti ti-refresh" />
+          {cargandoAlgo ? 'Actualizando…' : 'Actualizar'}
         </button>
-        <div className="metrica">
-          <div className="metrica-rot">{vistaFiltrada ? 'Artículos visibles' : 'Artículos'}</div>
-          <div className="metrica-val">{articulos.length}</div>
-          <div className="metrica-sub">
-            {error ? '⚠ error al sincronizar' : cargandoAlgo ? 'cargando…' : vistaFiltrada ? 'de tus proveedores asignados' : 'sincronizados con YiQi'}
-          </div>
-        </div>
-        <button type="button" className="metrica text-left hover:border-[var(--ind)]" onClick={() => onIrA?.('ocs')}>
-          <div className="metrica-rot">Requieren aprobación</div>
-          <div className={`metrica-val ${contadores.aprobacionPendiente ? 'text-[var(--blu)]' : 'text-gray-400'}`}>
-            {contadores.aprobacionPendiente ?? 0}
-          </div>
-          <div className="metrica-sub">órdenes esperando a Aris</div>
-        </button>
-      </div>
+        {onIrA && (
+          <button onClick={() => onIrA('nueva-oc')} className="btn btn-sm btn-pri">
+            <i className="ti ti-plus" />
+            Nueva OC
+          </button>
+        )}
+      </EncabezadoPagina>
 
-      {/* Buscador, filtro de proveedor y toggle ver todos */}
-      <div className="px-4 pb-2 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <input
-            type="text"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por SKU, nombre o proveedor…"
-            className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
-          />
-          <FiltroProveedor
-            proveedoresDisponibles={proveedoresDisponibles}
-            valor={filtroProveedor}
-            onChange={setFiltroProveedor}
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          {sinStockSeguridadTotal > 0 && (
-            <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer whitespace-nowrap">
-              <input
-                type="checkbox"
-                checked={ocultarSinSeguridad}
-                onChange={(e) => setOcultarSinSeguridad(e.target.checked)}
-              />
-              Ocultar Stock Seguridad = 0 ({sinStockSeguridadTotal})
-            </label>
-          )}
-          <label className="flex items-center gap-2 text-sm text-gray-500">
-            Filas por página
-            <select
-              value={filasPorPagina}
-              onChange={(e) => setFilasPorPagina(Number(e.target.value))}
-              className="border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm"
-            >
-              {[25, 50, 100, 200].map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </label>
+      <div className="pagina">
+        {/* Error de permisos: falla cerrado, no se muestra ningun dato */}
+        {permisos.error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-xl p-4">
+            <p className="font-semibold">No se pudieron determinar tus permisos</p>
+            <p className="text-sm mt-1">{permisos.error}</p>
+            <p className="text-xs mt-2 text-gray-500">
+              Por seguridad no se muestra ningún dato hasta resolverlo.
+            </p>
+          </div>
+        )}
+
+        {/* Error de datos */}
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-xl p-4">
+            <p className="font-semibold">No se pudo cargar Monitor de Stock</p>
+            <p className="text-sm mt-1">{error}</p>
+            <button onClick={cargarDatos} className="mt-2 text-sm underline">
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {/* Aviso de vista filtrada (solo operadores) */}
+        {vistaFiltrada && (
+          <Aviso tipo="filtro" autoCerrarEn={15} className="mb-4">
+            Vista filtrada: estás viendo únicamente los {permisos.nombres.length} proveedores asignados a tu
+            usuario. Si falta alguno, pedile a Aris que te lo asigne en “Usuarios y accesos”.
+          </Aviso>
+        )}
+
+        {/* Métricas (prototipo v7): lo que pide acción, no texto de contexto */}
+        <div className="metricas mb-5">
+          <div className="metrica" title="Punto de pedido manual si existe; si no, Stock Seguridad como respaldo (provisorio).">
+            <div className="metrica-rot">Alertas activas</div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="metrica-val text-[var(--red)]">{criticas}</span>
+              <span className="text-[11px] text-gray-400 mr-1.5">crít.</span>
+              <span className="metrica-val text-[#b8860b]">{preventivas}</span>
+              <span className="text-[11px] text-gray-400">prev.</span>
+            </div>
+            <div className="metrica-sub">productos bajo nivel de alerta</div>
+          </div>
           <button
-            onClick={() => setVerTodos((v) => !v)}
-            className="text-sm text-[var(--ind)] hover:underline whitespace-nowrap"
+            type="button"
+            className="metrica text-left cursor-pointer transition-colors hover:border-[var(--ind)]"
+            onClick={() => onIrA?.('ocs')}
           >
-            {verTodos ? 'Ver solo con alerta' : `Ver todos (${articulosConProveedor.length})`}
+            <div className="metrica-rot">OC en curso</div>
+            <div className="metrica-val text-[var(--ind)]">{contadores.ocsActivas ?? '—'}</div>
+            <div className="metrica-sub">enviadas, todavía sin recibir completas</div>
+          </button>
+          <div className="metrica">
+            <div className="metrica-rot">{vistaFiltrada ? 'Artículos visibles' : 'Artículos'}</div>
+            <div className="metrica-val text-[var(--text)]">{articulos.length.toLocaleString('es-AR')}</div>
+            <div className="metrica-sub">
+              {error ? '⚠ error al sincronizar' : cargandoAlgo ? 'cargando…' : vistaFiltrada ? 'de tus proveedores asignados' : 'sincronizados con YiQi'}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="metrica text-left cursor-pointer transition-colors hover:border-[var(--ind)]"
+            onClick={() => onIrA?.('ocs')}
+          >
+            <div className="metrica-rot">Requieren aprobación</div>
+            <div className={`metrica-val ${contadores.aprobacionPendiente ? 'text-[var(--red)]' : 'text-gray-400'}`}>
+              {contadores.aprobacionPendiente ?? 0}
+            </div>
+            <div className="metrica-sub">órdenes esperando a Aris</div>
           </button>
         </div>
-      </div>
 
-      {/* Tabla */}
-      <div className="mx-4 mb-2 bg-white rounded-xl border border-[var(--border)] overflow-hidden">
-        {cargandoAlgo && articulos.length === 0 ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">Cargando artículos…</div>
-        ) : filasAMostrar.length === 0 ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">
-            {verTodos
-              ? 'No hay artículos que coincidan con la búsqueda.'
-              : 'No hay artículos con alerta en este momento (o no coinciden con la búsqueda).'}
-          </div>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {[
-                  { label: 'SKU', columna: 'sku' },
-                  { label: 'Producto', columna: 'producto' },
-                  { label: 'Proveedor', columna: 'proveedor' },
-                  { label: 'Stock', columna: 'stock' },
-                  { label: 'Punto de pedido', columna: 'puntoPedido' },
-                  { label: 'Stock Seguridad', columna: 'stockSeguridad' },
-                  { label: 'Prom./mes', columna: 'rotacion' },
-                  { label: 'Cobertura', columna: 'cobertura' },
-                  { label: 'Estado OC', columna: 'estadoOC' },
-                  { label: 'Notas', columna: null },
-                  { label: 'Estado', columna: 'estado' },
-                  ...(onArmarOC ? [{ label: '', columna: null }] : []),
-                ].map(({ label, columna }) => (
-                  <th
-                    key={label}
-                    onClick={columna ? () => alHacerClickColumna(columna) : undefined}
-                    className={`text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap ${
-                      columna ? 'cursor-pointer select-none hover:text-gray-700' : ''
-                    }`}
-                    title={columna ? 'Ordenar por esta columna' : undefined}
-                  >
-                    {label}
-                    {columna && <FlechaOrden activa={sort.columna === columna} dir={sort.dir} />}
-                  </th>
+        {/* Título de la tabla + buscador, filtro de proveedor y toggle ver todos */}
+        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+          <span className="titulo-tabla">
+            {verTodos ? 'Todos los artículos' : 'Productos con alerta de bajo stock'}
+          </span>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por SKU, nombre o proveedor…"
+              className="w-[250px] max-w-full px-3 py-[7px] border border-[#d1d5db] rounded-lg text-[13px] bg-[#f9fafb] outline-none focus:border-[var(--ind)]"
+            />
+            <FiltroProveedor
+              proveedoresDisponibles={proveedoresDisponibles}
+              valor={filtroProveedor}
+              onChange={setFiltroProveedor}
+            />
+            {sinStockSeguridadTotal > 0 && (
+              <label className="flex items-center gap-2 text-[12px] text-gray-600 cursor-pointer whitespace-nowrap ml-1">
+                <input
+                  type="checkbox"
+                  checked={ocultarSinSeguridad}
+                  onChange={(e) => setOcultarSinSeguridad(e.target.checked)}
+                />
+                Ocultar Stock Seguridad = 0 ({sinStockSeguridadTotal})
+              </label>
+            )}
+            <label className="flex items-center gap-2 text-[12px] text-[var(--sub)] whitespace-nowrap ml-1">
+              Filas por página
+              <select
+                value={filasPorPagina}
+                onChange={(e) => setFilasPorPagina(Number(e.target.value))}
+                className="px-2 py-[6px] border border-[#d1d5db] rounded-lg text-[13px] bg-[#f9fafb] outline-none cursor-pointer focus:border-[var(--ind)]"
+              >
+                {[25, 50, 100, 200].map((n) => (
+                  <option key={n} value={n}>{n}</option>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filasPaginadas.map((a) => {
-                const alerta = calcularAlerta(a)
-                return (
-                  <tr key={a.yiqi_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td className="px-3.5 py-1.5 font-mono text-xs">{a.mate_codigo}</td>
-                    <td className="px-3.5 py-1.5 font-semibold"><div className="min-w-[240px]">{a.mate_nombre}</div></td>
-                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
-                    <td className="px-3.5 py-1.5">
-                      {/* 2/10/2026 (feedback Ivana 17/20): barra Stock vs Mín./Máx., igual que Alertas */}
-                      <BarraMinStockMax
-                        stock={a.mate_stock_disponible}
-                        min={a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : a.mate_stock_seguridad}
-                        max={a.mate_punto_pedido_max}
-                      />
-                      {(() => {
-                        const desglose = textoDesgloseStock(stockPorSku[a.mate_codigo])
-                        if (!desglose) return null
-                        return (
-                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                            <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                              {desglose.principal}
-                            </span>
-                            {desglose.extras.map((e) => (
-                              <span
-                                key={e.label}
-                                className={`inline-flex px-1.5 py-0.5 rounded-full text-[9px] font-semibold whitespace-nowrap ${
-                                  e.label === 'Jorge' ? 'bg-amber-50 text-[#92400e]' : 'bg-violet-50 text-[#5b21b6]'
-                                }`}
-                              >
-                                {e.label}: {e.valor}
-                              </span>
-                            ))}
-                          </div>
-                        )
-                      })()}
-                    </td>
-                    <td className="px-3.5 py-1.5 text-gray-400">
-                      {a.mate_punto_de_pedido > 0 ? (
-                        a.mate_punto_de_pedido
-                      ) : (
-                        <span
-                          className="text-gray-300 cursor-help"
-                          title="No hay Punto de pedido cargado para este artículo: la alerta usa Stock Seguridad como respaldo (columna de al lado, marcada con ●)."
-                        >
-                          —
-                        </span>
-                      )}
-                    </td>
-                    {/* 7/9/2026 (auditoría de usabilidad, U-1/U-5): cuando no hay
-                        Punto de pedido cargado, Stock Seguridad pasa a ser el
-                        criterio real de la alerta (ver calcularAlerta más arriba)
-                        pero antes se veía igual de gris/apagado que cualquier
-                        otro dato — nada distinguía "este valor decide la alerta"
-                        de "este valor es solo informativo". Se resalta y se marca
-                        con un punto cuando está activo. */}
-                    <td
-                      className={`px-3.5 py-1.5 ${
-                        a.mate_punto_de_pedido > 0 ? 'text-gray-400' : 'text-gray-700 font-semibold'
-                      }`}
+              </select>
+            </label>
+            <button
+              onClick={() => setVerTodos((v) => !v)}
+              className="text-[12px] font-semibold text-[var(--ind)] hover:underline whitespace-nowrap ml-1"
+            >
+              {verTodos ? 'Ver solo con alerta' : `Ver todos (${articulosConProveedor.length})`}
+            </button>
+          </div>
+        </div>
+
+        {/* Tabla */}
+        <div className="tw">
+          {cargandoAlgo && articulos.length === 0 ? (
+            <div className="p-8 text-center text-[var(--sub)] text-sm">Cargando artículos…</div>
+          ) : filasAMostrar.length === 0 ? (
+            <div className="p-8 text-center text-[var(--sub)] text-sm">
+              {verTodos
+                ? 'No hay artículos que coincidan con la búsqueda.'
+                : 'No hay artículos con alerta en este momento (o no coinciden con la búsqueda).'}
+            </div>
+          ) : (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  {[
+                    { label: 'SKU', columna: 'sku' },
+                    { label: 'Producto', columna: 'producto' },
+                    { label: 'Proveedor', columna: 'proveedor' },
+                    { label: 'Stock', columna: 'stock' },
+                    { label: 'Punto de pedido', columna: 'puntoPedido' },
+                    { label: 'Stock Seguridad', columna: 'stockSeguridad' },
+                    { label: 'Prom./mes', columna: 'rotacion' },
+                    { label: 'Cobertura', columna: 'cobertura' },
+                    { label: 'Estado OC', columna: 'estadoOC' },
+                    { label: 'Notas', columna: null },
+                    { label: 'Estado', columna: 'estado' },
+                    ...(onArmarOC ? [{ label: '', columna: null }] : []),
+                  ].map(({ label, columna }) => (
+                    <th
+                      key={label}
+                      onClick={columna ? () => alHacerClickColumna(columna) : undefined}
+                      className={columna ? 'cursor-pointer select-none hover:text-gray-700' : undefined}
+                      title={columna ? 'Ordenar por esta columna' : undefined}
                     >
-                      {a.mate_stock_seguridad ?? '—'}
-                      {!(a.mate_punto_de_pedido > 0) && a.mate_stock_seguridad != null && (
-                        <span
-                          className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--ind,#4338ca)] align-middle"
-                          title="Este es el valor que decide la alerta: no hay Punto de pedido cargado para este artículo."
+                      {label}
+                      {columna && <FlechaOrden activa={sort.columna === columna} dir={sort.dir} />}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filasPaginadas.map((a) => {
+                  const alerta = calcularAlerta(a)
+                  return (
+                    <tr key={a.yiqi_id}>
+                      <td className="sku whitespace-nowrap">{a.mate_codigo}</td>
+                      <td className="font-semibold"><div className="min-w-[240px]">{a.mate_nombre}</div></td>
+                      <td><span className="text-[12px] text-[var(--sub)]">{a.clie_nombre ?? '—'}</span></td>
+                      <td>
+                        {/* 2/10/2026 (feedback Ivana 17/20): barra Stock vs Mín./Máx., igual que Alertas */}
+                        <BarraMinStockMax
+                          stock={a.mate_stock_disponible}
+                          min={a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : a.mate_stock_seguridad}
+                          max={a.mate_punto_pedido_max}
                         />
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-[var(--ind,#4338ca)] font-semibold">
-                      {formatoNumero(rotacionPorSku[a.mate_codigo]?.promedio)}
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <Cobertura meses={calcularCobertura(a.mate_stock_disponible, rotacionPorSku[a.mate_codigo]?.promedio)} />
-                    </td>
-                    <td className="px-3.5 py-1.5">
-                      {estadoOCPorSku[a.mate_codigo] ? (
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${estadoOCPorSku[a.mate_codigo].clase}`}
-                          title={
-                            estadoOCPorSku[a.mate_codigo].cantidadEnCamino > 0
-                              ? `${formatoNumero(estadoOCPorSku[a.mate_codigo].cantidadEnCamino)} unidades ya pedidas, descontadas del cálculo de la alerta`
-                              : undefined
-                          }
-                        >
-                          {estadoOCPorSku[a.mate_codigo].label}
-                          {estadoOCPorSku[a.mate_codigo].cantidadEnCamino > 0 &&
-                            ` (+${formatoNumero(estadoOCPorSku[a.mate_codigo].cantidadEnCamino)})`}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
-                    </td>
-                    <td
-                      className="px-3.5 py-2.5 text-gray-400 text-xs max-w-[180px] truncate"
-                      title={a.mate_notas_sobre_punto_de ?? ''}
-                    >
-                      {a.mate_notas_sobre_punto_de ?? '—'}
-                    </td>
-                    <td className="px-3.5 py-1.5">
-                      <span
-                        className={`pill pill-${TONO_DE_COLOR[alerta.color] ?? 'gris'}`}
-                      >
-                        {alerta.label}
-                      </span>
-                    </td>
-                    {onArmarOC && (
-                      <td className="text-right whitespace-nowrap">
-                        {a.clie_nombre && (alerta.color === 'red' || alerta.color === 'yel') && (
-                          <button
-                            onClick={() => onArmarOC(a)}
-                            title={`Armar OC a ${a.clie_nombre} con este artículo`}
-                            className="btn btn-sm"
+                        {(() => {
+                          const desglose = textoDesgloseStock(stockPorSku[a.mate_codigo])
+                          if (!desglose) return null
+                          return (
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                              <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                {desglose.principal}
+                              </span>
+                              {desglose.extras.map((e) => (
+                                <span
+                                  key={e.label}
+                                  className={`inline-flex px-1.5 py-0.5 rounded-full text-[9px] font-semibold whitespace-nowrap ${
+                                    e.label === 'Jorge' ? 'bg-amber-50 text-[#92400e]' : 'bg-violet-50 text-[#5b21b6]'
+                                  }`}
+                                >
+                                  {e.label}: {e.valor}
+                                </span>
+                              ))}
+                            </div>
+                          )
+                        })()}
+                      </td>
+                      <td className="text-[#9ca3af]">
+                        {a.mate_punto_de_pedido > 0 ? (
+                          a.mate_punto_de_pedido
+                        ) : (
+                          <span
+                            className="text-gray-300 cursor-help"
+                            title="No hay Punto de pedido cargado para este artículo: la alerta usa Stock Seguridad como respaldo (columna de al lado, marcada con ●)."
                           >
-                            + OC
-                          </button>
+                            —
+                          </span>
                         )}
                       </td>
-                    )}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      {/* 7/9/2026 (auditoría de usabilidad, U-1/U-5): cuando no hay
+                          Punto de pedido cargado, Stock Seguridad pasa a ser el
+                          criterio real de la alerta (ver calcularAlerta más arriba)
+                          pero antes se veía igual de gris/apagado que cualquier
+                          otro dato — nada distinguía "este valor decide la alerta"
+                          de "este valor es solo informativo". Se resalta y se marca
+                          con un punto cuando está activo. */}
+                      <td
+                        className={`whitespace-nowrap ${
+                          a.mate_punto_de_pedido > 0 ? 'text-[#9ca3af]' : 'text-gray-700 font-semibold'
+                        }`}
+                      >
+                        {a.mate_stock_seguridad ?? '—'}
+                        {!(a.mate_punto_de_pedido > 0) && a.mate_stock_seguridad != null && (
+                          <span
+                            className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--ind,#4338ca)] align-middle"
+                            title="Este es el valor que decide la alerta: no hay Punto de pedido cargado para este artículo."
+                          />
+                        )}
+                      </td>
+                      <td className="text-right tabular-nums text-[var(--ind,#4338ca)] font-bold">
+                        {formatoNumero(rotacionPorSku[a.mate_codigo]?.promedio)}
+                      </td>
+                      <td>
+                        <Cobertura meses={calcularCobertura(a.mate_stock_disponible, rotacionPorSku[a.mate_codigo]?.promedio)} />
+                      </td>
+                      <td>
+                        {estadoOCPorSku[a.mate_codigo] ? (
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${estadoOCPorSku[a.mate_codigo].clase}`}
+                            title={
+                              estadoOCPorSku[a.mate_codigo].cantidadEnCamino > 0
+                                ? `${formatoNumero(estadoOCPorSku[a.mate_codigo].cantidadEnCamino)} unidades ya pedidas, descontadas del cálculo de la alerta`
+                                : undefined
+                            }
+                          >
+                            {estadoOCPorSku[a.mate_codigo].label}
+                            {estadoOCPorSku[a.mate_codigo].cantidadEnCamino > 0 &&
+                              ` (+${formatoNumero(estadoOCPorSku[a.mate_codigo].cantidadEnCamino)})`}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td
+                        className="text-gray-400 max-w-[180px] truncate"
+                        title={a.mate_notas_sobre_punto_de ?? ''}
+                      >
+                        {a.mate_notas_sobre_punto_de ?? '—'}
+                      </td>
+                      <td>
+                        <Pastilla tono={TONO_DE_COLOR[alerta.color] ?? 'gris'}>{alerta.label}</Pastilla>
+                      </td>
+                      {onArmarOC && (
+                        <td className="text-right whitespace-nowrap">
+                          {a.clie_nombre && (alerta.color === 'red' || alerta.color === 'yel') && (
+                            <button
+                              onClick={() => onArmarOC(a)}
+                              title={`Armar OC a ${a.clie_nombre} con este artículo`}
+                              className="btn btn-sm"
+                            >
+                              <i className="ti ti-plus" />
+                              OC
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Paginador */}
+        {filasAMostrar.length > 0 && (
+          <div className="mt-3 flex items-center justify-between text-[12px] text-[var(--sub)]">
+            <span>
+              Mostrando {inicioSlice + 1}–{Math.min(inicioSlice + filasPorPagina, totalFilas)} de {totalFilas}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+                disabled={paginaSegura <= 1}
+                className="btn btn-sm"
+              >
+                ‹ Anterior
+              </button>
+              <span className="text-[12px] text-gray-400">
+                Página {paginaSegura} de {totalPaginasTabla}
+              </span>
+              <button
+                onClick={() => setPaginaActual((p) => Math.min(totalPaginasTabla, p + 1))}
+                disabled={paginaSegura >= totalPaginasTabla}
+                className="btn btn-sm"
+              >
+                Siguiente ›
+              </button>
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Paginador */}
-      {filasAMostrar.length > 0 && (
-        <div className="mx-4 mb-6 flex items-center justify-between text-sm text-gray-500 px-1">
-          <span>
-            Mostrando {inicioSlice + 1}–{Math.min(inicioSlice + filasPorPagina, totalFilas)} de {totalFilas}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
-              disabled={paginaSegura <= 1}
-              className="px-2.5 py-1 rounded border border-[var(--border)] disabled:opacity-40"
-            >
-              ‹ Anterior
-            </button>
-            <span className="text-xs text-gray-400">
-              Página {paginaSegura} de {totalPaginasTabla}
-            </span>
-            <button
-              onClick={() => setPaginaActual((p) => Math.min(totalPaginasTabla, p + 1))}
-              disabled={paginaSegura >= totalPaginasTabla}
-              className="px-2.5 py-1 rounded border border-[var(--border)] disabled:opacity-40"
-            >
-              Siguiente ›
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

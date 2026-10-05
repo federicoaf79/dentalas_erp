@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import BloqueAccion from '../components/ui/BloqueAccion'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
+import InfoAyuda from '../components/ui/InfoAyuda'
 import { renderTemplate } from './TemplatesMensajes'
 import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
 
@@ -75,7 +77,17 @@ function pasoCantidad(actual, bulto, signo) {
     : Math.max(0, Math.ceil(n / paso - 1e-9) * paso - paso)
   return String(Math.round(sig * 1000) / 1000)
 }
-const BTN_PASO = 'w-7 h-7 rounded-md border border-[var(--border)] bg-white text-gray-600 font-bold leading-none hover:bg-gray-50 hover:text-[var(--ind)]'
+const BTN_PASO = 'w-7 h-7 inline-flex items-center justify-center rounded-lg border border-[#d1d5db] bg-white text-gray-600 hover:bg-gray-50 hover:text-[var(--ind)]'
+
+// Estilos de campo del prototipo v7: .fl (rótulo), .si (buscador), .fi/.fta
+// (input/textarea) e input[type=number] (cantidad, 14 px bold centrado).
+const ROTULO = 'text-[11px] text-[var(--sub)] uppercase tracking-[.04em] font-semibold'
+const INPUT_BUSCAR =
+  'px-3 py-[7px] border border-[#d1d5db] rounded-lg text-[13px] bg-[#f9fafb] outline-none focus:border-[var(--ind)]'
+const INPUT_CANT =
+  'px-2 py-[5px] border rounded-lg text-[14px] font-bold bg-[#f9fafb] text-center outline-none focus:border-[var(--ind)]'
+// .tabla th fija text-align:left fuera de capa: para alinear a la derecha hace falta style.
+const TH_DER = { textAlign: 'right' }
 
 function formatoFecha(f) {
   if (!f) return '—'
@@ -118,81 +130,80 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
   }, [proveedores])
 
   return (
-    <div className="p-4">
-      <div className="flex items-start justify-between mb-3 gap-3">
+    <div className="pagina">
+      {/* Panorama: el estado general antes de decidir */}
+      <div className="metricas mb-5">
+        <div className="metrica">
+          <div className="metrica-rot">Sin stock</div>
+          <div className="metrica-val text-[var(--red)]">{resumen.criticas}</div>
+          <div className="metrica-sub">artículos en cero</div>
+        </div>
+        <div className="metrica">
+          <div className="metrica-rot">Bajo mínimo</div>
+          <div className="metrica-val text-[#b8860b]">{resumen.preventivas}</div>
+          <div className="metrica-sub">todavía con stock</div>
+        </div>
+        <div className="metrica">
+          <div className="metrica-rot">Demanda en riesgo</div>
+          <div className="metrica-val text-[var(--text)]">{formatoNumero(resumen.demanda)}</div>
+          <div className="metrica-sub">unidades por mes</div>
+        </div>
+        <div className="metrica">
+          <div className="metrica-rot">Proveedores</div>
+          <div className="metrica-val text-[var(--ind)]">{proveedores.length}</div>
+          <div className="metrica-sub">con algo que reponer</div>
+        </div>
+      </div>
+
+      <div className="flex items-end justify-between mb-3 gap-3 flex-wrap">
         <div>
-          <div className="text-[15px] font-bold">¿Por dónde empezar?</div>
-          <div className="text-[12px] text-[var(--sub)]">
+          <div className="titulo-tabla">¿Por dónde empezar?</div>
+          <div className="text-[12px] text-[var(--sub)] mt-0.5">
             Proveedores ordenados por la demanda mensual que está en riesgo por falta de stock.
           </div>
         </div>
-        {onCancelar && (
-          <button onClick={onCancelar} className="text-sm text-gray-500 hover:underline whitespace-nowrap">
-            Cancelar
-          </button>
-        )}
-      </div>
-
-      {/* Panorama: el estado general antes de decidir */}
-      <div className="grid grid-cols-4 gap-2.5 mb-4">
-        <div className="bg-white rounded-xl p-3.5 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Sin stock</div>
-          <div className="text-2xl font-bold text-[var(--red)]">{resumen.criticas}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">artículos en cero</div>
-        </div>
-        <div className="bg-white rounded-xl p-3.5 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Bajo mínimo</div>
-          <div className="text-2xl font-bold text-[#92400e]">{resumen.preventivas}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">todavía con stock</div>
-        </div>
-        <div className="bg-white rounded-xl p-3.5 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Demanda en riesgo</div>
-          <div className="text-2xl font-bold">{formatoNumero(resumen.demanda)}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">unidades por mes</div>
-        </div>
-        <div className="bg-white rounded-xl p-3.5 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Proveedores</div>
-          <div className="text-2xl font-bold">{proveedores.length}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">con algo que reponer</div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar proveedor…"
+            className={`${INPUT_BUSCAR} w-[260px]`}
+          />
+          {onCancelar && (
+            <button onClick={onCancelar} className="btn btn-sm">
+              <i className="ti ti-x" /> Cancelar
+            </button>
+          )}
         </div>
       </div>
 
-      <input
-        type="text"
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar proveedor…"
-        className="w-full max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm mb-3"
-      />
-
-      <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="tw">
         {cargando ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">Calculando prioridades…</div>
+          <div className="p-8 text-center text-[var(--sub)] text-[13px]">Calculando prioridades…</div>
         ) : filtrados.length === 0 ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">
+          <div className="p-8 text-center text-[var(--sub)] text-[13px]">
             No hay proveedores con artículos para reponer.
           </div>
         ) : (
           <table className="tabla">
             <thead>
-              <tr className="bg-gray-50 border-b border-[var(--border)]">
-                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">#</th>
-                <th className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Proveedor</th>
-                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap">
-                  Demanda en riesgo
-                </th>
-                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Sin stock</th>
-                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">Bajo mín.</th>
-                <th className="text-right px-3 py-1.5 text-[10px] font-bold text-gray-400 tracking-wide whitespace-nowrap">Sin historial</th>
-                <th className="px-3.5 py-1.5"></th>
+              <tr>
+                <th className="w-10">#</th>
+                <th>Proveedor</th>
+                <th style={TH_DER}>Demanda en riesgo</th>
+                <th style={TH_DER}>Sin stock</th>
+                <th style={TH_DER}>Bajo mín.</th>
+                <th style={TH_DER}>Sin historial</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {filtrados.map((p, i) => (
-                <tr key={p.proveedor} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="px-3.5 py-1.5 text-xs text-gray-400 tabular-nums">{i + 1}</td>
-                  <td className="px-3.5 py-1.5 font-semibold text-[13px]">{p.proveedor}</td>
-                  <td className="px-3 py-1.5 text-right">
+                <tr key={p.proveedor}>
+                  <td className="text-gray-400 tabular-nums"><span className="text-[12px]">{i + 1}</span></td>
+                  <td className="font-semibold">{p.proveedor}</td>
+                  <td className="text-right">
                     {Number(p.demanda_riesgo) > 0 ? (
                       <span className="font-bold tabular-nums">
                         {formatoNumero(p.demanda_riesgo)}
@@ -202,33 +213,30 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
                       <span className="text-[11px] text-gray-400 italic">sin historial</span>
                     )}
                   </td>
-                  <td className="px-3 py-1.5 text-right">
+                  <td className="text-right">
                     {Number(p.criticas) > 0 ? (
-                      <span className="inline-flex px-2 py-0.5 rounded-full bg-[var(--red-bg)] text-[var(--red)] text-[11px] font-semibold">
+                      <span className="badge bg-[var(--red-bg)] text-[var(--red)]">
                         {p.criticas}
                       </span>
                     ) : (
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-1.5 text-right">
+                  <td className="text-right">
                     {Number(p.preventivas) > 0 ? (
-                      <span className="inline-flex px-2 py-0.5 rounded-full bg-[var(--yel-bg)] text-[#92400e] text-[11px] font-semibold">
+                      <span className="badge bg-[#fef3e8] text-[#92400e]">
                         {p.preventivas}
                       </span>
                     ) : (
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-1.5 text-right text-xs text-gray-400 tabular-nums">
-                    {Number(p.sin_historial) > 0 ? p.sin_historial : '—'}
+                  <td className="text-right text-gray-400 tabular-nums">
+                    <span className="text-[12px]">{Number(p.sin_historial) > 0 ? p.sin_historial : '—'}</span>
                   </td>
-                  <td className="px-3.5 py-1.5 text-right">
-                    <button
-                      onClick={() => onElegir(p.proveedor)}
-                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[var(--border)] bg-white hover:border-[var(--ind,#4338ca)] hover:text-[var(--ind,#4338ca)] whitespace-nowrap"
-                    >
-                      Armar orden
+                  <td className="text-right">
+                    <button onClick={() => onElegir(p.proveedor)} className="btn btn-sm">
+                      <i className="ti ti-file-plus" /> Armar orden
                     </button>
                   </td>
                 </tr>
@@ -561,33 +569,40 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
     ? null
     : esAdmin
       ? (valorizacion.sinCosto > 0
-          ? { clase: 'bg-[var(--yel-bg)] text-[#92400e] border-amber-200', label: 'Orden directa — faltan costos en algunos artículos' }
-          : { clase: 'bg-[var(--grn-bg,#dcfce7)] text-[var(--grn)] border-green-200', label: 'Orden directa (sin controles de aprobación)' })
+          ? { clase: 'bloque-amarillo', sem: 'sy', label: 'Orden directa — faltan costos en algunos artículos' }
+          : { clase: 'bloque-verde', sem: 'sg', label: 'Orden directa (sin controles de aprobación)' })
       : siempreAprueba
-        ? { clase: 'bg-blue-50 text-[#1d4ed8] border-blue-200', label: 'Este proveedor siempre requiere aprobación de Aris' }
+        ? { clase: 'bloque-azul', sem: 'sb', label: 'Este proveedor siempre requiere aprobación de Aris' }
         : valorizacion.sinCosto > 0
-          ? { clase: 'bg-[var(--yel-bg)] text-[#92400e] border-amber-200', label: 'Falta costo de algunos artículos' }
+          ? { clase: 'bloque-amarillo', sem: 'sy', label: 'Falta costo de algunos artículos' }
           : superaLimite
-            ? { clase: 'bg-blue-50 text-[#1d4ed8] border-blue-200', label: 'Requiere aprobación de Aris' }
-            : { clase: 'bg-[var(--grn-bg,#dcfce7)] text-[var(--grn)] border-green-200', label: 'Dentro del límite' }
+            ? { clase: 'bloque-azul', sem: 'sb', label: 'Requiere aprobación de Aris' }
+            : { clase: 'bloque-verde', sem: 'sg', label: 'Dentro del límite' }
 
   return (
-    <div className="p-4">
-      <button
-        onClick={onCancelar}
-        className="text-sm text-[var(--ind,#4338ca)] hover:underline mb-2 inline-block"
-      >
-        ← Volver a proveedores
+    <div className="pagina">
+      <button onClick={onCancelar} className="btn btn-sm mb-3">
+        <i className="ti ti-arrow-left" /> Volver a proveedores
       </button>
 
-      <div className="flex items-start justify-between mb-3 gap-3 flex-wrap">
+      <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
         <div>
-          <div className="text-[15px] font-bold">{proveedor}</div>
-          <div className="text-[12px] text-[var(--sub)]">
+          <div className="text-[15px] font-bold flex items-center">
+            {proveedor}
+            {/* Antes era un cartel azul (Aviso info "nuevaoc-sugerencia"); mismo texto, en el ⓘ. */}
+            <InfoAyuda>
+              La cantidad sugerida busca cubrir el consumo de los próximos meses según el promedio de venta y se
+              redondea hacia arriba al múltiplo de compra, con un tope máximo por producto. Esos parámetros y el
+              límite de aprobación se configuran en las reglas del sistema. Es un punto de partida: podés editar
+              libremente las cantidades.
+            </InfoAyuda>
+          </div>
+          <div className="text-[12px] text-[var(--sub)] mt-[3px]">
             {sugerencias.length} artículos por debajo del punto de pedido · {items.length} seleccionados
           </div>
           {semaforo && (
-            <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[12px] font-semibold ${semaforo.clase}`}>
+            <div className={`bloque mt-2.5 py-2! px-3.5! inline-flex items-center gap-2 text-[12px] font-semibold ${semaforo.clase}`}>
+              <span className={`sem ${semaforo.sem}`} />
               <span>{formatoMoneda(valorizacion.total)}</span>
               <span className="opacity-40">·</span>
               <span>{semaforo.label}</span>
@@ -607,7 +622,8 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
             </div>
           )}
           {noLlegaAlMinimo && (
-            <div className="mt-1.5 text-[11px] text-[#92400e] bg-[var(--yel-bg,#fef3c7)] inline-block px-2 py-1 rounded-md">
+            <div className="mt-1.5 badge bg-[var(--yel-bg)] text-[#92400e]">
+              <i className="ti ti-alert-triangle" />
               No llega al mínimo de compra de este proveedor
               ({minimoEsUnidades ? `${minimo} unidades` : formatoMoneda(minimo)})
             </div>
@@ -622,23 +638,25 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
               disabled={items.length === 0}
               onClick={abrirWhatsApp}
               title={`Abrir WhatsApp con ${whatsapp}`}
-              className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40"
+              className="btn"
+              style={{ background: 'var(--grn-bg)', borderColor: 'var(--grn)', color: 'var(--grn)' }}
             >
-              💬 Enviar por WhatsApp
+              <i className="ti ti-brand-whatsapp" /> Enviar por WhatsApp
             </button>
           )}
           <button
             disabled={ocupado || items.length === 0}
             onClick={() => onGuardar({ items, notas, estado: 'borrador', valorizacion })}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+            className="btn"
           >
-            Guardar borrador
+            <i className="ti ti-device-floppy" /> Guardar borrador
           </button>
           <button
             disabled={ocupado || items.length === 0}
             onClick={() => onGuardar({ items, notas, estado: requiereAprobacion ? 'pendiente' : 'aprobada', valorizacion })}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+            className="btn btn-pri"
           >
+            <i className={`ti ${requiereAprobacion ? 'ti-send' : 'ti-check'}`} />
             {requiereAprobacion ? 'Enviar a aprobación' : 'Confirmar orden'} ({items.length})
           </button>
         </div>
@@ -652,20 +670,13 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
         </Aviso>
       )}
 
-      <Aviso tipo="info" id="nuevaoc-sugerencia" className="mb-3">
-        La cantidad sugerida busca cubrir el consumo de los próximos meses según el promedio de venta y se
-        redondea hacia arriba al múltiplo de compra, con un tope máximo por producto. Esos parámetros y el
-        límite de aprobación se configuran en las reglas del sistema. Es un punto de partida: podés editar
-        libremente las cantidades.
-      </Aviso>
-
       {/* Agregar a mano: busca en TODO el catálogo comprable del
           proveedor, no solo lo que está en alerta. Al elegir un
           resultado se suma a la tabla de abajo, tildado, cantidad 1
           para editar. Si el artículo ya estaba en la tabla (por alerta
           o por un agregado previo), no se duplica: solo se tilda. */}
-      <div className="relative mb-3">
-        <label className="block text-[12px] font-semibold text-[var(--sub)] mb-1">
+      <div className="relative mb-4">
+        <label className={`block ${ROTULO} mb-[5px]`}>
           Agregar otro artículo del proveedor
         </label>
         <input
@@ -678,14 +689,14 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
           onFocus={() => setBuscarAbierto(true)}
           onBlur={() => setTimeout(() => setBuscarAbierto(false), 150)}
           placeholder="Buscar por SKU o nombre en todo el catálogo de este proveedor…"
-          className="w-full max-w-md border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+          className={`${INPUT_BUSCAR} w-full max-w-md`}
         />
         {buscarAbierto && buscarTexto.trim().length >= 2 && (
-          <div className="absolute z-10 mt-1 w-full max-w-md bg-white border border-[var(--border)] rounded-lg shadow-lg max-h-72 overflow-y-auto">
+          <div className="absolute z-10 mt-1 w-full max-w-md bg-white border border-[var(--border)] rounded-[10px] shadow-[0_8px_24px_rgba(0,0,0,.08)] max-h-72 overflow-y-auto">
             {buscarCargando ? (
-              <div className="px-3 py-2.5 text-sm text-[var(--sub)]">Buscando…</div>
+              <div className="px-3 py-2.5 text-[13px] text-[var(--sub)]">Buscando…</div>
             ) : buscarResultados.length === 0 ? (
-              <div className="px-3 py-2.5 text-sm text-[var(--sub)]">
+              <div className="px-3 py-2.5 text-[13px] text-[var(--sub)]">
                 Sin resultados en el catálogo de {proveedor}.
               </div>
             ) : (
@@ -700,14 +711,14 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                     className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0 flex items-center justify-between gap-2"
                   >
                     <span className="min-w-0 flex items-baseline gap-2">
-                      <span className="font-mono text-xs text-gray-400 whitespace-nowrap">{r.mate_codigo}</span>
-                      <span className="text-[13px] font-medium truncate">{r.mate_nombre ?? '—'}</span>
+                      <span className="sku text-gray-400 whitespace-nowrap">{r.mate_codigo}</span>
+                      <span className="text-[13px] font-semibold truncate">{r.mate_nombre ?? '—'}</span>
                     </span>
                     <span className="text-[11px] font-semibold whitespace-nowrap">
                       {yaIncluido ? (
-                        <span className="text-[var(--grn,#3d9970)]">Agregado ✓</span>
+                        <span className="text-[var(--grn)] inline-flex items-center gap-1"><i className="ti ti-check" /> Agregado</span>
                       ) : (
-                        <span className="text-[var(--ind,#4338ca)]">+ Agregar</span>
+                        <span className="text-[var(--ind)] inline-flex items-center gap-1"><i className="ti ti-plus" /> Agregar</span>
                       )}
                     </span>
                   </button>
@@ -718,14 +729,14 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
         <div className="flex items-center gap-3 flex-wrap">
           <input
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar por SKU o nombre…"
-            className="border border-[var(--border)] rounded-lg px-3 py-2 text-sm w-64"
+            className={`${INPUT_BUSCAR} w-64`}
           />
           {sinHistorialTotal > 0 && (
             <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer">
@@ -748,12 +759,12 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
             </label>
           )}
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-500">
+        <label className="flex items-center gap-2 text-[12px] text-[var(--sub)]">
           Filas por página
           <select
             value={filasPorPagina}
             onChange={(e) => setFilasPorPagina(Number(e.target.value))}
-            className="border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm"
+            className={`${INPUT_BUSCAR} cursor-pointer`}
           >
             {[25, 50, 100].map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -769,33 +780,34 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
           se editan en cualquiera de los dos lugares) + una acción para
           sacarlos de la orden sin tener que ir a buscarlos a su página. */}
       {filasSeleccionadas.length > 0 && (
-        <div className="bg-indigo-50/40 rounded-xl border border-indigo-100 overflow-hidden mb-3">
-          <div className="px-3.5 py-2 text-[11px] font-bold text-[var(--ind,#4338ca)] uppercase tracking-wide bg-indigo-50 border-b border-indigo-100">
+        <div className="rounded-xl border border-[var(--ind-lt)] overflow-hidden mb-4 bg-white">
+          <div className="px-3.5 py-2.5 text-[10px] font-bold text-[var(--ind)] uppercase tracking-[.06em] bg-[var(--ind-bg)] border-b border-[var(--ind-lt)]">
             Ya seleccionados ({filasSeleccionadas.length})
           </div>
           <table className="tabla">
             <tbody>
               {filasSeleccionadas.map((s) => (
-                <tr key={`sel-${s.mate_codigo}`} className="border-b border-indigo-100 last:border-0">
-                  <td className="px-3 py-2 w-8">
+                <tr key={`sel-${s.mate_codigo}`}>
+                  <td className="w-8">
                     <button
                       type="button"
                       onClick={() => toggle(s.mate_codigo)}
                       title="Sacar de la orden"
-                      className="text-gray-400 hover:text-[var(--red)] text-sm font-bold leading-none"
+                      aria-label="Sacar de la orden"
+                      className="text-gray-400 hover:text-[var(--red)] leading-none"
                     >
-                      ×
+                      <i className="ti ti-x text-[15px]" />
                     </button>
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs">{s.mate_codigo}</td>
-                  <td className="px-3 py-2 text-[13px] font-medium max-w-[280px] truncate" title={s.mate_nombre ?? ''}>
+                  <td className="sku">{s.mate_codigo}</td>
+                  <td className="font-semibold max-w-[280px] truncate" title={s.mate_nombre ?? ''}>
                     {s.mate_nombre ?? '—'}
                   </td>
-                  <td className="px-3 py-2 text-sm text-gray-500 whitespace-nowrap">Mín. {formatoNumero(s.umbral)}</td>
-                  <td className="px-3 py-2 text-gray-400 text-sm whitespace-nowrap">
+                  <td className="text-[var(--sub)] whitespace-nowrap">Mín. {formatoNumero(s.umbral)}</td>
+                  <td className="text-gray-400 whitespace-nowrap">
                     {s.unidades_por_bulto ? `x${formatoNumero(s.unidades_por_bulto)}` : '—'}
                   </td>
-                  <td className="px-3 py-2">
+                  <td>
                     <input
                       type="number"
                       min="0"
@@ -805,7 +817,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         const valor = e.target.value
                         setCantidades((prev) => ({ ...prev, [s.mate_codigo]: valor }))
                       }}
-                      className="w-24 border border-[var(--border)] rounded-lg px-2 py-1 text-sm text-right"
+                      className={`${INPUT_CANT} w-24 border-[#d1d5db]`}
                     />
                     {(() => {
                       const cant = Number(cantidades[s.mate_codigo]) || 0
@@ -828,11 +840,11 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden mb-3">
+      <div className="tw mb-3">
         {cargando ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">Calculando sugerencias…</div>
+          <div className="p-8 text-center text-[var(--sub)] text-[13px]">Calculando sugerencias…</div>
         ) : paginadas.length === 0 ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">
+          <div className="p-8 text-center text-[var(--sub)] text-[13px]">
             {filas.length === 0
               ? 'Este proveedor no tiene artículos por debajo del punto de pedido. Podés buscar y agregar artículos a mano más arriba.'
               : 'Ningún artículo coincide con el filtro.'}
@@ -840,8 +852,8 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
         ) : (
           <table className="tabla">
             <thead>
-              <tr className="bg-gray-50 border-b border-[var(--border)]">
-                <th className="px-3 py-1.5 w-10">
+              <tr>
+                <th className="w-10">
                   <input
                     type="checkbox"
                     title="Seleccionar todo lo visible en esta página"
@@ -852,7 +864,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                   />
                 </th>
                 {['SKU', 'Producto', 'Stock', 'Mín.', 'Prom./mes', 'Bulto', 'Costo unit.', 'Cantidad a pedir'].map((h) => (
-                  <th key={h} className="text-left px-3 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
+                  <th key={h} style={h === 'Costo unit.' ? TH_DER : undefined}>
                     {h}
                   </th>
                 ))}
@@ -865,24 +877,24 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                 return (
                   <tr
                     key={s.mate_codigo}
-                    className={`border-b border-gray-100 last:border-0 ${marcado ? 'bg-indigo-50/40' : ''}`}
+                    className={marcado ? 'bg-[var(--ind-bg)]/50' : ''}
                   >
-                    <td className="px-3 py-2">
+                    <td>
                       <input type="checkbox" checked={marcado} onChange={() => toggle(s.mate_codigo)} />
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs">{s.mate_codigo}</td>
-                    <td className="px-3 py-2 text-[13px] font-medium max-w-[280px] truncate" title={s.mate_nombre ?? ''}>
+                    <td className="sku">{s.mate_codigo}</td>
+                    <td className="font-semibold max-w-[280px] truncate" title={s.mate_nombre ?? ''}>
                       {s.mate_nombre ?? '—'}
                       {s.notas && (
                         <span
                           title={`Nota de YiQi sobre el punto de pedido: ${s.notas}`}
-                          className="ml-1 text-[11px] text-[var(--ind,#4338ca)] cursor-help"
+                          className="ml-1 text-[var(--ind)] cursor-help align-middle"
                         >
-                          📝
+                          <i className="ti ti-notes text-[14px]" />
                         </span>
                       )}
                     </td>
-                    <td className={`px-3 py-2 font-bold text-sm ${Number(s.stock) <= 0 ? 'text-[var(--red)]' : ''}`}>
+                    <td className={`font-bold ${Number(s.stock) <= 0 ? 'text-[var(--red)]' : ''}`}>
                       {formatoNumero(s.stock)}
                       {(() => {
                         const desglose = textoDesgloseStock(stockPorSku[s.mate_codigo])
@@ -910,23 +922,23 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         como "poco relevante", cuando el Mínimo es justo el dato que
                         más mira para decidir reposición (más que Costo unit., que
                         sigue en texto normal más abajo). Mismo peso visual que Costo. */}
-                    <td className="px-3 py-2 text-sm">{formatoNumero(s.umbral)}</td>
-                    <td className="px-3 py-2 text-sm">
+                    <td>{formatoNumero(s.umbral)}</td>
+                    <td>
                       {sinBase ? (
                         <span className="text-[11px] text-gray-400 italic whitespace-nowrap">Sin historial</span>
                       ) : (
-                        <span className="text-[var(--ind,#4338ca)] font-semibold">{formatoNumero(s.promedio)}</span>
+                        <span className="text-[var(--ind)] font-semibold">{formatoNumero(s.promedio)}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-gray-400 text-sm">
+                    <td className="text-gray-400">
                       {s.unidades_por_bulto ? `x${formatoNumero(s.unidades_por_bulto)}` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-sm text-right tabular-nums">
+                    <td className="text-right tabular-nums">
                       {s.costo_unitario
                         ? formatoMoneda(s.costo_unitario)
                         : <span className="text-[11px] text-gray-400 italic">sin costo</span>}
                     </td>
-                    <td className="px-3 py-2">
+                    <td>
                       {(() => {
                         const alCambiar = (valor) => {
                           setCantidades((prev) => ({ ...prev, [s.mate_codigo]: valor }))
@@ -945,8 +957,9 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                               className={BTN_PASO}
                               title={`Restar ${paso}`}
                               onClick={() => alCambiar(pasoCantidad(cantidades[s.mate_codigo], s.unidades_por_bulto, -1))}
+                              aria-label={`Restar ${paso}`}
                             >
-                              −
+                              <i className="ti ti-minus text-[13px]" />
                             </button>
                       <input
                         type="number"
@@ -972,8 +985,8 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                             )
                           }
                         }}
-                        className={`w-20 border rounded-lg px-2 py-1 text-sm text-right ${
-                          sinBase ? 'border-dashed border-gray-300 placeholder:text-[11px]' : 'border-[var(--border)]'
+                        className={`${INPUT_CANT} w-20 ${
+                          sinBase ? 'border-dashed border-gray-300 placeholder:text-[11px] placeholder:font-normal' : 'border-[#d1d5db]'
                         }`}
                       />
                             <button
@@ -981,8 +994,9 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                               className={BTN_PASO}
                               title={`Sumar ${paso}`}
                               onClick={() => alCambiar(pasoCantidad(cantidades[s.mate_codigo], s.unidades_por_bulto, 1))}
+                              aria-label={`Sumar ${paso}`}
                             >
-                              +
+                              <i className="ti ti-plus text-[13px]" />
                             </button>
                           </div>
                         )
@@ -1018,7 +1032,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
       </div>
 
       {totalFilas > 0 && (
-        <div className="flex items-center justify-between text-sm text-gray-500 px-1 mb-3">
+        <div className="flex items-center justify-between text-[12px] text-[var(--sub)] px-1 mb-4">
           <span>
             Mostrando {inicio + 1}–{Math.min(inicio + filasPorPagina, totalFilas)} de {totalFilas}
           </span>
@@ -1026,43 +1040,47 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
             <button
               onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
               disabled={paginaSegura <= 1}
-              className="px-2.5 py-1 rounded border border-[var(--border)] disabled:opacity-40"
+              className="btn btn-sm"
             >
-              ‹ Anterior
+              <i className="ti ti-chevron-left" /> Anterior
             </button>
-            <span className="text-xs text-gray-400">Página {paginaSegura} de {totalPaginas}</span>
+            <span className="text-[11px] text-gray-400">Página {paginaSegura} de {totalPaginas}</span>
             <button
               onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
               disabled={paginaSegura >= totalPaginas}
-              className="px-2.5 py-1 rounded border border-[var(--border)] disabled:opacity-40"
+              className="btn btn-sm"
             >
-              Siguiente ›
+              Siguiente <i className="ti ti-chevron-right" />
             </button>
           </div>
         </div>
       )}
 
-      <textarea
-        value={notas}
-        onChange={(e) => setNotas(e.target.value)}
-        placeholder="Notas para el proveedor o para Aris (opcional)…"
-        rows={2}
-        className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-sm mb-3"
-      />
+      <label className="block mb-3">
+        <div className={`${ROTULO} mb-[5px]`}>Notas</div>
+        <textarea
+          value={notas}
+          onChange={(e) => setNotas(e.target.value)}
+          placeholder="Notas para el proveedor o para Aris (opcional)…"
+          rows={2}
+          className="w-full px-3 py-2 border border-[#d1d5db] rounded-lg text-[13px] bg-[#f9fafb] outline-none focus:border-[var(--ind)] resize-y"
+        />
+      </label>
 
       <div className="flex items-center justify-end gap-2">
         <button
           disabled={ocupado || items.length === 0}
           onClick={() => onGuardar({ items, notas, estado: 'borrador', valorizacion })}
-          className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+          className="btn"
         >
-          Guardar borrador
+          <i className="ti ti-device-floppy" /> Guardar borrador
         </button>
         <button
           disabled={ocupado || items.length === 0}
           onClick={() => onGuardar({ items, notas, estado: requiereAprobacion ? 'pendiente' : 'aprobada', valorizacion })}
-          className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+          className="btn btn-pri"
         >
+          <i className={`ti ${requiereAprobacion ? 'ti-send' : 'ti-check'}`} />
           {requiereAprobacion ? 'Enviar a aprobación' : 'Confirmar orden'} ({items.length})
         </button>
       </div>
@@ -1318,73 +1336,75 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
 
   return (
     <div ref={raizRef} className="flex-1 overflow-y-auto bg-[#f7f8fa]">
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[17px] font-bold">Nueva OC</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5">
-            Armá órdenes a partir de los quiebres de stock. El seguimiento y la aprobación
-            están en “Órdenes de compra”.
-          </div>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Nueva OC"
+        bajada="Armá órdenes a partir de los quiebres de stock. El seguimiento y la aprobación están en “Órdenes de compra”."
+      />
 
-      {permisos.error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
-          <p className="font-semibold">No se pudieron determinar tus permisos</p>
-          <p className="text-sm mt-1">{permisos.error}</p>
-        </div>
-      )}
+      {(permisos.error || error || aviso || (vista === 'armar' && abiertasDelProveedor.length > 0)) && (
+        <div className="px-7 pt-5 flex flex-col gap-2.5">
+          {permisos.error && (
+            <BloqueAccion tono="rojo" titulo="No se pudieron determinar tus permisos">
+              {permisos.error}
+            </BloqueAccion>
+          )}
 
-      {error && (
-        <div className="mx-4 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg px-4 py-2.5 text-[13px]">
-          {error}
-        </div>
-      )}
+          {error && <div className="bloque bloque-rojo text-[13px]">{error}</div>}
 
-      {aviso && (
-        <BloqueAccion
-          tono="verde"
-          className="mx-4 mt-4"
-          titulo={`✓ ${aviso}`}
-          acciones={
-            <>
-              {ordenGuardadaId && (
-                <a
-                  href={`?page=ocs&orden=${ordenGuardadaId}`}
-                  target="_blank"
-                  rel="noopener"
-                  className="btn btn-sm"
-                >
-                  Ver orden #{ordenGuardadaId} ↗
+          {aviso && (
+            <BloqueAccion
+              tono="verde"
+              titulo={
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="ti ti-circle-check text-[15px]" /> {aviso}
+                </span>
+              }
+              acciones={
+                <>
+                  {ordenGuardadaId && (
+                    <a
+                      href={`?page=ocs&orden=${ordenGuardadaId}`}
+                      target="_blank"
+                      rel="noopener"
+                      className="btn btn-sm"
+                    >
+                      <i className="ti ti-eye" /> Ver orden #{ordenGuardadaId} <i className="ti ti-external-link" />
+                    </a>
+                  )}
+                  <button
+                    onClick={() => { setAviso(null); setOrdenGuardadaId(null) }}
+                    className="btn btn-sm"
+                    aria-label="Cerrar"
+                  >
+                    <i className="ti ti-x" />
+                  </button>
+                </>
+              }
+            >
+              Ya quedó guardada. No hace falta volver a armarla.
+            </BloqueAccion>
+          )}
+          {vista === 'armar' && abiertasDelProveedor.length > 0 && (
+            <BloqueAccion
+              tono="amarillo"
+              titulo={`Ya hay ${abiertasDelProveedor.length === 1 ? 'una orden abierta' : `${abiertasDelProveedor.length} órdenes abiertas`} de ${proveedorElegido}`}
+              acciones={abiertasDelProveedor.slice(0, 3).map((o) => (
+                <a key={o.id} href={`?page=ocs&orden=${o.id}`} target="_blank" rel="noopener" className="btn btn-sm">
+                  #{o.id} <i className="ti ti-external-link" />
                 </a>
-              )}
-              <button onClick={() => { setAviso(null); setOrdenGuardadaId(null) }} className="btn btn-sm">×</button>
-            </>
-          }
-        >
-          Ya quedó guardada. No hace falta volver a armarla.
-        </BloqueAccion>
-      )}
-      {vista === 'armar' && abiertasDelProveedor.length > 0 && (
-        <BloqueAccion
-          tono="amarillo"
-          className="mx-4 mt-4"
-          titulo={`Ya hay ${abiertasDelProveedor.length === 1 ? 'una orden abierta' : `${abiertasDelProveedor.length} órdenes abiertas`} de ${proveedorElegido}`}
-          acciones={abiertasDelProveedor.slice(0, 3).map((o) => (
-            <a key={o.id} href={`?page=ocs&orden=${o.id}`} target="_blank" rel="noopener" className="btn btn-sm">
-              #{o.id} ↗
-            </a>
-          ))}
-        >
-          {abiertasDelProveedor
-            .map((o) => `#${o.id} ${o.estado === 'pendiente' ? 'esperando aprobación' : 'borrador'} del ${new Date(o.creada_en).toLocaleDateString('es-AR')}`)
-            .join(' · ')}
-          . Revisá que no estés armando la misma orden otra vez.
-        </BloqueAccion>
+              ))}
+            >
+              {abiertasDelProveedor
+                .map((o) => `#${o.id} ${o.estado === 'pendiente' ? 'esperando aprobación' : 'borrador'} del ${new Date(o.creada_en).toLocaleDateString('es-AR')}`)
+                .join(' · ')}
+              . Revisá que no estés armando la misma orden otra vez.
+            </BloqueAccion>
+          )}
+        </div>
       )}
 
       {cargando ? (
-        <div className="p-10 text-center text-[var(--sub)] text-sm">Cargando…</div>
+        <div className="p-10 text-center text-[var(--sub)] text-[13px]">Cargando…</div>
       ) : vista === 'lista' ? (
         <SelectorProveedor
           proveedores={proveedores}

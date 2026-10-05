@@ -178,17 +178,21 @@ function pasosDeOrden(orden) {
 function DetalleOrden({ orden }) {
   const { pasos, sigue } = pasosDeOrden(orden)
   return (
-    <div className="border-t border-gray-100 px-6 py-5 bg-white">
-      <BarraPasos pasos={pasos} sigue={sigue} />
-      <div className="tw mt-5">
+    <div className="border-t border-[#f3f4f6] px-7 py-6 bg-white">
+      {/* Barra de pasos con las medidas del prototipo (.pipeline): punto 36 px, línea a 18 px. */}
+      <div className="pb-2 [&_.paso-punto]:w-9! [&_.paso-punto]:h-9! [&_.paso-punto]:text-[15px]! [&_.paso]:gap-2! [&_.paso:not(:last-child)]:after:top-[18px]! [&_.paso:not(:last-child)]:after:left-[calc(50%+20px)]! [&_.paso:not(:last-child)]:after:right-[calc(-50%+20px)]!">
+        <BarraPasos pasos={pasos} sigue={sigue} />
+      </div>
+      <div className="mt-4 text-[12px] font-bold text-[#374151] mb-2">Detalle por artículo</div>
+      <div className="tw">
         <table className="tabla">
           <thead>
             <tr>
               <th>SKU</th>
               <th>Artículo</th>
-              <th className="text-right">Pedido</th>
-              <th className="text-right">Entregado</th>
-              <th className="text-right">Pendiente</th>
+              <th className="text-right!">Pedido</th>
+              <th className="text-right!">Entregado</th>
+              <th className="text-right!">Pendiente</th>
             </tr>
           </thead>
           <tbody>
@@ -197,11 +201,11 @@ function DetalleOrden({ orden }) {
               return (
                 <tr key={i}>
                   <td className="sku">{l.sku ?? '—'}</td>
-                  <td className="font-medium text-gray-800">{l.nombreArticulo ?? '—'}</td>
-                  <td className="text-right tabular-nums">{l.cantidad}</td>
-                  <td className="text-right tabular-nums text-[var(--grn)] font-semibold">{l.entregada}</td>
+                  <td className="font-semibold text-gray-800">{l.nombreArticulo ?? '—'}</td>
+                  <td className="text-right tabular-nums">{l.cantidad} u</td>
+                  <td className="text-right tabular-nums text-[var(--grn)] font-bold">{l.entregada} u</td>
                   <td className="text-right tabular-nums">
-                    {pend > 0 ? <Pastilla tono="amarillo">{pend} u</Pastilla> : <span className="text-gray-300">—</span>}
+                    {pend > 0 ? <Pastilla tono="amarillo">{pend} u</Pastilla> : <span className="text-[#9ca3af]">—</span>}
                   </td>
                 </tr>
               )
@@ -219,15 +223,15 @@ function TarjetaOrden({ o, abierta, onToggle, causa, onCausa, compacta = false }
   return (
     <div className={`card card-${e.tono}`}>
       <div
-        className={`flex items-center gap-4 cursor-pointer hover:bg-gray-50 ${compacta ? 'px-4 py-3' : 'px-5 py-4'}`}
+        className={`flex items-center gap-4 cursor-pointer select-none hover:bg-[#fafafa] ${compacta ? 'px-4 py-3' : 'px-5 py-4'}`}
         onClick={onToggle}
       >
-        <div className="min-w-[96px]">
-          <div className="text-[14px] font-bold text-[var(--ind)]">OC #{o.nroOC}</div>
-          <div className="text-[11px] text-[var(--sub)] mt-0.5">{formatoFecha(o.fecha)}</div>
+        <div className="flex flex-col gap-[3px] min-w-[110px]">
+          <span className="text-[14px] font-bold text-[var(--ind)]">OC #{o.nroOC}</span>
+          <span className="text-[11px] text-[var(--sub)]">{formatoFecha(o.fecha)}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-semibold text-gray-900 truncate">{o.proveedor || '—'}</div>
+          <div className="text-[14px] font-semibold text-[var(--text)] truncate">{o.proveedor || '—'}</div>
           <div className="text-[12px] text-[var(--sub)] mt-0.5 truncate">
             {articulos} {articulos === 1 ? 'artículo' : 'artículos'}
             {/* El asunto es la nota manual de Ivana en YiQi (U-2, 7/9/2026). */}
@@ -244,15 +248,18 @@ function TarjetaOrden({ o, abierta, onToggle, causa, onCausa, compacta = false }
           className="btn btn-sm"
           title="Registrar por qué se demora o qué pasó con esta OC"
         >
-          📝 {causa ? 'Ver causa' : 'Causa'}
+          <i className="ti ti-message" /> {causa ? 'Ver causa' : 'Causa'}
         </button>
-        <div className="text-[14px] font-bold text-gray-900 min-w-[96px] text-right tabular-nums">
+        <div className="text-[14px] font-bold text-[var(--text)] min-w-[90px] text-right tabular-nums">
           {formatoMoneda(o.total)}
         </div>
-        <div className="min-w-[200px] text-right">
-          <Pastilla tono={e.tono}>{etiquetaEstado(e)}</Pastilla>
+        <div className="min-w-[220px] text-right">
+          <Pastilla tono={e.tono}>
+            {e.key === 'parcial' && <i className="ti ti-alert-triangle" />}
+            {etiquetaEstado(e)}
+          </Pastilla>
         </div>
-        <span className="text-gray-400 text-[12px] w-3">{abierta ? '▾' : '▸'}</span>
+        <i className={`ti ti-chevron-down inline-block text-[var(--sub)] transition-transform ${abierta ? 'rotate-180' : ''}`} />
       </div>
       {abierta && <DetalleOrden orden={o} />}
     </div>
@@ -368,7 +375,7 @@ export default function SeguimientoOC() {
   // sale sin apagar el loading y la pantalla queda colgada en "Cargando…".
   if (permisos.error) {
     return (
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto pad">
         <div className="bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
           <p className="font-semibold">No se pudieron determinar tus permisos</p>
           <p className="text-sm mt-1">{permisos.error}</p>
@@ -381,12 +388,12 @@ export default function SeguimientoOC() {
   }
 
   if (loading || permisos.cargando) {
-    return <div className="flex-1 overflow-y-auto p-6 text-gray-500">Cargando órdenes de compra...</div>
+    return <div className="flex-1 overflow-y-auto pad text-[13px] text-[var(--sub)]">Cargando órdenes de compra...</div>
   }
 
   if (error) {
     return (
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto pad">
         <div className="bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
           <p className="font-semibold">No se pudo cargar Seguimiento de OC</p>
           <p className="text-sm mt-1">{error}</p>
@@ -409,7 +416,7 @@ export default function SeguimientoOC() {
         titulo="Seguimiento de OC"
         bajada={`OC enviadas a proveedores, según YiQi · ${contadores.enviada + contadores.parcial} en curso`}
       >
-        <button onClick={cargar} className="btn btn-sm">↻ Actualizar</button>
+        <button onClick={cargar} className="btn btn-sm"><i className="ti ti-refresh" /> Actualizar</button>
       </EncabezadoPagina>
 
       <div className="pad">
@@ -432,7 +439,7 @@ export default function SeguimientoOC() {
                 : `Ingreso parcial en ${parciales.length} OC`
             }
             acciones={
-              <button className="btn btn-sm" onClick={() => setFiltroEstado('parcial')}>Ver</button>
+              <button className="btn btn-sm" onClick={() => setFiltroEstado('parcial')}><i className="ti ti-eye" /> Ver</button>
             }
           >
             {parciales.length === 1
@@ -484,7 +491,7 @@ export default function SeguimientoOC() {
         </div>
 
         {/* OC en curso: enviadas y parciales */}
-        <div className="space-y-3 mb-8">
+        <div className="space-y-3.5 mb-8">
           {noCompletadas.map((o) => (
             <TarjetaOrden
               key={o.nroOC}
@@ -508,14 +515,15 @@ export default function SeguimientoOC() {
               <div key={mes} className="mb-2">
                 <button
                   onClick={() => toggleCarpeta(mes)}
-                  className="w-full text-left px-4 py-2.5 bg-white border border-[var(--border)] rounded-lg text-[13px] font-semibold text-gray-700 hover:bg-gray-50"
+                  className="w-full flex items-center gap-2 text-left px-5 py-3 bg-white border border-[var(--border)] rounded-xl text-[13px] font-semibold text-[var(--text)] hover:bg-[#fafafa]"
                 >
-                  {carpetasAbiertas[mes] ? '▾' : '▸'} {mes}{' '}
+                  <i className={`ti ti-chevron-down inline-block text-[var(--sub)] transition-transform ${carpetasAbiertas[mes] ? '' : '-rotate-90'}`} />
+                  {mes}{' '}
                   <span className="text-[var(--sub)] font-normal">({Object.values(dias).flat().length})</span>
                 </button>
                 {carpetasAbiertas[mes] &&
                   Object.entries(dias).map(([dia, ocs]) => (
-                    <div key={dia} className="ml-4 mt-2 space-y-2">
+                    <div key={dia} className="ml-4 mt-2.5 space-y-2.5">
                       <p className="text-[11px] text-gray-400">{dia}</p>
                       {ocs.map((o) => (
                         <TarjetaOrden

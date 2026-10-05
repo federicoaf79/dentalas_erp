@@ -8,6 +8,7 @@ import { ESTADO_OC_PROPIA } from '../lib/estados'
 import Pastilla from './ui/Pastilla'
 import BloqueAccion from './ui/BloqueAccion'
 import BarraPasos from './ui/BarraPasos'
+import InfoAyuda from './ui/InfoAyuda'
 import { renderTemplate } from '../pages/TemplatesMensajes'
 // ============================================================
 // OrdenesPropias.jsx
@@ -84,18 +85,21 @@ function formatoFecha(f) {
   } catch { return '—' }
 }
 
-// Botones de la columna de acciones (30/9/2026). Mismo alto para todos
-// (h-7) así la fila queda alineada; los de consulta son neutros y los de
-// la acción del estado llevan color.
-const BTN_BASE = 'inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[12px] font-semibold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
-const BTN_SEC = `${BTN_BASE} bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-[var(--ind,#4338ca)]`
-const BTN_PRIM = `${BTN_BASE} bg-[var(--ind,#4338ca)] border-[var(--ind,#4338ca)] text-white hover:opacity-90`
-const BTN_OK = `${BTN_BASE} bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700`
-const BTN_PELIGRO = `${BTN_BASE} bg-white border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300`
-const BTN_WA = `${BTN_BASE} bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100`
-const BTN_WA_OUT = `${BTN_BASE} bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50`
-const BTN_AVISO = `${BTN_BASE} bg-amber-50 border-amber-300 text-[#92400e] hover:bg-amber-100`
-const BTN_ICONO = `${BTN_BASE} px-2 bg-white border-transparent text-gray-400 hover:text-red-600 hover:bg-red-50`
+// Botones del pie de cada tarjeta (5/10/2026: estilos del prototipo v7,
+// .btn .btn-sm con ícono Tabler). Los de consulta son neutros y los de la
+// acción del estado llevan color. Los colores extra (WhatsApp, aviso, ícono)
+// van con "!" porque .btn está fuera de las capas de Tailwind y si no gana.
+const BTN_SEC = 'btn btn-sm'
+const BTN_PRIM = 'btn btn-sm btn-pri'
+const BTN_OK = 'btn btn-sm btn-ok'
+const BTN_PELIGRO = 'btn btn-sm btn-peligro'
+const BTN_WA = 'btn btn-sm btn-ok'
+const BTN_WA_OUT = 'btn btn-sm text-[var(--grn)]! border-[var(--grn-bd)]!'
+const BTN_AVISO = 'btn btn-sm bg-[var(--yel-bg)]! border-[var(--yel)]! text-[#92400e]!'
+const BTN_ICONO = 'btn btn-sm px-2! text-gray-400! hover:text-[var(--red)]! hover:bg-[var(--red-bg)]!'
+// Botones de los modales (mismo .btn de 13 px del prototipo).
+const BTN_MODAL = 'btn'
+const BTN_MODAL_ROJO = 'btn bg-[var(--red)]! border-[var(--red)]! text-white! hover:opacity-90'
 
 // soloOrdenId (2/10/2026, feedback Ivana 12/19): cuando la pantalla se abre
 // con ?orden=N (pestaña nueva desde "Ver/Editar ↗"), se muestra SOLO esa
@@ -895,7 +899,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
 
   if (!cargando && ordenes.length === 0) return null
   return (
-    <div className="mx-4 mt-4">
+    <div className="mx-7 mt-4">
       {error && (
         <div className="bg-red-50 border border-red-200 text-[var(--red)] rounded-lg px-4 py-2.5 text-[13px] mb-3">
           {error}
@@ -908,34 +912,33 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
         </div>
       )}
       {!soloOrdenId && (<>
-      <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-        <div>
-          <div className="text-[15px] font-bold">
-            Órdenes generadas desde el sistema
-            {pendientes.length > 0 && (
-              <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-[#1d4ed8] text-[11px] font-semibold align-middle">
-                {pendientes.length} {pendientes.length === 1 ? 'espera aprobación' : 'esperan aprobación'}
-              </span>
-            )}
-          </div>
-          <div className="text-[12px] text-[var(--sub)]">
-            Al aprobarse se vinculan solas a YiQi. El envío al proveedor por WhatsApp (💬) es
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[15px] font-bold text-[var(--text)]">Órdenes generadas desde el sistema</span>
+          <InfoAyuda>
+            Al aprobarse se vinculan solas a YiQi. El envío al proveedor por WhatsApp es
             semi-automático: descarga el PDF y abre WhatsApp con el texto listo — el único paso manual
             es arrastrar el PDF a la conversación, WhatsApp no permite adjuntarlo solo.
-          </div>
+          </InfoAyuda>
+          {pendientes.length > 0 && (
+            <Pastilla tono="azul">
+              {pendientes.length} {pendientes.length === 1 ? 'espera aprobación' : 'esperan aprobación'}
+            </Pastilla>
+          )}
         </div>
         <div className="flex gap-2">
           {[
             { key: 'activas', label: `Órdenes (${activas.length})` },
             // La papelera es cosa de Aris: quien la mando ahi es quien
             // decide si se restaura o se borra para siempre.
-            ...(permisos.esAdmin ? [{ key: 'papelera', label: `🗑 Papelera (${archivadas.length})` }] : []),
+            ...(permisos.esAdmin ? [{ key: 'papelera', icono: 'ti-trash', label: `Papelera (${archivadas.length})` }] : []),
           ].map((f) => (
             <button
               key={f.key}
               onClick={() => setFiltro(f.key)}
-              className={`chip ${filtro === f.key ? 'chip-on' : ''}`}
+              className={`chip inline-flex items-center gap-1.5 ${filtro === f.key ? 'chip-on' : ''}`}
             >
+              {f.icono && <i className={`ti ${f.icono} text-[14px]`} aria-hidden="true" />}
               {f.label}
             </button>
           ))}
@@ -944,12 +947,12 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
       {/* 2/10/2026 (feedback Ivana 17, prototipo v7): tarjetas con semáforo en
           vez de tabla. Mismas acciones y reglas que antes; solo cambia la forma. */}
       {filtro === 'activas' && !cargando && visibles.length > 0 && (
-        <div className="flex items-center gap-5 flex-wrap px-4 py-2.5 mb-3 bg-white border border-[var(--border)] rounded-xl text-[12px]">
-          <span className="font-bold text-[11px] uppercase tracking-wide text-[var(--sub)]">Qué hay que hacer:</span>
-          <span className="flex items-center gap-2"><span className="sem sb" /> <b className="text-[var(--blu)]">Aprobar</b> <span className="text-[var(--sub)]">— espera a Aris</span></span>
-          <span className="flex items-center gap-2"><span className="sem sy" /> <b className="text-[#92400e]">Completar o enviar</b> <span className="text-[var(--sub)]">— borrador o lista para mandar al proveedor</span></span>
-          <span className="flex items-center gap-2"><span className="sem sr" /> <b className="text-[var(--red)]">Problema</b> <span className="text-[var(--sub)]">— rechazada o no se pudo cargar en YiQi</span></span>
-          <span className="flex items-center gap-2"><span className="sem sg" /> <b className="text-[var(--grn)]">Listo</b> <span className="text-[var(--sub)]">— enviada al proveedor</span></span>
+        <div className="flex items-center gap-5 flex-wrap px-4 py-3 mb-4 bg-white border border-[var(--border)] rounded-[10px] text-[12px]">
+          <span className="font-bold text-[11px] uppercase tracking-[.04em] text-[#374151]">Acción requerida:</span>
+          <span className="flex items-center gap-[7px]"><span className="sem sb" /><span className="font-semibold text-[var(--blu)]">Aprobar</span><span className="text-[var(--sub)]">— espera a Aris</span></span>
+          <span className="flex items-center gap-[7px]"><span className="sem sy" /><span className="font-semibold text-[#92400e]">Completar o enviar</span><span className="text-[var(--sub)]">— borrador o lista para mandar al proveedor</span></span>
+          <span className="flex items-center gap-[7px]"><span className="sem sr" /><span className="font-semibold text-[var(--red)]">Problema</span><span className="text-[var(--sub)]">— rechazada o no se pudo cargar en YiQi</span></span>
+          <span className="flex items-center gap-[7px]"><span className="sem sg" /><span className="font-semibold text-[var(--grn)]">Listo</span><span className="text-[var(--sub)]">— enviada al proveedor</span></span>
         </div>
       )}
       <div className="mb-6">
@@ -960,34 +963,43 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
             {filtro === 'papelera' ? 'La papelera está vacía.' : 'No hay órdenes.'}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {visibles.map((o) => {
               const vista = vistaEstadoOrden(o)
               const causa = causasPorOrden[String(o.id)]
+              const editable = puedeEditarItems(o)
               return (
-                <div key={o.id} className={`card card-${vista.tono}`}>
-                  <div className="px-5 py-3.5 flex items-center gap-4">
+                <div key={o.id} className="card">
+                  <div className="px-5 py-4 flex items-center gap-3.5">
                     <span className={`sem ${SEM_DE_TONO[vista.tono]}`} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[15px] font-bold text-gray-900 truncate">{o.proveedor_nombre}</div>
-                      <div className="text-[12px] text-[var(--sub)] mt-0.5">
+                      <div className="text-[15px] font-bold text-[var(--text)] truncate">{o.proveedor_nombre}</div>
+                      <div className="text-[12px] text-[var(--sub)] mt-[3px]">
                         Orden #{o.id} · {o.creador_nombre ?? '—'} · {formatoDia(o.creada_en)} · {o.cant_items ?? 0} {(o.cant_items ?? 0) === 1 ? 'ítem' : 'ítems'}
-                        {o.items_sin_costo > 0 && <span className="text-[#92400e]"> · {o.items_sin_costo} sin costo</span>}
+                        {o.items_sin_costo > 0 && <span className="text-[#92400e] font-semibold"> · {o.items_sin_costo} sin costo</span>}
                       </div>
                       {o.estado === 'aprobada' && !o.yiqi_id_creado && o.yiqi_error && (
-                        <div className="text-[11px] text-[var(--red)] mt-1 truncate" title={o.yiqi_error}>⚠ {o.yiqi_error}</div>
+                        <div className="text-[11px] text-[var(--red)] mt-1 truncate flex items-center gap-1" title={o.yiqi_error}>
+                          <i className="ti ti-alert-triangle text-[13px]" aria-hidden="true" /> {o.yiqi_error}
+                        </div>
                       )}
                       {causa && (
-                        <div className="text-[11px] text-gray-500 mt-1 truncate" title={causa.nota ?? ''}>📝 {causa.causa_rotulo}</div>
+                        <div className="text-[11px] text-gray-500 mt-1 truncate flex items-center gap-1" title={causa.nota ?? ''}>
+                          <i className="ti ti-notes text-[13px]" aria-hidden="true" /> {causa.causa_rotulo}
+                        </div>
                       )}
                     </div>
                     <Pastilla tono={vista.tono}>{vista.label}</Pastilla>
-                    <div className={`text-[18px] font-bold tabular-nums min-w-[130px] text-right ${COLOR_TOTAL[vista.tono]}`}>
+                    <div className={`text-[15px] font-bold tabular-nums whitespace-nowrap text-right ${COLOR_TOTAL[vista.tono]}`}>
                       {o.total_estimado != null ? formatoMoneda(o.total_estimado) : '—'}
                     </div>
                   </div>
-                  <div className="px-5 py-2.5 bg-[#fafafa] border-t border-[var(--border)] flex items-center justify-end">
-                      <div className="inline-flex items-center justify-end gap-1.5">
+                  <div className="px-5 py-3 bg-[#fafafa] border-t border-[var(--border)] flex items-center justify-between gap-3 flex-wrap">
+                      <div className="text-[12px] text-[#374151]">
+                        Total estimado: <strong>{o.total_estimado != null ? formatoMoneda(o.total_estimado) : '—'}</strong>
+                        {' · '}{o.cant_items ?? 0} {(o.cant_items ?? 0) === 1 ? 'ítem' : 'ítems'}
+                      </div>
+                      <div className="inline-flex items-center justify-end gap-2 flex-wrap">
                         <button
                           onClick={() => {
                             // Pestaña nueva de verdad (28/9/2026), no el panel
@@ -999,26 +1011,26 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                             const url = `${window.location.origin}${window.location.pathname}?page=ocs&orden=${o.id}`
                             window.open(url, '_blank', 'noopener')
                           }}
-                          title={puedeEditarItems(o) ? 'Abrir la orden para editarla (pestaña nueva)' : 'Ver la orden (pestaña nueva)'}
+                          title={editable ? 'Abrir la orden para editarla (pestaña nueva)' : 'Ver la orden (pestaña nueva)'}
                           className={BTN_SEC}
                         >
                           {/* Feedback Ivana 2/10 (punto 13): "Editar" solo cuando se puede editar de verdad. */}
-                          {puedeEditarItems(o) ? '✏️ Editar ↗' : 'Ver ↗'}
+                          <i className={`ti ${editable ? 'ti-edit' : 'ti-eye'}`} aria-hidden="true" />
+                          {editable ? 'Editar ↗' : 'Ver ↗'}
                         </button>
                         <button onClick={() => imprimir(o)} title="Ver e imprimir el PDF de la orden" className={BTN_SEC}>
-                          📄 PDF
+                          <i className="ti ti-file-text" aria-hidden="true" /> PDF
                         </button>
                         <button
                           onClick={() =>
                             setModalCausa({ referenciaId: o.id, referenciaTexto: `Orden #${o.id} — ${o.proveedor_nombre}` })
                           }
-                          title={causasPorOrden[String(o.id)] ? 'Ver o editar la causa declarada' : 'Declarar una causa (demora, faltante, etc.)'}
-                          className={causasPorOrden[String(o.id)] ? `${BTN_SEC} border-amber-300 text-[#92400e] bg-amber-50` : BTN_SEC}
+                          title={causa ? 'Ver o editar la causa declarada' : 'Declarar una causa (demora, faltante, etc.)'}
+                          className={causa ? BTN_AVISO : BTN_SEC}
                         >
-                          {causasPorOrden[String(o.id)] ? '📝 Causa' : '📝 Causa +'}
+                          <i className="ti ti-notes" aria-hidden="true" />
+                          {causa ? 'Causa' : 'Causa +'}
                         </button>
-
-                        {(filtro === 'activas' || filtro === 'papelera') && <span className="w-px h-5 bg-gray-200 mx-1" aria-hidden="true" />}
 
                         {filtro === 'activas' && o.estado === 'aprobada' && (
                           <button
@@ -1027,26 +1039,27 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                             title={o.whatsapp_enviada_en ? `Ya se envió el ${formatoFecha(o.whatsapp_enviada_en)} — volver a enviar` : 'Descargar PDF y abrir WhatsApp'}
                             className={o.whatsapp_enviada_en ? BTN_WA_OUT : BTN_WA}
                           >
-                            {enviandoWaId === o.id ? 'Enviando…' : o.whatsapp_enviada_en ? '💬 Reenviar' : '💬 WhatsApp'}
+                            <i className="ti ti-brand-whatsapp" aria-hidden="true" />
+                            {enviandoWaId === o.id ? 'Enviando…' : o.whatsapp_enviada_en ? 'Reenviar' : 'WhatsApp'}
                           </button>
                         )}
                         {filtro === 'activas' && permisos.esAdmin && o.estado === 'pendiente' && (
                           <>
                             <button disabled={ocupado} onClick={() => pedirDecision(o, 'aprobada')} className={BTN_OK}>
-                              ✓ Aprobar
+                              <i className="ti ti-check" aria-hidden="true" /> Aprobar
                             </button>
                             <button disabled={ocupado} onClick={() => pedirDecision(o, 'rechazada')} className={BTN_PELIGRO}>
-                              Rechazar
+                              <i className="ti ti-x" aria-hidden="true" /> Rechazar
                             </button>
                           </>
                         )}
                         {filtro === 'activas' && !permisos.esAdmin && o.estado === 'borrador' && (
                           <>
                             <button disabled={ocupado} onClick={() => enviarAAprobacion(o)} className={BTN_PRIM}>
-                              Enviar a aprobación
+                              <i className="ti ti-send" aria-hidden="true" /> Enviar a aprobación
                             </button>
                             <button disabled={ocupado} onClick={() => pedirBorrar(o)} className={BTN_PELIGRO}>
-                              Eliminar
+                              <i className="ti ti-trash" aria-hidden="true" /> Eliminar
                             </button>
                           </>
                         )}
@@ -1059,7 +1072,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                             title={`${o.yiqi_error || 'Todavía no se envió a YiQi.'} — Reintentar vuelve a mandar esta misma orden a YiQi con los mismos datos.`}
                             className={BTN_AVISO}
                           >
-                            ↻ Reintentar envío
+                            <i className="ti ti-refresh" aria-hidden="true" /> Reintentar envío
                           </button>
                         )}
                         {filtro === 'activas' && permisos.esAdmin && (
@@ -1070,16 +1083,16 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                             aria-label="Archivar"
                             className={BTN_ICONO}
                           >
-                            🗑
+                            <i className="ti ti-trash" aria-hidden="true" />
                           </button>
                         )}
                         {filtro === 'papelera' && (
                           <>
                             <button disabled={ocupado} onClick={() => restaurar(o)} className={BTN_PRIM}>
-                              Restaurar
+                              <i className="ti ti-arrow-back-up" aria-hidden="true" /> Restaurar
                             </button>
                             <button disabled={ocupado} onClick={() => pedirEliminarDefinitivo(o)} className={BTN_PELIGRO}>
-                              Eliminar definitivamente
+                              <i className="ti ti-trash" aria-hidden="true" /> Eliminar definitivamente
                             </button>
                           </>
                         )}
@@ -1097,7 +1110,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
       )}
       {/* Detalle */}
       {abierta && (
-        <div className={`card card-${(ESTADO_OC_PROPIA[abierta.estado] ?? {}).tono ?? 'gris'} p-5 mb-6`}>
+        <div className={`card card-${(ESTADO_OC_PROPIA[abierta.estado] ?? {}).tono ?? 'gris'} px-[22px] py-5 mb-7`}>
           {/* Encabezado (feedback Ivana 19): número, estado, proveedor y total grande */}
           <div className="flex items-start justify-between mb-4 gap-4">
             <div className="min-w-0">
@@ -1108,14 +1121,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 </Pastilla>
                 {abierta.archivada_en && <Pastilla tono="gris">En papelera</Pastilla>}
               </div>
-              <div className="text-[15px] font-semibold text-gray-900 mt-1">{abierta.proveedor_nombre}</div>
-              <div className="text-[12px] text-[var(--sub)] mt-0.5">
+              <div className="text-[15px] font-bold text-[var(--text)] mt-1">{abierta.proveedor_nombre}</div>
+              <div className="text-[12px] text-[var(--sub)] mt-[3px]">
                 Creada {formatoFecha(abierta.creada_en)}
                 {abierta.items_sin_costo > 0 && ` · ${abierta.items_sin_costo} artículos sin costo cargado`}
               </div>
             </div>
             <div className="text-right flex-shrink-0">
-              <div className="text-[24px] font-bold text-gray-900 tabular-nums leading-none">
+              <div className="text-[26px] font-bold text-[var(--text)] tabular-nums leading-none">
                 {abierta.total_estimado != null ? formatoMoneda(abierta.total_estimado) : '—'}
               </div>
               <div className="text-[11px] text-[var(--sub)] mt-1">total estimado</div>
@@ -1177,10 +1190,10 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               acciones={!permisos.esAdmin && !abierta.archivada_en && (
                 <>
                   <button disabled={ocupado} onClick={() => enviarAAprobacion(abierta)} className="btn btn-sm btn-pri">
-                    Enviar a aprobación
+                    <i className="ti ti-send" aria-hidden="true" /> Enviar a aprobación
                   </button>
                   <button disabled={ocupado} onClick={() => pedirBorrar(abierta)} className="btn btn-sm btn-peligro">
-                    Eliminar
+                    <i className="ti ti-trash" aria-hidden="true" /> Eliminar
                   </button>
                 </>
               )}
@@ -1196,10 +1209,10 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               acciones={permisos.esAdmin && !abierta.archivada_en && (
                 <>
                   <button disabled={ocupado} onClick={() => pedirDecision(abierta, 'rechazada')} className="btn btn-sm btn-peligro">
-                    Rechazar
+                    <i className="ti ti-x" aria-hidden="true" /> Rechazar
                   </button>
                   <button disabled={ocupado} onClick={() => pedirDecision(abierta, 'aprobada')} className="btn btn-sm btn-ok">
-                    ✓ Aprobar orden
+                    <i className="ti ti-check" aria-hidden="true" /> Aprobar orden
                   </button>
                 </>
               )}
@@ -1216,7 +1229,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
             <BloqueAccion
               tono="rojo"
               className="mb-3"
-              titulo="⚠ No se pudo cargar en YiQi"
+              titulo={<span className="inline-flex items-center gap-1.5"><i className="ti ti-alert-triangle" aria-hidden="true" /> No se pudo cargar en YiQi</span>}
               acciones={permisos.esAdmin && (
                 <button
                   disabled={ocupado}
@@ -1224,7 +1237,8 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                   title="Vuelve a mandar esta misma orden a YiQi con los mismos datos."
                   className="btn btn-sm btn-peligro"
                 >
-                  {ocupado ? 'Reintentando…' : '↻ Reintentar envío'}
+                  <i className="ti ti-refresh" aria-hidden="true" />
+                  {ocupado ? 'Reintentando…' : 'Reintentar envío'}
                 </button>
               )}
             >
@@ -1240,15 +1254,16 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 : 'Lista para enviar al proveedor'}
               acciones={
                 <>
-                  <button onClick={() => imprimir(abierta)} className="btn btn-sm">📄 PDF</button>
+                  <button onClick={() => imprimir(abierta)} className="btn btn-sm"><i className="ti ti-file-text" aria-hidden="true" /> PDF</button>
                   <button
                     disabled={enviandoWaId === abierta.id}
                     onClick={() => enviarWhatsApp(abierta)}
                     className={`btn btn-sm ${abierta.whatsapp_enviada_en ? '' : 'btn-ok'}`}
                   >
+                    <i className="ti ti-brand-whatsapp" aria-hidden="true" />
                     {enviandoWaId === abierta.id
                       ? 'Enviando…'
-                      : abierta.whatsapp_enviada_en ? '💬 Reenviar' : '💬 Enviar por WhatsApp'}
+                      : abierta.whatsapp_enviada_en ? 'Reenviar' : 'Enviar por WhatsApp'}
                   </button>
                 </>
               }
@@ -1258,14 +1273,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
             </BloqueAccion>
           )}
           {abierta.notas && (
-            <div className="border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
-              <span className="text-[10px] uppercase text-gray-400 block mb-0.5">Notas</span>
+            <div className="border border-[var(--border)] rounded-[10px] px-3.5 py-2.5 text-[13px] mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-[.06em] text-[var(--sub)] block mb-0.5">Notas</span>
               {abierta.notas}
             </div>
           )}
           {abierta.comentario_decision && abierta.estado !== 'rechazada' && (
-            <div className="border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[13px] mb-3">
-              <span className="text-[10px] uppercase text-gray-400 block mb-0.5">Comentario de aprobación</span>
+            <div className="border border-[var(--border)] rounded-[10px] px-3.5 py-2.5 text-[13px] mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-[.06em] text-[var(--sub)] block mb-0.5">Comentario de aprobación</span>
               {abierta.comentario_decision}
             </div>
           )}
@@ -1281,7 +1296,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 onClick={iniciarEdicionItems}
                 className="btn btn-sm btn-pri"
               >
-                ✏ Editar orden (cantidades, quitar o agregar artículos)
+                <i className="ti ti-edit" aria-hidden="true" /> Editar orden (cantidades, quitar o agregar artículos)
               </button>
             </div>
           )}
@@ -1301,7 +1316,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                   value={buscarEdit}
                   onChange={(e) => setBuscarEdit(e.target.value)}
                   placeholder="Buscar por SKU o nombre en el catálogo del proveedor…"
-                  className="w-full max-w-md border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+                  className="w-full max-w-md bg-white border border-[var(--border)] rounded-lg px-3 py-2 text-[13px]"
                 />
                 {buscarEdit.trim().length >= 2 && (
                   <div className="absolute z-10 mt-1 w-full max-w-md bg-white border border-[var(--border)] rounded-lg shadow-lg max-h-72 overflow-y-auto">
@@ -1355,10 +1370,10 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               </thead>
               <tbody>
                 {(editandoItems ? itemsEdit : items).map((i) => (
-                  <tr key={i.id} className="border-b border-gray-100 last:border-0">
-                    <td className="px-3.5 py-2 font-mono text-xs">{i.mate_codigo}</td>
-                    <td className="px-3.5 py-2 text-[13px] font-medium">{i.mate_nombre ?? '—'}</td>
-                    <td className="px-3.5 py-2 font-bold">
+                  <tr key={i.id}>
+                    <td className="sku">{i.mate_codigo}</td>
+                    <td className="font-semibold">{i.mate_nombre ?? '—'}</td>
+                    <td className="font-bold">
                       {editandoItems ? (
                         <div className="flex items-center gap-1">
                           <button type="button" disabled={ocupado} onClick={() => pasoEdit(i.id, -1)}
@@ -1382,26 +1397,27 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                         formatoNumero(i.cantidad)
                       )}
                     </td>
-                    <td className="px-3.5 py-2 text-sm tabular-nums">
+                    <td className="tabular-nums">
                       {i.costo_unitario ? formatoMoneda2(i.costo_unitario) : '—'}
                     </td>
-                    <td className="px-3.5 py-2 text-sm tabular-nums font-semibold">
+                    <td className="tabular-nums font-semibold">
                       {i.costo_unitario
                         ? formatoMoneda2(subtotalLinea(editandoItems ? { ...i, cantidad: i._cantidad } : i))
                         : '—'}
                     </td>
-                    <td className="px-3.5 py-2 text-gray-400 text-sm">{formatoNumero(i.stock_al_momento)}</td>
-                    <td className="px-3.5 py-2 text-gray-400 text-sm">{formatoNumero(i.promedio_mensual)}</td>
+                    <td className="text-[var(--sub)] tabular-nums">{formatoNumero(i.stock_al_momento)}</td>
+                    <td className="text-[var(--sub)] tabular-nums">{formatoNumero(i.promedio_mensual)}</td>
                     {editandoItems && (
-                      <td className="px-3.5 py-2">
+                      <td>
                         <button
                           type="button"
                           disabled={ocupado || itemsEdit.length <= 1}
                           onClick={() => quitarItemEdit(i.id)}
                           title="Quitar línea"
-                          className="text-gray-400 hover:text-[var(--red)] disabled:opacity-30 text-lg leading-none"
+                          aria-label="Quitar línea"
+                          className="text-gray-400 hover:text-[var(--red)] disabled:opacity-30 text-[16px] leading-none"
                         >
-                          ×
+                          <i className="ti ti-x" aria-hidden="true" />
                         </button>
                       </td>
                     )}
@@ -1416,7 +1432,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 type="button"
                 disabled={ocupado}
                 onClick={cancelarEdicionItems}
-                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                className="btn"
               >
                 Cancelar
               </button>
@@ -1424,18 +1440,19 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 type="button"
                 disabled={ocupado}
                 onClick={guardarEdicionItems}
-                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+                className="btn btn-pri"
               >
+                <i className="ti ti-check" aria-hidden="true" />
                 {ocupado ? 'Guardando…' : 'Guardar cambios'}
               </button>
             </div>
           )}
           {/* Fila de acciones al pie (feedback Ivana 19) */}
-          <div className="flex items-center justify-between gap-2 flex-wrap pt-3 mt-1 border-t border-gray-100">
+          <div className="flex items-center justify-between gap-2 flex-wrap pt-4 mt-1 border-t border-[var(--border)]">
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => imprimir(abierta)} className="btn btn-sm">📄 PDF de la orden</button>
+              <button onClick={() => imprimir(abierta)} className="btn btn-sm"><i className="ti ti-file-text" aria-hidden="true" /> PDF de la orden</button>
               {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
-                <button onClick={() => abrirAgregarMercaderia(abierta)} className="btn btn-sm">+ Agregar mercadería</button>
+                <button onClick={() => abrirAgregarMercaderia(abierta)} className="btn btn-sm"><i className="ti ti-plus" aria-hidden="true" /> Agregar mercadería</button>
               )}
               <button
                 onClick={() =>
@@ -1443,7 +1460,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 }
                 className="btn btn-sm"
               >
-                📝 {causasPorOrden[String(abierta.id)] ? 'Ver causa' : 'Declarar causa'}
+                <i className="ti ti-notes" aria-hidden="true" /> {causasPorOrden[String(abierta.id)] ? 'Ver causa' : 'Declarar causa'}
               </button>
             </div>
             {soloOrdenId ? null : (
@@ -1483,14 +1500,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                   <button
                     disabled={ocupado}
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                    className={BTN_MODAL}
                   >
                     Cancelar
                   </button>
                   <button
                     disabled={ocupado}
                     onClick={confirmarBorrar}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--red)] text-white hover:opacity-90 disabled:opacity-40"
+                    className={BTN_MODAL_ROJO}
                   >
                     {ocupado ? 'Eliminando…' : 'Eliminar'}
                   </button>
@@ -1513,7 +1530,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+                    className={BTN_MODAL}
                   >
                     Entendido
                   </button>
@@ -1576,9 +1593,9 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 <button
                   type="button"
                   onClick={agregarLineaNueva}
-                  className="text-[13px] font-semibold text-[var(--ind,#4338ca)] hover:underline mb-4"
+                  className="text-[13px] font-semibold text-[var(--ind)] hover:underline mb-4 inline-flex items-center gap-1"
                 >
-                  + otra línea
+                  <i className="ti ti-plus" aria-hidden="true" /> otra línea
                 </button>
                 {errorMercaderia && (
                   <div className="border border-[#fecaca] bg-[#fef2f2] text-[var(--red)] rounded-lg px-3 py-2 text-[13px] mb-3">
@@ -1589,14 +1606,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                   <button
                     disabled={ocupado}
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                    className={BTN_MODAL}
                   >
                     Cancelar
                   </button>
                   <button
                     disabled={ocupado}
                     onClick={confirmarAgregarMercaderia}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+                    className="btn btn-pri"
                   >
                     {ocupado ? 'Agregando…' : 'Agregar a la orden'}
                   </button>
@@ -1614,14 +1631,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                   <button
                     disabled={ocupado}
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                    className={BTN_MODAL}
                   >
                     Cancelar
                   </button>
                   <button
                     disabled={ocupado}
                     onClick={confirmarEliminarDefinitivo}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--red)] text-white hover:opacity-90 disabled:opacity-40"
+                    className={BTN_MODAL_ROJO}
                   >
                     {ocupado ? 'Eliminando…' : 'Eliminar definitivamente'}
                   </button>
@@ -1654,16 +1671,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                   <button
                     disabled={ocupado}
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                    className={BTN_MODAL}
                   >
                     Cancelar
                   </button>
                   <button
                     disabled={ocupado}
                     onClick={confirmarDecision}
-                    className={`px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40 ${
-                      modal.tipo === 'aprobar' ? 'bg-[var(--grn,#3d9970)]' : 'bg-[var(--red)]'
-                    }`}
+                    className={modal.tipo === 'aprobar' ? 'btn btn-ok' : BTN_MODAL_ROJO}
                   >
                     {ocupado
                       ? 'Guardando…'

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
+import BloqueAccion from '../components/ui/BloqueAccion'
 
 // ============================================================
 // ConectorYiQi.jsx — pantalla nueva (15 julio 2026)
@@ -11,6 +13,9 @@ import { supabase } from '../lib/supabase'
 // están habilitadas. Nunca muestra el Bearer token (la Edge
 // Function solo devuelve un subconjunto seguro de datos).
 // ============================================================
+
+// Rótulo de campo del prototipo v7 (.fl).
+const ROTULO = 'text-[11px] text-[var(--sub)] uppercase tracking-[.04em] font-semibold'
 
 function formatoFechaHora(fechaStr) {
   if (!fechaStr) return 'Nunca'
@@ -71,143 +76,148 @@ export default function ConectorYiQi() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[17px] font-bold">Conector YiQi</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5">Diagnóstico de la integración en vivo</div>
-        </div>
-        <button
-          onClick={cargar}
-          disabled={loading}
-          className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
-        >
-          {loading ? 'Verificando…' : '↻ Verificar ahora'}
+      <EncabezadoPagina titulo="Conector YiQi" bajada="Diagnóstico de la integración en vivo">
+        <button onClick={cargar} disabled={loading} className="btn btn-sm">
+          <i className={`ti ${loading ? 'ti-loader-2 animate-spin' : 'ti-plug'}`} />
+          {loading ? 'Verificando…' : 'Verificar ahora'}
         </button>
-      </div>
+      </EncabezadoPagina>
 
-      {error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
-          <p className="font-semibold">No se pudo consultar el estado</p>
-          <p className="text-sm mt-1">{error}</p>
-        </div>
-      )}
+      <div className="pagina flex flex-col gap-4">
+        {error && (
+          <BloqueAccion tono="rojo" titulo="No se pudo consultar el estado">
+            {error}
+          </BloqueAccion>
+        )}
 
-      {loading && !estado ? (
-        <div className="p-8 text-center text-[var(--sub)] text-sm">Verificando conexión…</div>
-      ) : estado ? (
-        <div className="mx-4 mt-4 space-y-4">
-          {/* Estado de conexión */}
-          <div className="bg-white rounded-xl border border-[var(--border)] p-5">
-            <div className="flex items-center gap-3">
-              <span
-                className={`w-3 h-3 rounded-full ${
-                  estado.conectado ? 'bg-[var(--grn)]' : 'bg-[var(--red)]'
+        {loading && !estado ? (
+          <div className="p-8 text-center text-[var(--sub)] text-[13px]">Verificando conexión…</div>
+        ) : estado ? (
+          <>
+            {/* Estado de conexión */}
+            <div className="seccion">
+              <div className="seccion-titulo flex items-center gap-2" style={{ marginBottom: 14 }}>
+                <i className="ti ti-plug-connected text-[var(--ind)] text-[15px]" />
+                Estado de la conexión
+              </div>
+              <div
+                className={`flex items-center gap-2 px-4 py-3 rounded-[10px] border text-[13px] font-semibold ${
+                  estado.conectado
+                    ? 'bg-[var(--grn-bg)] border-[var(--grn-bd)] text-[var(--grn)]'
+                    : 'bg-[var(--red-bg)] border-[var(--red-bd)] text-[var(--red)]'
                 }`}
-              />
-              <span className="text-lg font-bold">
+              >
+                <i className={`ti ${estado.conectado ? 'ti-circle-check' : 'ti-circle-x'} text-[16px]`} />
                 {estado.conectado ? 'Conectado a YiQi' : 'Sin conexión'}
-              </span>
-            </div>
-            {!estado.conectado && estado.error && (
-              <p className="text-sm text-[var(--red)] mt-2">{estado.error}</p>
-            )}
-          </div>
+              </div>
+              {!estado.conectado && estado.error && (
+                <p className="text-[13px] text-[var(--red)] mt-2">{estado.error}</p>
+              )}
 
-          {/* Señal temprana (agregado 20/8/2026): renovaciones que
-              fallaron en las últimas 24hs pero sin cortar el sync
-              todavía, porque el token guardado alcanzaba. Antes de
-              yiqi_token_eventos esto se perdía en logs efímeros --
-              ahora queda visible acá aunque arriba diga "Conectado". */}
-          {diagnostico && Number(diagnostico.fallos_recuperables_24h) > 0 && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm">
-              <p className="font-semibold">
-                ⚠ {diagnostico.fallos_recuperables_24h} renovación(es) de token fallaron en las últimas 24hs
-              </p>
-              <p className="mt-1">
+              {estado.conectado && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-4">
+                  <div className="flex flex-col gap-[5px] min-w-0">
+                    <div className={ROTULO}>Última sincronización</div>
+                    <div className="text-[14px] font-semibold">{formatoFechaHora(estado.ultimaSync)}</div>
+                  </div>
+                  <div className="flex flex-col gap-[5px] min-w-0">
+                    <div className={ROTULO}>Schema</div>
+                    <div className="text-[14px] font-semibold">{estado.schemaId}</div>
+                  </div>
+                  <div className="flex flex-col gap-[5px] min-w-0">
+                    <div className={ROTULO}>Base URL</div>
+                    <div className="text-[14px] font-semibold truncate" title={estado.baseUrl}>
+                      {estado.baseUrl}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Señal temprana (agregado 20/8/2026): renovaciones que
+                fallaron en las últimas 24hs pero sin cortar el sync
+                todavía, porque el token guardado alcanzaba. Antes de
+                yiqi_token_eventos esto se perdía en logs efímeros --
+                ahora queda visible acá aunque arriba diga "Conectado". */}
+            {diagnostico && Number(diagnostico.fallos_recuperables_24h) > 0 && (
+              <BloqueAccion
+                tono="amarillo"
+                titulo={
+                  <span className="inline-flex items-center gap-1.5">
+                    <i className="ti ti-alert-triangle text-[14px]" />
+                    {diagnostico.fallos_recuperables_24h} renovación(es) de token fallaron en las últimas 24hs
+                  </span>
+                }
+              >
                 No cortó el sync porque el token guardado todavía alcanzaba, pero es la misma falla que termina en
                 "Sin conexión" si se repite. Último intento fallido: {formatoFechaHora(diagnostico.ultimo_evento_en)}.
-              </p>
-            </div>
-          )}
+              </BloqueAccion>
+            )}
 
-          {estado.conectado && (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-white rounded-xl border border-[var(--border)] p-4">
-                <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">
-                  Última sincronización
-                </div>
-                <div className="text-sm font-semibold">{formatoFechaHora(estado.ultimaSync)}</div>
+            {/* Entidades permitidas */}
+            <div className="seccion">
+              <div className="seccion-titulo flex items-center gap-2">
+                <i className="ti ti-api text-[var(--ind)] text-[15px]" />
+                Entidades habilitadas para consultar
               </div>
-              <div className="bg-white rounded-xl border border-[var(--border)] p-4">
-                <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Schema</div>
-                <div className="text-sm font-semibold">{estado.schemaId}</div>
-              </div>
-              <div className="bg-white rounded-xl border border-[var(--border)] p-4">
-                <div className="text-[10px] text-[var(--sub)] uppercase tracking-wide mb-1">Base URL</div>
-                <div className="text-sm font-semibold truncate" title={estado.baseUrl}>
-                  {estado.baseUrl}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {(estado.entidadesPermitidas ?? []).map((e) => (
+                  <span key={e} className="badge bg-[#f3f4f6] text-[#374151] font-mono">
+                    {e}
+                  </span>
+                ))}
               </div>
             </div>
-          )}
 
-          {/* Entidades permitidas */}
-          <div className="bg-white rounded-xl border border-[var(--border)] p-5">
-            <div className="text-[13px] font-bold mb-3">Entidades habilitadas para consultar</div>
-            <div className="flex flex-wrap gap-2">
-              {(estado.entidadesPermitidas ?? []).map((e) => (
-                <span
-                  key={e}
-                  className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-mono"
-                >
-                  {e}
+            {/* Smarties conocidas (referencia fija, no viene de la API) */}
+            <div className="seccion">
+              <div className="seccion-titulo flex items-center gap-2" style={{ marginBottom: 14 }}>
+                <i className="ti ti-database text-[var(--ind)] text-[15px]" />
+                Smarties configuradas en YiQi
+              </div>
+              <div className="tw">
+                <table className="tabla">
+                  <thead>
+                    <tr>
+                      <th>Nombre en YiQi</th>
+                      <th>Entidad</th>
+                      <th>smartieId</th>
+                      <th>Uso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="sku">API_Articulos_Stock NO BORRAR</td>
+                      <td className="sku">MATERIAL</td>
+                      <td className="font-semibold">2344</td>
+                      <td className="text-[12px] text-[var(--sub)]">Monitor de Stock, Alertas, Proveedores, Usuarios y accesos</td>
+                    </tr>
+                    <tr>
+                      <td className="sku">API_OC_Recientes NO BORRAR</td>
+                      <td className="sku">REPORTE_DE_OC</td>
+                      <td className="font-semibold">2345</td>
+                      <td className="text-[12px] text-[var(--sub)]">Seguimiento de OC, Historial de OC, Órdenes de compra</td>
+                    </tr>
+                    <tr>
+                      <td className="sku">API_Proveedores_Activos NO BORRAR</td>
+                      <td className="sku">CLIENTE</td>
+                      <td className="font-semibold">2346</td>
+                      <td className="text-[12px] text-[var(--sub)]">Proveedores (datos de contacto)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="text-[11px] text-[var(--sub)] mt-2.5 flex items-start gap-1.5">
+                <i className="ti ti-bulb text-[13px] mt-px" />
+                <span>
+                  Renombrar una smartie en YiQi cambia su smartieId — si alguien renombra alguna de estas, hay que
+                  actualizar el código con el nuevo ID (ver hover sobre la pestaña en YiQi).
                 </span>
-              ))}
+              </div>
             </div>
-          </div>
-
-          {/* Smarties conocidas (referencia fija, no viene de la API) */}
-          <div className="bg-white rounded-xl border border-[var(--border)] p-5">
-            <div className="text-[13px] font-bold mb-3">Smarties configuradas en YiQi</div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-400 text-[11px] uppercase">
-                  <th className="py-1.5">Nombre en YiQi</th>
-                  <th className="py-1.5">Entidad</th>
-                  <th className="py-1.5">smartieId</th>
-                  <th className="py-1.5">Uso</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t border-gray-100">
-                  <td className="py-1.5 font-mono text-xs">API_Articulos_Stock NO BORRAR</td>
-                  <td className="py-1.5 font-mono text-xs">MATERIAL</td>
-                  <td className="py-1.5">2344</td>
-                  <td className="py-1.5 text-gray-500">Monitor de Stock, Alertas, Proveedores, Usuarios y accesos</td>
-                </tr>
-                <tr className="border-t border-gray-100">
-                  <td className="py-1.5 font-mono text-xs">API_OC_Recientes NO BORRAR</td>
-                  <td className="py-1.5 font-mono text-xs">REPORTE_DE_OC</td>
-                  <td className="py-1.5">2345</td>
-                  <td className="py-1.5 text-gray-500">Seguimiento de OC, Historial de OC, Órdenes de compra</td>
-                </tr>
-                <tr className="border-t border-gray-100">
-                  <td className="py-1.5 font-mono text-xs">API_Proveedores_Activos NO BORRAR</td>
-                  <td className="py-1.5 font-mono text-xs">CLIENTE</td>
-                  <td className="py-1.5">2346</td>
-                  <td className="py-1.5 text-gray-500">Proveedores (datos de contacto)</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="text-[11px] text-gray-400 px-1">
-            💡 Renombrar una smartie en YiQi cambia su smartieId — si alguien renombra alguna de estas, hay que
-            actualizar el código con el nuevo ID (ver hover sobre la pestaña en YiQi).
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </div>
     </div>
   )
 }

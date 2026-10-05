@@ -4,6 +4,7 @@ import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import OrdenesPropias from '../components/OrdenesPropias'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
+import Pastilla from '../components/ui/Pastilla'
 // ============================================================
 // OrdenesCompra.jsx — v3
 // v2: leia de la tabla propia ordenes_yiqi en vez de YiQi en vivo.
@@ -104,40 +105,45 @@ function calcularEstado(orden) {
 }
 function DetalleOrden({ orden }) {
   return (
-    <div className="px-4 py-3 bg-gray-50">
-      <table className="w-full text-[13px]">
-        <thead>
-          <tr className="text-left text-gray-400 text-[11px] uppercase">
-            <th className="py-1.5 px-2">SKU</th>
-            <th className="py-1.5 px-2">Artículo</th>
-            <th className="py-1.5 px-2">Cantidad</th>
-            <th className="py-1.5 px-2">Entregado</th>
-            <th className="py-1.5 px-2">Pendiente</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orden.lineas.map((l, i) => {
-            const pend = l.pendiente ?? 0
-            return (
-              <tr key={i} className={pend > 0 ? 'bg-yellow-50' : ''}>
-                <td className="py-1.5 px-2 font-mono text-xs">{l.sku ?? '—'}</td>
-                <td className="py-1.5 px-2 font-medium">{l.nombreArticulo ?? '—'}</td>
-                <td className="py-1.5 px-2">{l.cantidad}</td>
-                <td className="py-1.5 px-2 text-[var(--grn)] font-semibold">{l.entregada}</td>
-                <td className={`py-1.5 px-2 font-semibold ${pend > 0 ? 'text-[var(--red)]' : 'text-gray-300'}`}>
-                  {pend > 0 ? pend : '—'}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      <div className="mt-3 text-[11px] text-amber-600">
-        ⚠ "Editar OC" y "Enviar OC" todavía no están disponibles — el sistema es solo lectura contra YiQi (Sprint 2 pendiente).
+    <div className="px-5 py-4 bg-[#fafafa]">
+      <div className="tw">
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Artículo</th>
+              <th>Cantidad</th>
+              <th>Entregado</th>
+              <th>Pendiente</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orden.lineas.map((l, i) => {
+              const pend = l.pendiente ?? 0
+              return (
+                <tr key={i} className={pend > 0 ? 'bg-yellow-50' : ''}>
+                  <td className="sku">{l.sku ?? '—'}</td>
+                  <td className="font-semibold">{l.nombreArticulo ?? '—'}</td>
+                  <td className="tabular-nums">{l.cantidad}</td>
+                  <td className="text-[var(--grn)] font-semibold tabular-nums">{l.entregada}</td>
+                  <td className={`font-semibold tabular-nums ${pend > 0 ? 'text-[var(--red)]' : 'text-gray-300'}`}>
+                    {pend > 0 ? pend : '—'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3 text-[11px] text-[#92400e] flex items-center gap-1.5">
+        <i className="ti ti-alert-triangle text-[13px]" aria-hidden="true" />
+        "Editar OC" y "Enviar OC" todavía no están disponibles — el sistema es solo lectura contra YiQi (Sprint 2 pendiente).
       </div>
     </div>
   )
 }
+// Tono de la pastilla según el estado calculado (solo presentación).
+const TONO_ESTADO_YIQI = { completada: 'verde', parcial: 'amarillo', enviada: 'gris' }
 export default function OrdenesCompra({ onCambioOrdenes }) {
   const permisos = usePermisos()
   const [ordenSola] = useState(() => {
@@ -203,7 +209,7 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
     return (
       <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
         <EncabezadoPagina titulo={`Orden #${ordenSola}`} bajada="Detalle de una orden generada desde el sistema">
-          <a href="?page=ocs" className="btn btn-sm">← Todas las órdenes</a>
+          <a href="?page=ocs" className="btn btn-sm"><i className="ti ti-arrow-left" aria-hidden="true" /> Todas las órdenes</a>
         </EncabezadoPagina>
         <OrdenesPropias onCambio={onCambioOrdenes} soloOrdenId={ordenSola} />
       </div>
@@ -212,29 +218,25 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[17px] font-bold">Órdenes de compra</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5">
-            {cargandoAlgo
-              ? 'Cargando…'
-              : `${ordenes.length} OC activas (no completadas) · ${totalPendienteGeneral} unidades pendientes en total`}
-          </div>
-        </div>
-        <button
-          onClick={cargarDatos}
-          disabled={cargandoAlgo}
-          className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
-        >
-          {cargandoAlgo ? 'Actualizando…' : '↻ Actualizar'}
+      {/* Header (prototipo v7 .ph) */}
+      <EncabezadoPagina
+        titulo="Órdenes de compra"
+        bajada={
+          cargandoAlgo
+            ? 'Cargando…'
+            : `${ordenes.length} OC activas (no completadas) · ${totalPendienteGeneral} unidades pendientes en total`
+        }
+      >
+        <button onClick={cargarDatos} disabled={cargandoAlgo} className="btn btn-sm">
+          <i className={`ti ti-refresh ${cargandoAlgo ? 'animate-spin' : ''}`} aria-hidden="true" />
+          {cargandoAlgo ? 'Actualizando…' : 'Actualizar'}
         </button>
-      </div>
+      </EncabezadoPagina>
       {/* Error de permisos: falla cerrado, no se muestra ningun dato */}
       {permisos.error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
-          <p className="font-semibold">No se pudieron determinar tus permisos</p>
-          <p className="text-sm mt-1">{permisos.error}</p>
+        <div className="mx-7 mt-4 bloque bloque-rojo">
+          <p className="font-semibold text-[13px]">No se pudieron determinar tus permisos</p>
+          <p className="text-[13px] mt-1">{permisos.error}</p>
           <p className="text-xs mt-2 text-gray-500">
             Por seguridad no se muestra ningún dato hasta resolverlo.
           </p>
@@ -242,11 +244,11 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
       )}
       {/* Error de datos */}
       {error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
-          <p className="font-semibold">No se pudo cargar Órdenes de compra</p>
-          <p className="text-sm mt-1">{error}</p>
-          <button onClick={cargarDatos} className="mt-2 text-sm underline">
-            Reintentar
+        <div className="mx-7 mt-4 bloque bloque-rojo">
+          <p className="font-semibold text-[13px]">No se pudo cargar Órdenes de compra</p>
+          <p className="text-[13px] mt-1">{error}</p>
+          <button onClick={cargarDatos} className="btn btn-sm mt-2">
+            <i className="ti ti-refresh" aria-hidden="true" /> Reintentar
           </button>
         </div>
       )}
@@ -257,7 +259,7 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
       <OrdenesPropias onCambio={onCambioOrdenes} />
       {/* Aviso de vista filtrada (solo operadores) */}
       {vistaFiltrada && (
-        <Aviso tipo="filtro" autoCerrarEn={15} className="mx-4 mt-4">
+        <Aviso tipo="filtro" autoCerrarEn={15} className="mx-7 mt-4">
           Vista filtrada: solo se muestran las OC de tus {permisos.nombres.length} proveedores asignados. Si un
           proveedor tuyo no tiene ninguna OC cargada, simplemente no aparece acá.
         </Aviso>
@@ -267,44 +269,45 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
           propias" que se renderiza justo antes -- son cosas distintas
           y el layout no lo dejaba claro. Se agrega un título propio acá
           para que quede a la vista a qué tabla corresponde el resumen. */}
-      <div className="px-4 pt-5 pb-1">
-        <div className="text-[13px] font-bold text-gray-700">Todas las OC sincronizadas desde YiQi</div>
-        <div className="text-[11px] text-gray-400 mt-0.5">
+      <div className="px-7 pt-5 pb-1">
+        <div className="text-[15px] font-bold text-[var(--text)]">Todas las OC sincronizadas desde YiQi</div>
+        <div className="text-[12px] text-[var(--sub)] mt-[3px]">
           Es la tabla a la que corresponde el resumen de arriba. Distinto de "Órdenes propias" (sección de arriba),
           que son las que se generan y aprueban desde este sistema.
         </div>
       </div>
 
       {/* Buscador */}
-      <div className="px-4 pt-2 pb-2 flex items-center justify-between gap-3">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por Nro OC, proveedor o asunto…"
-          className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
-        />
-        <span className="text-[11px] text-gray-400">💡 Click en una OC para ver el detalle (Ver detalle).</span>
+      <div className="px-7 pt-3 pb-1 flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative flex-1 max-w-sm">
+          <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sub)] text-[15px]" aria-hidden="true" />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por Nro OC, proveedor o asunto…"
+            className="w-full bg-white border border-[var(--border)] rounded-lg pl-9 pr-3 py-2 text-[13px]"
+          />
+        </div>
+        <span className="text-[11px] text-[var(--sub)] flex items-center gap-1">
+          <i className="ti ti-info-circle text-[13px]" aria-hidden="true" />
+          Click en una OC para ver el detalle (Ver detalle).
+        </span>
       </div>
       {/* Tabla */}
-      <div className="mx-4 mt-2 mb-6 bg-white rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="mx-7 mt-3 mb-7 tw">
         {cargandoAlgo && ordenes.length === 0 ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">Cargando órdenes activas…</div>
+          <div className="p-8 text-center text-[var(--sub)] text-[13px]">Cargando órdenes activas…</div>
         ) : ordenesFiltradas.length === 0 ? (
-          <div className="p-8 text-center text-[var(--sub)] text-sm">
+          <div className="p-8 text-center text-[var(--sub)] text-[13px]">
             No hay órdenes activas que coincidan con la búsqueda. 🎉
           </div>
         ) : (
-          <table className="w-full border-collapse">
+          <table className="tabla">
             <thead>
-              <tr className="bg-gray-50 border-b border-[var(--border)]">
+              <tr>
                 {['Nro OC', 'Proveedor', 'Fecha', 'Asunto', 'Total', 'Estado', ''].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"
-                  >
-                    {h}
-                  </th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -313,27 +316,26 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
                 <Fragment key={o.nroOC}>
                   <tr
                     onClick={() => toggleOrden(o.nroOC)}
-                    className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer ${
-                      ordenExpandida === o.nroOC ? 'bg-indigo-50/50' : ''
-                    }`}
+                    className={`cursor-pointer ${ordenExpandida === o.nroOC ? 'bg-indigo-50/50' : ''}`}
                   >
-                    <td className="px-3.5 py-1.5 font-mono text-xs">#{o.nroOC}</td>
-                    <td className="px-3.5 py-1.5 font-semibold">{o.proveedor}</td>
-                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(o.fecha)}</td>
-                    <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{o.asunto ?? '—'}</td>
-                    <td className="px-3.5 py-1.5 font-semibold">{formatoMoneda(o.total)}</td>
-                    <td className="px-3.5 py-1.5">
-                      <span
-                        className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${o._estado.clase}`}
-                      >
-                        {o._estado.label}
+                    <td className="sku">#{o.nroOC}</td>
+                    <td className="font-semibold">{o.proveedor}</td>
+                    <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap">{formatoFecha(o.fecha)}</td>
+                    <td className="text-[var(--sub)] text-[12px]!">{o.asunto ?? '—'}</td>
+                    <td className="font-semibold tabular-nums whitespace-nowrap">{formatoMoneda(o.total)}</td>
+                    <td>
+                      <Pastilla tono={TONO_ESTADO_YIQI[o._estado.key] ?? 'gris'}>{o._estado.label}</Pastilla>
+                    </td>
+                    <td className="text-right">
+                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--ind)] whitespace-nowrap">
+                        <i className={`ti ${ordenExpandida === o.nroOC ? 'ti-chevron-up' : 'ti-eye'} text-[14px]`} aria-hidden="true" />
+                        Ver detalle
                       </span>
                     </td>
-                    <td className="px-3.5 py-1.5 text-sm text-[var(--ind)]">Ver detalle</td>
                   </tr>
                   {ordenExpandida === o.nroOC && (
                     <tr>
-                      <td colSpan={7} className="p-0">
+                      <td colSpan={7} className="p-0!">
                         <DetalleOrden orden={o} />
                       </td>
                     </tr>

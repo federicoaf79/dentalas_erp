@@ -26,44 +26,44 @@ import CambiarMiPassword from './CambiarMiPassword'
 // depósito (AppDeposito.jsx); Aris/Ivana quedan con la vista de
 // supervisión de abajo, solo lectura.
 const NAV_STOCK = [
-  { key: 'stock', label: 'Monitor de stock', icon: '📦' },
+  { key: 'stock', label: 'Monitor de stock', icon: 'ti-package' },
   // 7/9/2026: vista de supervisión (solo lectura) del circuito nuevo
   // Central<->Local — las acciones viven en las cuentas de depósito
   // (AppDeposito.jsx), acá se ve el historial completo de los dos
   // circuitos. Gate real de admin adentro de la pantalla misma, mismo
   // patrón que "Usuarios y accesos".
-  { key: 'reposicion-central-local', label: 'Reposición Central-Local', icon: '🏭' },
+  { key: 'reposicion-central-local', label: 'Reposición Central-Local', icon: 'ti-building-warehouse' },
 ]
 
 const NAV_COMPRAS = [
-  { key: 'alertas', label: 'Alertas', icon: '🔔' },
-  { key: 'nueva-oc', label: 'Nueva OC', icon: '📝' },
-  { key: 'ocs', label: 'Órdenes de compra', icon: '📋' },
-  { key: 'seguimiento', label: 'Seguimiento de OC', icon: '🔄' },
-  { key: 'historial', label: 'Historial de OC', icon: '🕐' },
-  { key: 'precios', label: 'Comparar precios', icon: '💲' },
-  { key: 'equivalencias', label: 'Revisar equivalencias', icon: '🔗' },
+  { key: 'alertas', label: 'Alertas', icon: 'ti-bell' },
+  { key: 'nueva-oc', label: 'Nueva OC', icon: 'ti-file-plus' },
+  { key: 'ocs', label: 'Órdenes de compra', icon: 'ti-clipboard-list' },
+  { key: 'seguimiento', label: 'Seguimiento de OC', icon: 'ti-route' },
+  { key: 'historial', label: 'Historial de OC', icon: 'ti-history' },
+  { key: 'precios', label: 'Comparar precios', icon: 'ti-currency-dollar' },
+  { key: 'equivalencias', label: 'Revisar equivalencias', icon: 'ti-link' },
 ]
 
 const NAV_INTELIGENCIA = [
-  { key: 'predictor', label: 'Predictor de demanda', icon: '📈' },
+  { key: 'predictor', label: 'Predictor de demanda', icon: 'ti-chart-line' },
 ]
 
 const NAV_CONFIG = [
-  { key: 'empresa', label: 'Datos de la empresa', icon: '🏢' },
-  { key: 'proveedores', label: 'Proveedores', icon: '🏬' },
-  { key: 'condiciones', label: 'Condiciones comerciales', icon: '🤝' },
-  { key: 'usuarios', label: 'Usuarios y accesos', icon: '👥' },
-  { key: 'causas', label: 'Catálogo de causas', icon: '🏷️' },
+  { key: 'empresa', label: 'Datos de la empresa', icon: 'ti-building' },
+  { key: 'proveedores', label: 'Proveedores', icon: 'ti-building-store' },
+  { key: 'condiciones', label: 'Condiciones comerciales', icon: 'ti-file-certificate' },
+  { key: 'usuarios', label: 'Usuarios y accesos', icon: 'ti-users' },
+  { key: 'causas', label: 'Catálogo de causas', icon: 'ti-tags' },
   // 7/9/2026 (auditoría de usabilidad, U-3): se llamaba "Reglas y
   // alertas", nombre que se pisa con la pantalla "Alertas" de más
   // arriba sin ser lo mismo — acá se configuran límites de aprobación
   // y cobertura de reposición, no los umbrales de Mín./Máx./Stock
   // Seguridad que se ven en Alertas. La key ('reglas') y el archivo
   // (ReglasAlertas.jsx) no cambian, solo el rótulo visible.
-  { key: 'reglas', label: 'Reglas de compra y aprobación', icon: '⚙️' },
-  { key: 'templates', label: 'Templates de mensajes', icon: '💬' },
-  { key: 'yiqi', label: 'Conector YiQi', icon: '🔌' },
+  { key: 'reglas', label: 'Reglas de compra y aprobación', icon: 'ti-adjustments' },
+  { key: 'templates', label: 'Templates de mensajes', icon: 'ti-message' },
+  { key: 'yiqi', label: 'Conector YiQi', icon: 'ti-plug-connected' },
 ]
 
 // ------------------------------------------------------------
@@ -85,14 +85,15 @@ function NavItem({ item, active, onClick, badges }) {
   return (
     <div
       onClick={() => onClick(item.key)}
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-[13px] mb-0.5 select-none transition-colors
+      className={`flex items-center gap-[9px] px-2.5 py-[9px] rounded-lg cursor-pointer text-[13px] mb-0.5 select-none transition-colors
         ${active
           ? 'bg-[var(--ind-bg)] text-[var(--ind)] font-bold'
           : 'text-gray-700 hover:bg-[var(--ind-bg)]'
         }`}
     >
-      <span className="text-[15px] flex-shrink-0">{item.icon}</span>
-      <span className="flex-1">{item.label}</span>
+      {/* 5/10/2026: íconos de línea Tabler, iguales al prototipo v7 (antes emojis). */}
+      <i className={`ti ${item.icon} text-[16px] flex-shrink-0`} aria-hidden="true" />
+      <span className="flex-1 truncate">{item.label}</span>
       {badges && <div className="flex gap-1 items-center">{badges}</div>}
     </div>
   )
@@ -100,7 +101,7 @@ function NavItem({ item, active, onClick, badges }) {
 
 function NavSection({ title }) {
   return (
-    <div className="text-[10px] text-gray-400 uppercase tracking-wider px-2.5 pt-3 pb-1">
+    <div className="text-[10px] text-gray-400 uppercase tracking-[.08em] px-2.5 pt-3.5 pb-1">
       {title}
     </div>
   )
@@ -191,8 +192,9 @@ export default function Sidebar({
 
   return (
     <aside className="w-[228px] bg-white border-r border-[var(--border)] flex flex-col flex-shrink-0 h-screen">
-      <div className="px-3.5 pt-3.5 pb-3 border-b border-[var(--border)]">
+      <div className="px-[18px] pt-5 pb-3.5 border-b border-[var(--border)]">
         <div className="text-[15px] font-bold">🦷 Dentalab</div>
+        <div className="text-[11px] text-[var(--sub)] mt-0.5">Gestión de compras</div>
         {yiqiHayAviso ? (
           <div
             onClick={() => onNavigate('yiqi')}
@@ -214,7 +216,7 @@ export default function Sidebar({
         )}
       </div>
 
-      <nav className="px-1.5 py-1.5 flex-1 overflow-y-auto">
+      <nav className="px-2 py-2.5 flex-1 overflow-y-auto">
         <NavSection title="Stock" />
         {renderGrupo(NAV_STOCK)}
 
@@ -232,12 +234,12 @@ export default function Sidebar({
           vista sin tener que bajar por los 4 módulos. Usa el mismo
           NavItem/onNavigate que el resto — abre la pantalla Ayuda.jsx
           como una página más, no un modal. */}
-      <div className="px-1.5 pt-1.5 pb-1 border-t border-[var(--border)]">
-        <NavItem item={{ key: 'ayuda', icon: '❓', label: 'Ayuda' }} active={currentPage === 'ayuda'} onClick={onNavigate} />
+      <div className="px-2 pt-1.5 pb-1 border-t border-[var(--border)]">
+        <NavItem item={{ key: 'ayuda', icon: 'ti-help-circle', label: 'Ayuda' }} active={currentPage === 'ayuda'} onClick={onNavigate} />
       </div>
 
       <div className="p-3 border-t border-[var(--border)] flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-full bg-[var(--ind-bg)] flex items-center justify-center text-[11px] font-bold text-[var(--ind)] flex-shrink-0 uppercase">
+        <div className="w-[34px] h-[34px] rounded-full bg-[var(--ind-bg)] flex items-center justify-center text-[12px] font-bold text-[var(--ind)] flex-shrink-0 uppercase">
           {nombreUsuario.slice(0, 2)}
         </div>
         <div className="flex-1 min-w-0">

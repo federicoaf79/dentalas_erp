@@ -10,6 +10,7 @@ import { aplicarFiltroProveedor, FILTRO_PROVEEDOR_INICIAL } from '../lib/filtroP
 import { TONO_DE_COLOR } from '../lib/estados'
 import FiltroProveedor from '../components/FiltroProveedor'
 import BarraMinStockMax from '../components/BarraMinStockMax'
+import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 
 // ============================================================
 // Alertas.jsx — v7
@@ -576,28 +577,68 @@ export default function Alertas({ onArmarOC }) {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[17px] font-bold">Alertas</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5">
-            {cargandoAlgo
-              ? 'Cargando…'
-              : `${criticas} críticas · ${preventivas} preventivas · sincronizado ${formatoFechaHora(ultimaSync)}`}
-          </div>
-        </div>
-        <button
-          onClick={cargarDatos}
-          disabled={cargandoAlgo}
-          className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
-        >
-          {cargandoAlgo ? 'Actualizando…' : '↻ Actualizar'}
+      {/* Header (prototipo v7 .ph). El cartel azul "Criterio de alerta…"
+          pasó al "ⓘ" del encabezado, con el texto completo. */}
+      <EncabezadoPagina
+        titulo="Alertas"
+        bajada={
+          cargandoAlgo
+            ? 'Cargando…'
+            : `${criticas} críticas · ${preventivas} preventivas · sincronizado ${formatoFechaHora(ultimaSync)}`
+        }
+        info={
+          <>
+            Criterio de alerta: se respeta el Punto de pedido cuando Dentalab lo cargó manualmente; si no, se usa
+            Stock Seguridad como umbral temporal. Datos sincronizados desde YiQi cada 15 minutos. No se muestran
+            alertas de SKU administrativos, publicaciones de Mercado Libre, artículos discontinuados ni producción
+            propia. Los artículos excluidos o pausados manualmente tampoco se cuentan acá.
+          </>
+        }
+      >
+        <button onClick={cargarDatos} disabled={cargandoAlgo} className="btn btn-sm">
+          <i className="ti ti-refresh" />
+          {cargandoAlgo ? 'Actualizando…' : 'Actualizar'}
         </button>
-      </div>
+      </EncabezadoPagina>
+
+      <div className="pagina">
+      {/* Resumen (prototipo v7 .metrics) -- solo números que esta
+          pantalla ya calcula: críticas, preventivas, pausadas y
+          excluidos (este último solo admin, igual que su pestaña). */}
+      {!permisos.error && (
+        <div className="metricas mb-5">
+          <div className="metrica">
+            <div className="metrica-rot">Preventivas</div>
+            <div className="metrica-val text-[#b8860b]">{cargandoAlgo ? '—' : preventivas}</div>
+            <div className="metrica-sub">tiempo para actuar</div>
+          </div>
+          <div className="metrica">
+            <div className="metrica-rot">Críticas</div>
+            <div className="metrica-val text-[var(--red)]">{cargandoAlgo ? '—' : criticas}</div>
+            <div className="metrica-sub">acción inmediata</div>
+          </div>
+          <div className="metrica">
+            <div className="metrica-rot">Pausadas</div>
+            <div className="metrica-val text-[var(--ind)]">{cargandoAlgo ? '—' : pausadas.length}</div>
+            <div className="metrica-sub">
+              {pausasVencidas.length > 0
+                ? `${pausasVencidas.length} vencida${pausasVencidas.length === 1 ? '' : 's'} · ya vuelven a contar`
+                : 'por 15 días'}
+            </div>
+          </div>
+          {permisos.esAdmin && (
+            <div className="metrica">
+              <div className="metrica-rot">Excluidos</div>
+              <div className="metrica-val text-[var(--text)]">{cargandoAlgo ? '—' : excluidos.length}</div>
+              <div className="metrica-sub">permanentes</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Error de permisos: falla cerrado, no se muestra ningun dato */}
       {permisos.error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
+        <div className="mb-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
           <p className="font-semibold">No se pudieron determinar tus permisos</p>
           <p className="text-sm mt-1">{permisos.error}</p>
           <p className="text-xs mt-2 text-gray-500">
@@ -608,7 +649,7 @@ export default function Alertas({ onArmarOC }) {
 
       {/* Error de datos */}
       {error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
+        <div className="mb-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
           <p className="font-semibold">No se pudo cargar Alertas</p>
           <p className="text-sm mt-1">{error}</p>
           <button onClick={cargarDatos} className="mt-2 text-sm underline">
@@ -619,23 +660,20 @@ export default function Alertas({ onArmarOC }) {
 
       {/* Aviso de una acción de exclusión/pausa (excluir/pausar/restaurar/reactivar) */}
       {aviso && (
-        <div className="mx-4 mt-4 bg-[var(--grn-bg,#dcfce7)] border border-green-200 text-[var(--grn,#3d9970)] rounded-lg px-4 py-2.5 text-[13px] flex items-center justify-between">
-          <span>{aviso}</span>
-          <button onClick={() => setAviso(null)} className="opacity-60 hover:opacity-100 px-1">×</button>
+        <div className="mb-4 bg-[var(--grn-bg,#dcfce7)] border border-[var(--grn-bd,#bbf7d0)] text-[var(--grn,#3d9970)] rounded-[10px] px-4 py-2.5 text-[13px] flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <i className="ti ti-check" />
+            {aviso}
+          </span>
+          <button onClick={() => setAviso(null)} className="opacity-60 hover:opacity-100 px-1" title="Cerrar">
+            <i className="ti ti-x" />
+          </button>
         </div>
       )}
 
-      {/* Nota de criterio */}
-      <Aviso tipo="info" id="alertas-criterio" className="mx-4 mt-4">
-        Criterio de alerta: se respeta el Punto de pedido cuando Dentalab lo cargó manualmente; si no, se usa
-        Stock Seguridad como umbral temporal. Datos sincronizados desde YiQi cada 15 minutos. No se muestran
-        alertas de SKU administrativos, publicaciones de Mercado Libre, artículos discontinuados ni producción
-        propia. Los artículos excluidos o pausados manualmente tampoco se cuentan acá.
-      </Aviso>
-
       {/* Aviso de vista filtrada (solo operadores) */}
       {!permisos.cargando && !permisos.error && !permisos.esAdmin && (
-        <Aviso tipo="filtro" autoCerrarEn={15} className="mx-4 mt-2">
+        <Aviso tipo="filtro" autoCerrarEn={15} className="mb-3">
           Vista filtrada: estás viendo únicamente los {permisos.nombres.length} proveedores asignados a tu
           usuario. Si falta alguno, pedile a Aris que te lo asigne en “Usuarios y accesos”.
         </Aviso>
@@ -643,7 +681,7 @@ export default function Alertas({ onArmarOC }) {
 
       {/* Aviso activo: pausas vencidas que necesitan revisión */}
       {vista !== 'pausadas' && pausasVencidas.length > 0 && (
-        <Aviso tipo="filtro" className="mx-4 mt-2">
+        <Aviso tipo="filtro" className="mb-3">
           {pausasVencidas.length === 1
             ? '1 alerta pausada venció'
             : `${pausasVencidas.length} alertas pausadas vencieron`}{' '}
@@ -655,7 +693,7 @@ export default function Alertas({ onArmarOC }) {
       )}
 
       {/* Pestañas: Alertas / Excluidos (admin) / Pausadas */}
-      <div className="px-4 pt-4 flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {[
           { key: 'alertas', label: `Alertas (${criticas + preventivas})` },
           ...(permisos.esAdmin ? [{ key: 'excluidos', label: `Excluidos (${excluidos.length})` }] : []),
@@ -670,11 +708,7 @@ export default function Alertas({ onArmarOC }) {
           <button
             key={f.key}
             onClick={() => setVista(f.key)}
-            className={`px-3 py-1.5 rounded-full text-sm border ${
-              vista === f.key
-                ? 'bg-[var(--ind,#4338ca)] text-white border-[var(--ind,#4338ca)]'
-                : 'bg-white text-gray-600 border-gray-200'
-            }`}
+            className={`chip ${vista === f.key ? 'chip-on' : ''}`}
           >
             {f.label}
           </button>
@@ -684,7 +718,7 @@ export default function Alertas({ onArmarOC }) {
       {vista === 'alertas' && (
         <>
           {/* Filtros por nivel */}
-          <div className="px-4 pt-3 flex items-center gap-2">
+          <div className="pt-3 flex items-center gap-2 flex-wrap">
             {[
               { key: 'todas', label: `Todas (${criticas + preventivas})` },
               { key: 'critica', label: `Críticas (${criticas})` },
@@ -693,11 +727,7 @@ export default function Alertas({ onArmarOC }) {
               <button
                 key={f.key}
                 onClick={() => setFiltroNivel(f.key)}
-                className={`px-3 py-1.5 rounded-full text-sm border ${
-                  filtroNivel === f.key
-                    ? 'bg-[var(--ind)] text-white border-[var(--ind)]'
-                    : 'bg-white text-gray-600 border-gray-200'
-                }`}
+                className={`chip ${filtroNivel === f.key ? 'chip-on' : ''}`}
               >
                 {f.label}
               </button>
@@ -705,15 +735,18 @@ export default function Alertas({ onArmarOC }) {
           </div>
 
           {/* Buscador, filtro de proveedor y filas por página */}
-          <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-3 flex-wrap">
+          <div className="pt-3 pb-3 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <input
-                type="text"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar por SKU, nombre o proveedor…"
-                className="flex-1 max-w-sm border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
-              />
+              <div className="relative flex-1 max-w-sm">
+                <i className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[15px] text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar por SKU, nombre o proveedor…"
+                  className="w-full bg-white border border-[var(--border)] rounded-lg pl-9 pr-3 py-2 text-[13px]"
+                />
+              </div>
               <FiltroProveedor
                 proveedoresDisponibles={proveedoresDisponibles}
                 valor={filtroProveedor}
@@ -721,12 +754,12 @@ export default function Alertas({ onArmarOC }) {
                 permitirSinProveedor={false}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm text-gray-500">
+            <label className="flex items-center gap-2 text-[12px] text-[var(--sub)]">
               Filas por página
               <select
                 value={filasPorPagina}
                 onChange={(e) => setFilasPorPagina(Number(e.target.value))}
-                className="border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm"
+                className="bg-white border border-[var(--border)] rounded-lg px-2 py-1.5 text-[13px]"
               >
                 {[25, 50, 100, 200].map((n) => (
                   <option key={n} value={n}>{n}</option>
@@ -736,7 +769,7 @@ export default function Alertas({ onArmarOC }) {
           </div>
 
           {/* Tabla */}
-          <div className="mx-4 mb-2 bg-white rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="tw mb-3">
             {cargandoAlgo && articulos.length === 0 ? (
               <div className="p-8 text-center text-[var(--sub)] text-sm">Cargando artículos en alerta…</div>
             ) : filasPaginadas.length === 0 ? (
@@ -744,9 +777,10 @@ export default function Alertas({ onArmarOC }) {
                 No hay artículos en alerta que coincidan con los filtros. 🎉
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="tabla">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-[var(--border)]">
+                  <tr>
                     {[
                       { label: 'SKU', columna: 'sku' },
                       { label: 'Producto', columna: 'producto' },
@@ -764,9 +798,7 @@ export default function Alertas({ onArmarOC }) {
                       <th
                         key={label || 'acciones'}
                         onClick={columna ? () => alHacerClickColumna(columna) : undefined}
-                        className={`text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide whitespace-nowrap ${
-                          columna ? 'cursor-pointer select-none hover:text-gray-700' : ''
-                        }`}
+                        className={columna ? 'cursor-pointer select-none hover:text-gray-700' : undefined}
                         title={columna ? 'Ordenar por esta columna' : undefined}
                       >
                         {label}
@@ -777,16 +809,16 @@ export default function Alertas({ onArmarOC }) {
                 </thead>
                 <tbody>
                   {filasPaginadas.map((a) => (
-                    <tr key={a.yiqi_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                      <td className="px-3.5 py-1.5 font-mono text-xs">{a.mate_codigo}</td>
-                      <td className="px-3.5 py-1.5 font-semibold"><div className="min-w-[240px]">{a.mate_nombre}</div></td>
-                      <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{a.clie_nombre ?? '—'}</td>
+                    <tr key={a.yiqi_id} className={a._alerta.nivel === 'critica' ? 'bg-[#fdf2f2]' : undefined}>
+                      <td className="sku whitespace-nowrap">{a.mate_codigo}</td>
+                      <td className="font-semibold"><div className="min-w-[240px]">{a.mate_nombre}</div></td>
+                      <td className="text-[var(--sub)] text-[12px]">{a.clie_nombre ?? '—'}</td>
                       {/* Punto 3 (28/9/2026): gráfico en vez de 3 columnas numéricas
                           sueltas (Stock/Mín./Máx.) -- ver components/BarraMinStockMax.jsx.
                           El umbral que se grafica como "Mín." es el mismo que decide la
                           alerta (Punto de pedido si existe, si no Stock Seguridad como
                           respaldo -- igual criterio que calcularAlerta más arriba). */}
-                      <td className="px-3.5 py-1.5">
+                      <td>
                         <BarraMinStockMax
                           stock={a.mate_stock_disponible}
                           min={a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : a.mate_stock_seguridad}
@@ -799,9 +831,7 @@ export default function Alertas({ onArmarOC }) {
                           calcularAlerta), y antes no había ninguna marca que lo
                           distinguiera de un dato simplemente vacío. */}
                       <td
-                        className={`px-3.5 py-1.5 ${
-                          a.mate_punto_de_pedido > 0 ? 'text-gray-400' : 'text-gray-700 font-semibold'
-                        }`}
+                        className={a.mate_punto_de_pedido > 0 ? 'text-gray-400' : 'text-gray-700 font-semibold'}
                       >
                         {a.mate_stock_seguridad ?? '—'}
                         {!(a.mate_punto_de_pedido > 0) && a.mate_stock_seguridad != null && (
@@ -811,13 +841,13 @@ export default function Alertas({ onArmarOC }) {
                           />
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums text-[var(--ind,#4338ca)] font-semibold">
+                      <td className="text-right tabular-nums text-[var(--ind,#4338ca)] font-semibold">
                         {formatoNumero(rotacionPorSku[a.mate_codigo]?.promedio)}
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td>
                         <Cobertura meses={calcularCobertura(a.mate_stock_disponible, rotacionPorSku[a.mate_codigo]?.promedio)} />
                       </td>
-                      <td className="px-3.5 py-1.5">
+                      <td>
                         {estadoOCPorSku[a.mate_codigo] ? (
                           <span
                             className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${estadoOCPorSku[a.mate_codigo].clase}`}
@@ -836,19 +866,19 @@ export default function Alertas({ onArmarOC }) {
                         )}
                       </td>
                       <td
-                        className="px-3.5 py-2.5 text-gray-400 text-xs max-w-[180px] truncate"
+                        className="text-gray-400 text-[12px] max-w-[180px] truncate"
                         title={a.mate_notas_sobre_punto_de ?? ''}
                       >
                         {a.mate_notas_sobre_punto_de ?? '—'}
                       </td>
-                      <td className="px-3.5 py-1.5">
+                      <td>
                         <span
                           className={`pill pill-${TONO_DE_COLOR[a._alerta.color] ?? 'gris'}`}
                         >
                           {a._alerta.label}
                         </span>
                       </td>
-                      <td className="px-3.5 py-1.5">
+                      <td>
                         {/* 2/10/2026: sin causa = solo un botón chico (antes "— / Declarar causa" en 3 líneas) */}
                         {causasPorSku[a.mate_codigo] ? (
                           <button
@@ -861,7 +891,8 @@ export default function Alertas({ onArmarOC }) {
                             title={causasPorSku[a.mate_codigo]?.nota ?? 'Ver o cambiar la causa declarada'}
                             className="pill pill-amarillo max-w-[160px] truncate"
                           >
-                            📝 {causasPorSku[a.mate_codigo].causa_rotulo}
+                            <i className="ti ti-message" />
+                            {causasPorSku[a.mate_codigo].causa_rotulo}
                           </button>
                         ) : (
                           <button
@@ -874,11 +905,12 @@ export default function Alertas({ onArmarOC }) {
                             className="btn btn-sm whitespace-nowrap"
                             title="Declarar por qué falta este artículo"
                           >
-                            📝 Causa
+                            <i className="ti ti-message" />
+                            Causa
                           </button>
                         )}
                       </td>
-                      <td className="px-3.5 py-1.5 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           {/* Punto 4 (28/9/2026): salta a Nueva OC con este proveedor +
                               SKU ya cargados, reusando el puente preseleccionOC que
@@ -892,25 +924,28 @@ export default function Alertas({ onArmarOC }) {
                                   ? `Armar OC a ${a.clie_nombre} con este artículo`
                                   : 'Este artículo no tiene proveedor cargado'
                               }
-                              className="px-2 py-1 rounded text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                              className="btn btn-sm"
                             >
-                              🛒 Armar OC
+                              <i className="ti ti-file-plus" />
+                              Armar OC
                             </button>
                           )}
                           <button
                             onClick={() => pedirPausar(a)}
                             title="Pausar esta alerta por 15 días"
-                            className="px-2 py-1 rounded text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+                            className="btn btn-sm"
                           >
-                            ⏸ Pausar
+                            <i className="ti ti-player-pause" />
+                            Pausar
                           </button>
                           {permisos.esAdmin && (
                             <button
                               onClick={() => pedirExcluir(a)}
                               title="Excluir permanentemente de las alertas"
-                              className="px-2 py-1 rounded text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+                              className="btn btn-sm"
                             >
-                              🚫 Excluir
+                              <i className="ti ti-ban" />
+                              Excluir
                             </button>
                           )}
                         </div>
@@ -919,12 +954,13 @@ export default function Alertas({ onArmarOC }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
           {/* Paginador */}
           {ordenadas.length > 0 && (
-            <div className="mx-4 mb-6 flex items-center justify-between text-sm text-gray-500 px-1">
+            <div className="flex items-center justify-between text-[12px] text-[var(--sub)] px-1">
               <span>
                 Mostrando {inicioSlice + 1}–{Math.min(inicioSlice + filasPorPagina, totalFilas)} de {totalFilas}
               </span>
@@ -932,19 +968,21 @@ export default function Alertas({ onArmarOC }) {
                 <button
                   onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
                   disabled={paginaSegura <= 1}
-                  className="px-2.5 py-1 rounded border border-[var(--border)] disabled:opacity-40"
+                  className="btn btn-sm"
                 >
-                  ‹ Anterior
+                  <i className="ti ti-chevron-left" />
+                  Anterior
                 </button>
-                <span className="text-xs text-gray-400">
+                <span className="text-[11px] text-gray-400">
                   Página {paginaSegura} de {totalPaginasTabla}
                 </span>
                 <button
                   onClick={() => setPaginaActual((p) => Math.min(totalPaginasTabla, p + 1))}
                   disabled={paginaSegura >= totalPaginasTabla}
-                  className="px-2.5 py-1 rounded border border-[var(--border)] disabled:opacity-40"
+                  className="btn btn-sm"
                 >
-                  Siguiente ›
+                  Siguiente
+                  <i className="ti ti-chevron-right" />
                 </button>
               </div>
             </div>
@@ -953,17 +991,18 @@ export default function Alertas({ onArmarOC }) {
       )}
 
       {vista === 'excluidos' && permisos.esAdmin && (
-        <div className="mx-4 mt-3 mb-6 bg-white rounded-xl border border-[var(--border)] overflow-hidden">
+        <div className="tw mt-3">
           {excluidos.length === 0 ? (
             <div className="p-8 text-center text-[var(--sub)] text-sm">
               No hay artículos excluidos permanentemente de las alertas.
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="tabla">
               <thead>
-                <tr className="bg-gray-50 border-b border-[var(--border)]">
+                <tr>
                   {['SKU', 'Producto', 'Proveedor', 'Motivo', 'Excluido por', 'Excluido el', ''].map((h) => (
-                    <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
+                    <th key={h}>
                       {h}
                     </th>
                   ))}
@@ -973,23 +1012,24 @@ export default function Alertas({ onArmarOC }) {
                 {excluidos.map((e) => {
                   const info = infoPorCodigo[e.mate_codigo]
                   return (
-                    <tr key={e.mate_codigo} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                      <td className="px-3.5 py-1.5 font-mono text-xs">{e.mate_codigo}</td>
-                      <td className="px-3.5 py-1.5 font-semibold">{info?.mate_nombre ?? '—'}</td>
-                      <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{info?.clie_nombre ?? '—'}</td>
-                      <td className="px-3.5 py-1.5 text-gray-600 text-xs max-w-[240px] truncate" title={e.motivo}>
+                    <tr key={e.mate_codigo}>
+                      <td className="sku whitespace-nowrap">{e.mate_codigo}</td>
+                      <td className="font-semibold">{info?.mate_nombre ?? '—'}</td>
+                      <td className="text-[var(--sub)] text-[12px]">{info?.clie_nombre ?? '—'}</td>
+                      <td className="text-gray-600 text-[12px] max-w-[240px] truncate" title={e.motivo}>
                         {e.motivo}
                       </td>
-                      <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{e.excluido_por_nombre ?? '—'}</td>
-                      <td className="px-3.5 py-1.5 text-gray-400 text-xs whitespace-nowrap">
+                      <td className="text-[var(--sub)] text-[12px]">{e.excluido_por_nombre ?? '—'}</td>
+                      <td className="text-gray-400 text-[12px] whitespace-nowrap">
                         {formatoFechaHora(e.excluido_en)}
                       </td>
-                      <td className="px-3.5 py-1.5 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <button
                           onClick={() => pedirRestaurar(e)}
-                          className="px-2 py-1 rounded text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+                          className="btn btn-sm"
                         >
-                          ♻ Restaurar
+                          <i className="ti ti-restore" />
+                          Restaurar
                         </button>
                       </td>
                     </tr>
@@ -997,20 +1037,22 @@ export default function Alertas({ onArmarOC }) {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
 
       {vista === 'pausadas' && (
-        <div className="mx-4 mt-3 mb-6 bg-white rounded-xl border border-[var(--border)] overflow-hidden">
+        <div className="tw mt-3">
           {pausadas.length === 0 ? (
             <div className="p-8 text-center text-[var(--sub)] text-sm">No hay alertas pausadas.</div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="tabla">
               <thead>
-                <tr className="bg-gray-50 border-b border-[var(--border)]">
+                <tr>
                   {['SKU', 'Producto', 'Proveedor', 'Motivo', 'Pausada por', 'Pausada el', 'Reactiva el', ''].map((h) => (
-                    <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
+                    <th key={h}>
                       {h}
                     </th>
                   ))}
@@ -1021,33 +1063,34 @@ export default function Alertas({ onArmarOC }) {
                   const info = infoPorCodigo[p.mate_codigo]
                   const vencida = new Date(p.reactivar_en).getTime() <= Date.now()
                   return (
-                    <tr key={p.mate_codigo} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                      <td className="px-3.5 py-1.5 font-mono text-xs">{p.mate_codigo}</td>
-                      <td className="px-3.5 py-1.5 font-semibold">{info?.mate_nombre ?? '—'}</td>
-                      <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{info?.clie_nombre ?? '—'}</td>
-                      <td className="px-3.5 py-1.5 text-gray-600 text-xs max-w-[200px] truncate" title={p.motivo ?? ''}>
+                    <tr key={p.mate_codigo}>
+                      <td className="sku whitespace-nowrap">{p.mate_codigo}</td>
+                      <td className="font-semibold">{info?.mate_nombre ?? '—'}</td>
+                      <td className="text-[var(--sub)] text-[12px]">{info?.clie_nombre ?? '—'}</td>
+                      <td className="text-gray-600 text-[12px] max-w-[200px] truncate" title={p.motivo ?? ''}>
                         {p.motivo ?? '—'}
                       </td>
-                      <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{p.pausada_por_nombre ?? '—'}</td>
-                      <td className="px-3.5 py-1.5 text-gray-400 text-xs whitespace-nowrap">
+                      <td className="text-[var(--sub)] text-[12px]">{p.pausada_por_nombre ?? '—'}</td>
+                      <td className="text-gray-400 text-[12px] whitespace-nowrap">
                         {formatoFechaHora(p.pausada_en)}
                       </td>
-                      <td className="px-3.5 py-1.5 text-xs whitespace-nowrap">
+                      <td className="text-[12px] whitespace-nowrap">
                         {vencida ? (
-                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--yel-bg)] text-[#92400e]">
+                          <span className="pill pill-amarillo">
                             Vencida — volvió a contar
                           </span>
                         ) : (
                           formatoFechaHora(p.reactivar_en)
                         )}
                       </td>
-                      <td className="px-3.5 py-1.5 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <button
                           onClick={() => pedirReactivar(p)}
                           title="Sacar la pausa ahora (antes de que venza)"
-                          className="px-2 py-1 rounded text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+                          className="btn btn-sm"
                         >
-                          ▶ Reactivar ahora
+                          <i className="ti ti-player-play" />
+                          Reactivar ahora
                         </button>
                       </td>
                     </tr>
@@ -1055,9 +1098,12 @@ export default function Alertas({ onArmarOC }) {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
+
+      </div>
 
       {/* Modal: excluir / pausar / restaurar / reactivar (ítem #48) —
           mismo patrón visual que OrdenesPropias.jsx / DeclararCausaModal */}
@@ -1092,14 +1138,14 @@ export default function Alertas({ onArmarOC }) {
                   <button
                     disabled={ocupado}
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                    className="btn"
                   >
                     Cancelar
                   </button>
                   <button
                     disabled={ocupado || !motivoModal.trim()}
                     onClick={confirmarExcluir}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--red)] text-white hover:opacity-90 disabled:opacity-40"
+                    className="btn btn-peligro"
                   >
                     {ocupado ? 'Guardando…' : 'Excluir'}
                   </button>
@@ -1130,14 +1176,14 @@ export default function Alertas({ onArmarOC }) {
                   <button
                     disabled={ocupado}
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                    className="btn"
                   >
                     Cancelar
                   </button>
                   <button
                     disabled={ocupado}
                     onClick={confirmarPausar}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+                    className="btn btn-pri"
                   >
                     {ocupado ? 'Guardando…' : 'Pausar 15 días'}
                   </button>
@@ -1153,14 +1199,14 @@ export default function Alertas({ onArmarOC }) {
                   <button
                     disabled={ocupado}
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                    className="btn"
                   >
                     Cancelar
                   </button>
                   <button
                     disabled={ocupado}
                     onClick={confirmarRestaurar}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+                    className="btn btn-pri"
                   >
                     {ocupado ? 'Guardando…' : 'Restaurar'}
                   </button>
@@ -1177,14 +1223,14 @@ export default function Alertas({ onArmarOC }) {
                   <button
                     disabled={ocupado}
                     onClick={cerrarModal}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-40"
+                    className="btn"
                   >
                     Cancelar
                   </button>
                   <button
                     disabled={ocupado}
                     onClick={confirmarReactivar}
-                    className="px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-[var(--ind,#4338ca)] text-white hover:opacity-90 disabled:opacity-40"
+                    className="btn btn-pri"
                   >
                     {ocupado ? 'Guardando…' : 'Reactivar ahora'}
                   </button>
