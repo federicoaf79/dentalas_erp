@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import BarraMinStockMax from '../components/BarraMinStockMax'
 import BloqueAccion from '../components/ui/BloqueAccion'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import InfoAyuda from '../components/ui/InfoAyuda'
@@ -894,8 +895,11 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         </span>
                       )}
                     </td>
-                    <td className={`font-bold ${Number(s.stock) <= 0 ? 'text-[var(--red)]' : ''}`}>
-                      {formatoNumero(s.stock)}
+                    {/* 7/10/2026 (feedback Ivana 28/9, punto 11): barra Stock vs Mín./Máx.,
+                        mismo componente que Alertas y Monitor. El Máx. viene de
+                        sugerencias_compra().maximo (migración 20261007120000). */}
+                    <td>
+                      <BarraMinStockMax stock={s.stock} min={s.umbral} max={s.maximo} />
                       {(() => {
                         const desglose = textoDesgloseStock(stockPorSku[s.mate_codigo])
                         if (!desglose) return null

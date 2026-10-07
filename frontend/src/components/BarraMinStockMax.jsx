@@ -10,8 +10,7 @@
 // valores que ya se mostraban sueltos.
 //
 // Ivana pidió lo mismo para Nueva OC (ver FEEDBACK_IVANA_28-9-2026.md,
-// punto 11) -- queda pendiente de construir ahí, este componente ya
-// queda listo para reusarse cuando se decida hacerlo.
+// punto 11) -- aplicado ahí el 7/10/2026 (columna Stock).
 // ============================================================
 export default function BarraMinStockMax({ stock, min, max }) {
   const s = Number(stock) || 0
