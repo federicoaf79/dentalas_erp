@@ -265,7 +265,7 @@ export default function PredictorDemanda() {
                   <th className="text-right!">Prom./mes</th>
                   <th>Cobertura</th>
                   {meses.map((m) => (
-                    <th key={m.clave} className="text-right! px-2.5! text-gray-400!">
+                    <th key={m.clave} className="text-right! px-1.5! text-gray-400!">
                       {m.label}
                     </th>
                   ))}
@@ -278,10 +278,10 @@ export default function PredictorDemanda() {
                   return (
                     <tr key={f.mate_codigo}>
                       <td className="sku sticky left-0 bg-white">{f.mate_codigo}</td>
-                      <td className="font-semibold max-w-[280px] truncate" title={f.mate_nombre ?? ''}>
+                      <td className="font-semibold max-w-[200px] truncate" title={f.mate_nombre ?? ''}>
                         {f.mate_nombre ?? '—'}
                       </td>
-                      <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap">{f.proveedor ?? '—'}</td>
+                      <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap max-w-[120px] truncate" title={f.proveedor ?? ''}>{f.proveedor ?? '—'}</td>
                       <td className="text-right tabular-nums font-semibold">{formatoNumero(f.stock_actual)}</td>
                       <td className="text-right font-semibold tabular-nums text-[var(--ind,#4338ca)]">
                         {formatoNumero(f.promedio)}
@@ -292,7 +292,7 @@ export default function PredictorDemanda() {
                         return (
                           <td
                             key={m.clave}
-                            className={`px-2.5! text-right text-[12px]! tabular-nums ${
+                            className={`px-1.5! text-right text-[12px]! tabular-nums ${
                               valor == null ? 'text-gray-200' : Number(valor) < 0 ? 'text-[var(--red)]' : 'text-gray-600'
                             }`}
                           >

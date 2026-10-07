@@ -778,7 +778,7 @@ export default function Alertas({ onArmarOC }) {
               </div>
             ) : (
               <div className="overflow-x-auto">
-              <table className="tabla">
+              <table className="tabla tabla-acciones">
                 <thead>
                   <tr>
                     {[
@@ -811,7 +811,7 @@ export default function Alertas({ onArmarOC }) {
                   {filasPaginadas.map((a) => (
                     <tr key={a.yiqi_id} className={a._alerta.nivel === 'critica' ? 'bg-[#fdf2f2]' : undefined}>
                       <td className="sku whitespace-nowrap">{a.mate_codigo}</td>
-                      <td className="font-semibold"><div className="min-w-[240px]">{a.mate_nombre}</div></td>
+                      <td className="font-semibold"><div className="min-w-[180px]">{a.mate_nombre}</div></td>
                       <td className="text-[var(--sub)] text-[12px]">{a.clie_nombre ?? '—'}</td>
                       {/* Punto 3 (28/9/2026): gráfico en vez de 3 columnas numéricas
                           sueltas (Stock/Mín./Máx.) -- ver components/BarraMinStockMax.jsx.
@@ -866,7 +866,7 @@ export default function Alertas({ onArmarOC }) {
                         )}
                       </td>
                       <td
-                        className="text-gray-400 text-[12px] max-w-[180px] truncate"
+                        className="text-gray-400 text-[12px] max-w-[110px] truncate"
                         title={a.mate_notas_sobre_punto_de ?? ''}
                       >
                         {a.mate_notas_sobre_punto_de ?? '—'}
@@ -927,7 +927,7 @@ export default function Alertas({ onArmarOC }) {
                               className="btn btn-sm"
                             >
                               <i className="ti ti-file-plus" />
-                              Armar OC
+                              <span className="btn-lbl-compacto">Armar OC</span>
                             </button>
                           )}
                           <button
@@ -936,7 +936,7 @@ export default function Alertas({ onArmarOC }) {
                             className="btn btn-sm"
                           >
                             <i className="ti ti-player-pause" />
-                            Pausar
+                            <span className="btn-lbl-compacto">Pausar</span>
                           </button>
                           {permisos.esAdmin && (
                             <button
@@ -945,7 +945,7 @@ export default function Alertas({ onArmarOC }) {
                               className="btn btn-sm"
                             >
                               <i className="ti ti-ban" />
-                              Excluir
+                              <span className="btn-lbl-compacto">Excluir</span>
                             </button>
                           )}
                         </div>

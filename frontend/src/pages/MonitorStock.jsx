@@ -586,7 +586,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                 : 'No hay artículos con alerta en este momento (o no coinciden con la búsqueda).'}
             </div>
           ) : (
-            <table className="tabla">
+            <table className="tabla tabla-acciones">
               <thead>
                 <tr>
                   {[
@@ -621,7 +621,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                   return (
                     <tr key={a.yiqi_id}>
                       <td className="sku whitespace-nowrap">{a.mate_codigo}</td>
-                      <td className="font-semibold"><div className="min-w-[240px]">{a.mate_nombre}</div></td>
+                      <td className="font-semibold"><div className="min-w-[180px]">{a.mate_nombre}</div></td>
                       <td><span className="text-[12px] text-[var(--sub)]">{a.clie_nombre ?? '—'}</span></td>
                       <td>
                         {/* 2/10/2026 (feedback Ivana 17/20): barra Stock vs Mín./Máx., igual que Alertas */}
@@ -709,7 +709,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                         )}
                       </td>
                       <td
-                        className="text-gray-400 max-w-[180px] truncate"
+                        className="text-gray-400 max-w-[110px] truncate"
                         title={a.mate_notas_sobre_punto_de ?? ''}
                       >
                         {a.mate_notas_sobre_punto_de ?? '—'}

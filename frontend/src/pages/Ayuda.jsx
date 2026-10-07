@@ -296,6 +296,7 @@ const MODULOS = [
               '**Excluir** (solo Aris): la saca de las alertas en forma permanente, con un motivo obligatorio. Se puede volver atrás desde la pestaña "Excluidos" con "Restaurar en alertas".',
             ],
           },
+          { tip: 'En pantallas medianas (por ejemplo, una notebook o Windows con la escala al 125%), Armar OC, Pausar y Excluir se ven solo con su ícono, para que entren todas las columnas. Al pasar el mouse por cada botón dice qué hace.' },
         ],
         reglas: [
           { tip: 'Declarar una causa es solo para dejar registro — no cambia el estado de la alerta ni la saca de la lista. Cada declaración se agrega al historial, nunca se edita ni se borra una anterior.' },
