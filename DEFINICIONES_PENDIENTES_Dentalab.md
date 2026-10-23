@@ -1,6 +1,6 @@
 # Definiciones pendientes — Dentalab-Compras
 
-## Estado al 18/10/2026 (reconciliación)
+## Estado al 18/10/2026 (reconciliación), actualizado el 23/10/2026
 
 > El documento original del 31/7/2026 queda abajo sin cambios, como registro de lo que se preguntó. Esta tabla dice qué pasó con cada punto. El estado operativo vigente está en `CLAUDE.md`.
 
@@ -12,11 +12,11 @@
 | D. Smarties "NO BORRAR" | **Sigue abierto.** El sistema usa 6 smarties (2344, 2345, 2346, 2353, 2359, 2360, según `CLAUDE.md`); la pantalla Conector YiQi lista solo 3 (2344, 2345, 2346). No hay usuario de YiQi propio del sistema. | [en vivo 2026-10-18, Federico en /?page=yiqi]; decisión de Aris pendiente |
 | E. Producción propia | **Decidido y construido.** "Dentalab" como proveedor queda fuera de las sugerencias (`es_comprable`). Orden de producción: no construida. | [repo 2026-10-18] |
 | F. Artículo 1002, tránsito −58 | **Sin resolver.** La app muestra Local 97 · Central 187 · Jorge 34 · ML Full 45 (stock 284) y no lee la ubicación "En tránsito" para este cálculo. | [en vivo 2026-10-18, Federico en /?page=stock]; dato en YiQi [sin verificar] |
-| G. Campo "Asunto" de las OC | **Respondido en la práctica.** Ivana escribe el estado real en el Asunto ("Listo", "Revisión-enviado") porque todas las OC quedan "En preparación" en YiQi. "Cantidad en camino" (16–17/9) reemplazó la marca manual. | [en vivo 2026-10-02, Ventas Online en me.yiqi.com.ar]; [repo `fe2c185`] |
+| G. Campo "Asunto" de las OC | **Respondido y resuelto en la app (23/10).** Ciclo de Ivana: "Revisión - enviado" → "Listo - dsps borrar contenido" (pedido hecho) → cuando la mercadería está dada de alta, vacía la OC y deja "Listo". YiQi no cambia el estado de la OC ni vincula el remito de compra. La app marca "Cerrada en YiQi" la OC que deja de venir en el reporte 2345 (`20261023180000`): las Demoradas bajaron de 88 a 11. "Cantidad en camino" ya no suma las OC cerradas. Falta confirmar con Ivana si también vacía las OC canceladas. | [en vivo 2026-10-23, Ventas Online en /view/ORDEN_DE_COMPRA y /view/REMITO_COMPRA]; [en vivo 2026-10-23, Federico en /?page=seguimiento]; [repo `8b25782`] |
 | H. Catálogo de causas | **Construido.** Ámbitos Stock / Compras / Entregas, declaraciones append-only, archivar y restaurar. Validación de las categorías por Ivana: [sin verificar]. | [repo `b6f9dd8`, `bca7b94`] |
 | I. Forma de trabajo de Ivana | **Parcialmente respondido** por su feedback (28/9 y 2/10): arma por proveedor desde Nueva OC y envía por WhatsApp. Frecuencia de pedidos: [sin verificar]. | `claude/FEEDBACK_IVANA_*.md` (proyecto) |
 | Parte 3 — Envío de la OC al proveedor | **WhatsApp semiautomático** (PDF + texto con plantilla). Email: no construido. | [repo 2026-10-18] |
-| Parte 3 — Escritura de la OC en YiQi | **Funciona** (`POST /ORDEN_DE_COMPRA`, OC #9 el 19/8). Ver en `CLAUDE.md` la contradicción sobre si debe estar activa al aprobar. | [repo `OrdenesPropias.jsx:683`] |
+| Parte 3 — Escritura de la OC en YiQi | **Construida y apagada (modo prueba desde el 23/10).** Federico: "No autorizamos a pasar a Live la herramienta de momento". Interruptor `reglas_compra.escritura_yiqi_habilitada = false` y cron 6 pausado; las 5 funciones que escriben responden `modo_prueba`. La contradicción del 18/10 quedó resuelta. | [prod 2026-10-23]; [repo `ff8eb62`, `48d907c`] |
 | Parte 3 — Comparación de precios | **Construido** ("Comparar precios" y "Revisar equivalencias"). | [repo 2026-10-18] |
 | Parte 3 — Capacitación de Ivana | **Pendiente.** | — |
 

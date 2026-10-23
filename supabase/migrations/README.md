@@ -1,6 +1,6 @@
 # supabase/migrations
 
-**Estado al 23/10/2026:** 55 migraciones, de `20260801000000_baseline_objetos_creados_a_mano.sql` a `20261007120000_sugerencias_compra_maximo.sql`. Las 35 tablas de `public` en producción tienen su `CREATE TABLE` en esta carpeta. [repo 2026-10-23, prod 2026-10-23]
+**Estado al 23/10/2026:** 59 migraciones, de `20260801000000_baseline_objetos_creados_a_mano.sql` a `20261023180000_ordenes_yiqi_cerrada_en_yiqi.sql`. Las 35 tablas de `public` en producción tienen su `CREATE TABLE` en esta carpeta. [repo 2026-10-23, prod 2026-10-23]
 
 ## Historia corta
 
@@ -16,9 +16,12 @@
   - `scripts/verificar_migraciones_21_8.sql` (28/28 objetos y 6/6 versiones, 21/8).
   - `scripts/verificar_migraciones_10_9.sql`.
   - `scripts/radiografia_esquema_30_9.sql` y `scripts/radiografia_funciones_30_9.sql`.
-- **Últimas dos, verificadas en producción:**
+- **Últimas, verificadas en producción:**
   - `20261003100000` (policies `crear/editar/borrar items` y trigger `trg_items_vuelve_a_borrador`). [prod 2026-10-03]
   - `20261007120000` (`sugerencias_compra` devuelve `maximo`, EXECUTE solo `authenticated`). [prod 2026-10-07]
+  - `20261023150000` (cron 6 pausado, barrido sin archivadas), `20261023160000` (interruptor `escritura_yiqi_habilitada = false`) y `20261023170000` (limpieza etapa 1). [prod 2026-10-23]
+  - `20261023180000` (`ordenes_yiqi.cerrada_en_yiqi`, `upsert_ordenes_yiqi` marca las OC ausentes del reporte, `contadores_sidebar` sin cerradas). [prod 2026-10-23, 37 vigentes / 125 cerradas, 3 controles en `true`]
+- **Patrón para tocar una función sin pisar la versión de prod:** leerla con `pg_get_functiondef`; o parchearla con un bloque `DO` que hace `regexp_replace` sobre la definición vigente y aborta si no encuentra el texto esperado (ver `20261023180000`, paso 4).
 
 ## Reglas
 

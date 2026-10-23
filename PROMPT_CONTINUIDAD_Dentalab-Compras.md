@@ -31,7 +31,7 @@
 >
 > **20/8/2026 — Envío de la OC por WhatsApp, semi-automático, construido y validado en vivo.** El botón 💬 en una orden aprobada (Órdenes de compra) descarga un PDF real (sumamos jsPDF — el PDF viejo era un diálogo de impresión, no un archivo) y abre WhatsApp con el texto de la plantilla ya completado con los datos reales de la orden; el único paso manual es arrastrar el PDF a la conversación, porque WhatsApp no permite adjuntar por link. Se encontró y corrigió en el camino un bug real de producción (interop de `jspdf-autotable` con el build de Vite) — validado con un segundo deploy y una prueba en vivo de punta a punta (caso sin WhatsApp cargado y caso con WhatsApp cargado, sin dejar datos de prueba). Ver **punto 14**.
 >
-> **Todavía el mismo 19/8/2026 — Stock cerrado del todo, sidebar reorganizado en módulos, y accesos reales de Aris/Ivana habilitados.** Se confirmó en vivo (captura) el ciclo completo ✓ Movido de punta a punta: acción sobre el SKU `6245-S` → banner de confirmación → contador bajó de 547 a 545 pendientes, "Quiebre total A" de 8 a 6 — la fila desaparece de la vista y el estado queda escrito en `reposiciones_sugeridas`. **Aclarado con Federico:** esta acción es 100% interna a Dentalab-Compras, **no escribe nada en YiQi** (distinto del flujo de Órdenes de Compra, que sí llama a `enviar-oc-yiqi`) — si conviene que también genere un movimiento de stock en YiQi es una pregunta para Aris, no se decidió unilateralmente (ver ESPERA A OTRA PERSONA). Por pedido de Federico ("el desarrollo puede llegar a crecer con más módulos"), se reorganizó el sidebar de una lista plana a **dos módulos separados** — Stock (Monitor de stock, Reposición interna) y Compras (Alertas al frente, Órdenes de compra, Seguimiento, Historial, Nueva OC) — con badges cableados por `key` en vez de por posición en el array, para evitar el bug de desincronización que ya había pasado una vez esta misma sesión. Ver **punto 12**. Por último, se agregó un botón de **reseteo de contraseña admin-only** ("🔑 Contraseña") en Usuarios y accesos, y Federico lo usó para habilitar el login real de Aris (`aris@dentalab.com.ar`) e Ivana (`comprasdentalab@gmail.com`) con la misma clave que la demo (`Dentalab2026!`) — **confirmado por Federico: "testeado y funcionando"**. Ver **punto 13**.
+> **Todavía el mismo 19/8/2026 — Stock cerrado del todo, sidebar reorganizado en módulos, y accesos reales de Aris/Ivana habilitados.** Se confirmó en vivo (captura) el ciclo completo ✓ Movido de punta a punta: acción sobre el SKU `6245-S` → banner de confirmación → contador bajó de 547 a 545 pendientes, "Quiebre total A" de 8 a 6 — la fila desaparece de la vista y el estado queda escrito en `reposiciones_sugeridas`. **Aclarado con Federico:** esta acción es 100% interna a Dentalab-Compras, **no escribe nada en YiQi** (distinto del flujo de Órdenes de Compra, que sí llama a `enviar-oc-yiqi`) — si conviene que también genere un movimiento de stock en YiQi es una pregunta para Aris, no se decidió unilateralmente (ver ESPERA A OTRA PERSONA). Por pedido de Federico ("el desarrollo puede llegar a crecer con más módulos"), se reorganizó el sidebar de una lista plana a **dos módulos separados** — Stock (Monitor de stock, Reposición interna) y Compras (Alertas al frente, Órdenes de compra, Seguimiento, Historial, Nueva OC) — con badges cableados por `key` en vez de por posición en el array, para evitar el bug de desincronización que ya había pasado una vez esta misma sesión. Ver **punto 12**. Por último, se agregó un botón de **reseteo de contraseña admin-only** ("🔑 Contraseña") en Usuarios y accesos, y Federico lo usó para habilitar el login real de Aris (`aris@dentalab.com.ar`) e Ivana (`comprasdentalab@gmail.com`) con la misma clave que la demo (`[clave omitida el 23/10/2026]`) — **confirmado por Federico: "testeado y funcionando"**. Ver **punto 13**.
 >
 > **Actualización 19/8/2026 — criterio 5 del MVP cerrado del todo, y arrancó el módulo de Stock.** Sesión 18-19/8: se probó y quedó en producción la escritura real a YiQi (orden #9 creada, `yiqi_id=1689`), se encontró y corrigió un bug de fondo en el sync (YiQi devuelve `ID` mayúscula, no `id`), se agregó red de seguridad por `pg_cron` + UI de error/reintento, y arrancó la **Fase 1 del módulo de Stock**: sync automático de stock por depósito (`stock_yiqi`, 7150 SKUs, cron cada 15 min). Detalle completo en **punto 9** (cierre de escritura YiQi) y **punto 10** (Stock Fase 1), al final del documento. Quedó pendiente una limpieza pedida por Federico (archivo suelto, fila basura, webhook de Vercel) — ver nota al final del punto 10.
 >
@@ -69,7 +69,7 @@ Soy Federico, de Tulkas LLC. Estoy desarrollando **Dentalab-Compras**, un sistem
 - **Alex Samandjian** = hermano de Aris, también usuario de YiQi.
 - Mails reales: Ivana `comprasdentalab@gmail.com`, Aris `aris@dentalab.com.ar`
 - Usuario YiQi del sistema: `ventas@dentalab.com.ar` (con "Integrador" habilitado)
-- `[chrome-live 2026-08-07]` Confirmado en vivo: ambas cuentas reales (Ivana y Aris) ya existen en Supabase Auth con su fila resuelta en `usuarios_config`. `[19/8/2026]` **Login real habilitado y confirmado funcionando** — ver punto 13. Ambos pueden entrar con su mail y `Dentalab2026!`.
+- `[chrome-live 2026-08-07]` Confirmado en vivo: ambas cuentas reales (Ivana y Aris) ya existen en Supabase Auth con su fila resuelta en `usuarios_config`. `[19/8/2026]` **Login real habilitado y confirmado funcionando** — ver punto 13. Ambos pueden entrar con su mail y `[clave omitida el 23/10/2026]`.
 
 ## INFRAESTRUCTURA
 
@@ -78,7 +78,7 @@ Soy Federico, de Tulkas LLC. Estoy desarrollando **Dentalab-Compras**, un sistem
 - Supabase: `hsfudsnmooaesrzdwecg` (org UrbanTales), plan Pro
 - Deploy: `vercel --prod` desde `frontend\` → **https://dentalab-compras.vercel.app**
 - Bearer token de YiQi: tabla `yiqi_config`
-- Demo: `aris@dentalab-compras.demo` / `ivana@dentalab-compras.demo`, pass `Dentalab2026!`
+- Demo: `aris@dentalab-compras.demo` / `ivana@dentalab-compras.demo`, pass `[clave omitida el 23/10/2026]`
 
 ---
 
@@ -279,7 +279,7 @@ Script de auditoría: comparar `$r.columns.field` contra esa lista.
 
 # LO QUE SIGUE, EN ORDEN
 
-1. ~~Crear los usuarios reales en Supabase Auth + su fila en `usuarios_config`, y habilitar su login.~~ **✅ HECHO 19/8/2026** — se agregó un reset de contraseña admin-only (botón "🔑 Contraseña" en Usuarios y accesos) y se fijó `Dentalab2026!` en las cuentas reales de Aris (`aris@dentalab.com.ar`) e Ivana (`comprasdentalab@gmail.com`). Confirmado por Federico: "testeado y funcionando". Ver punto 13.
+1. ~~Crear los usuarios reales en Supabase Auth + su fila en `usuarios_config`, y habilitar su login.~~ **✅ HECHO 19/8/2026** — se agregó un reset de contraseña admin-only (botón "🔑 Contraseña" en Usuarios y accesos) y se fijó `[clave omitida el 23/10/2026]` en las cuentas reales de Aris (`aris@dentalab.com.ar`) e Ivana (`comprasdentalab@gmail.com`). Confirmado por Federico: "testeado y funcionando". Ver punto 13.
 2. ~~Envío de la OC al proveedor.~~ **✅ HECHO 20/8/2026 (WhatsApp)** — ver punto 14. Falta cargar el WhatsApp de pedidos de los proveedores reales (Aris/Ivana, ver ESPERA A OTRA PERSONA) y, si hace falta más adelante, el envío por email (Resend) — no pedido todavía.
 3. ~~🔴 Escritura en YiQi (`POST /ORDEN_DE_COMPRA`).~~ **✅ HECHO — este ítem estaba desactualizado, encontrado y corregido en la reconciliación del 21/8/2026.** El mapeo de campos y la integración en el flujo (que este ítem daba como pendiente) ya estaban construidos desde el 18-19/8 (ver SESIÓN 18/8/2026 y 19/8/2026) — nunca se tachó acá. `[repo 2026-08-21]` `components/OrdenesPropias.jsx` muestra "Vinculada a YiQi (OC #...)"/"⚠ Error de vinculación a YiQi" con `yiqi_id_creado`/`yiqi_error`; `supabase/functions/enviar-oc-yiqi/index.ts` existe y fue tocado el 20/8 (fix de duplicación, ver SESIÓN 20/8/2026 sección 3). `[en vivo 2026-08-21, Aris en /]` "Órdenes de compra" muestra 6 órdenes reales vinculadas (#5 a #9, con "Reenviar"/"WhatsApp"), la OC #2572 en YiQi con Asunto "Dentalab-Compras #8" confirmando la escritura real, y la orden #2 con "⚠ Error de vinculación a YiQi" (el caso conocido, pendiente de que Aris confirme duplicados — ver ESPERA A OTRA PERSONA).
 4. **Condiciones comerciales por proveedor** — depende de que Aris complete los datos. `[repo 2026-08-06]` La pantalla (`CondicionesProveedor.jsx`) ya existe. `[11/8/2026]` Diseño confirmado como cerrado (decisión de negocio #13).
@@ -1056,15 +1056,15 @@ Federico pidió evaluar el menú lateral pensando en que el desarrollo va a segu
 
 **Pedido de Federico:** *"necesito que le habilitemos de nuevo los usuarios y pasword para entrar al sistema con sus mails"* — Aris e Ivana tienen cuenta real en Supabase Auth desde el 7/8 (`aris@dentalab.com.ar`, `comprasdentalab@gmail.com`) pero nadie conoce su contraseña original, así que en la práctica seguían usando las cuentas demo.
 
-**Decisión (`AskUserQuestion`):** ponerles la misma clave que la demo (`Dentalab2026!`) en vez de armar un flujo de reset por mail — apropiado para un sistema interno de pocos usuarios, sin la complejidad de configurar envío de mails en producción.
+**Decisión (`AskUserQuestion`):** ponerles la misma clave que la demo (`[clave omitida el 23/10/2026]`) en vez de armar un flujo de reset por mail — apropiado para un sistema interno de pocos usuarios, sin la complejidad de configurar envío de mails en producción.
 
 **Backend — `admin-usuarios` Edge Function, acción nueva `resetPassword`:** `POST ?accion=resetPassword` con `{ userId, password }`, usa `supabaseAdmin.auth.admin.updateUserById(userId, { password })` (API de administración de Supabase, service_role) para fijar la contraseña directo, sin mandar mail ni pedir la anterior. Protegida por el mismo gate `verificarLlamador({ soloAdmin: true })` que ya cubre el resto de la función — sin código de autorización nuevo.
 
-**Frontend — `UsuariosAccesos.jsx`:** botón nuevo "🔑 Contraseña" junto a "Gestionar accesos" en cada fila de usuario, abre un modal propio (mismo patrón visual que el resto de la app, no `window.prompt`) pre-cargado con `Dentalab2026!` (editable), con aviso de éxito transitorio.
+**Frontend — `UsuariosAccesos.jsx`:** botón nuevo "🔑 Contraseña" junto a "Gestionar accesos" en cada fila de usuario, abre un modal propio (mismo patrón visual que el resto de la app, no `window.prompt`) pre-cargado con `[clave omitida el 23/10/2026]` (editable), con aviso de éxito transitorio.
 
 **Contratiempo de deploy, encontrado y corregido en la misma sesión:** el primer intento de deploy/commit salió con el código viejo — el puente con la compu de Federico (`device_commit_files`) había estado caído justo cuando se mandaron los archivos por chat, y sin el paso manual de guardarlos, `git commit` reportó "no changes to commit" para los dos archivos editados, y el deploy de la función mandó el código anterior. Se detectó releyendo literalmente la salida pegada por Federico (no se asumió éxito), se reescribieron los archivos directo por el puente ya reconectado, y se repitió el ciclo completo (`supabase functions deploy admin-usuarios` + `git add`/commit/push) — esta vez limpio, commit `31730f0`.
 
-**✅ Confirmado por Federico, en producción: "listo, testeado y funcionando."** Aris y Ivana ya pueden entrar a `dentalab-compras.vercel.app` con su mail real y `Dentalab2026!`.
+**✅ Confirmado por Federico, en producción: "listo, testeado y funcionando."** Aris y Ivana ya pueden entrar a `dentalab-compras.vercel.app` con su mail real y `[clave omitida el 23/10/2026]`.
 
 **Alcance actual, explícito (sin sobre-construir):** no existe todavía autoservicio de cambio de contraseña para un usuario ya logueado, ni recuperación por "olvidé mi contraseña" (requeriría configurar SMTP/`resetPasswordForEmail` en Supabase Auth, no confirmado como armado en producción). Hoy, tanto para cambiar como para un olvido, el único camino es que un admin repita el reset con el botón 🔑. Evaluado con Federico y dejado así a propósito por ahora — suficiente para un equipo interno de 2-3 usuarios; queda anotado como mejora futura, no bloqueante.
 
@@ -1270,3 +1270,33 @@ Desde el 9/10 este historial no se reescribe: `CLAUDE.md` es el estado operativo
 - **`yiqi-renovar-token.ps1`:** la clave se sacó del working tree; ahora la lee de `$env:YIQI_CLAVE`. Sigue en el historial (`03b6288`).
 
 Todas las cifras: [prod 2026-10-23]. Detalle en `CLAUDE.md`.
+
+## Entrada 23/10/2026 (tarde) — feedback de Ivana, modo prueba, limpieza y OC cerradas en YiQi (append)
+
+El estado vigente está en `CLAUDE.md`, sección "Actualización 2026-10-23". Acá queda la constancia.
+
+- **Commits:** `9298460`, `c9f76a0`, `16a7a5e`, `ff8eb62`, `48d907c`, `f5e92e8`, `8b25782` y `8076d6c`. HEAD = `origin/main`.
+- **Feedback de Ivana (23/10):** 8 preguntas y checklist de 19 puntos respondidos. Se implementó todo lo que no necesitaba decisión (`c9f76a0`).
+  - Quedan: órdenes propias en Seguimiento, máximos y fraccionados, y "Detalle de una sola orden".
+- **Modo prueba:** "No autorizamos a pasar a Live la herramienta de momento" (Federico, 23/10).
+  - Cron 6 pausado y barrido sin archivadas.
+  - Interruptor `escritura_yiqi_habilitada = false`.
+  - 5 funciones que escriben con guarda fail-closed.
+  - La #21 de Aris (20/10) recibió 400 de YiQi y se reintentó cada 10 min hasta las 16:20 UTC.
+  - **Confirmado en vivo que no existe en YiQi.**
+- **Limpieza etapa 1:**
+  - cron 15 pausado;
+  - 8 pedidos automáticos del 30/9 anulados;
+  - #2 y #12 a la papelera.
+  - Etapa 2 (borrado definitivo de #3–#11 con respaldo): espera a Aris.
+- **Punto 3, "Recibida confiable":**
+  - YiQi no cambia el estado de la OC ni vincula el remito de compra.
+  - Ivana vacía la OC cuando la mercadería está dada de alta. Ya lo había explicado el 16/9: "Listo - dsps borrar contenido" = pedido hecho.
+  - La smartie 2345 trae solo OC con pendientes, sin corte por fecha.
+  - Columna `ordenes_yiqi.cerrada_en_yiqi` + `upsert_ordenes_yiqi` que marca las ausentes (guarda ≥ 10 OC) + `contadores_sidebar` sin cerradas (`20261023180000`).
+  - Frontend: Seguimiento, Órdenes de compra, Historial, "en camino" y Ayuda (`8b25782`).
+  - Resultado: Demoradas 88 → 11; 125 OC "Cerradas en YiQi"; salen de "en camino" 9.713 u de 311 SKU.
+- **Fechas de OC en hora local y carpetas de Seguimiento ordenadas** (`8076d6c`).
+- **Lección:** antes de plantear una hipótesis sobre el proceso de Ivana, buscar en `PROMPT_CONTINUIDAD_RESUMEN` y en los comentarios del código (`estadoOCPorSku.js:30`). La respuesta sobre el asunto "Listo" estaba escrita desde el 16/9.
+
+Cifras: [prod 2026-10-23], [en vivo 2026-10-23]. Detalle en `claude/INVESTIGACION_escrituras_YiQi_23-10-2026.md` (proyecto).

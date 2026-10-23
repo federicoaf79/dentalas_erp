@@ -22,7 +22,7 @@ El estado del proyecto, la arquitectura y los pendientes están en `../CLAUDE.md
 - `src/index.css` tiene las clases del prototipo v7: `.ph`, `.btn*`, `.chip*`, `.pill-*`, `.card-*`, `.bloque-*`, `.tw` / `.tabla`, `.pasos`, `.metricas`, `.pagina` e `.info-ayuda`.
 - Las clases sin capa le ganan a las utilidades de Tailwind (que viven en capas): para pisarlas hace falta el modificador `!`.
 - Hasta 1700 px de ancho, las celdas son más compactas y los botones marcados `.btn-lbl-compacto` quedan solo con su ícono. `.tabla-acciones` deja fija la última columna.
-- `src/pages/Ayuda.jsx` describe cada pantalla. Hay que actualizarlo a mano cuando una pantalla cambia (última revisión: 7/10/2026).
+- `src/pages/Ayuda.jsx` describe cada pantalla. Hay que actualizarlo a mano cuando una pantalla cambia (última revisión: 23/10/2026).
 
 ## Comandos (PowerShell)
 
