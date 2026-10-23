@@ -6,6 +6,9 @@ import BarraMinStockMax from '../components/BarraMinStockMax'
 import BloqueAccion from '../components/ui/BloqueAccion'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import InfoAyuda from '../components/ui/InfoAyuda'
+// 23/10/2026 — modo prueba YiQi (no autorizado Live)
+import AvisoModoPrueba from '../components/ui/AvisoModoPrueba'
+import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
 import { renderTemplate } from './TemplatesMensajes'
 import { traerStockPorDeposito, textoDesgloseStock } from '../lib/stockPorDeposito'
 
@@ -271,7 +274,7 @@ function formatoMoneda(n) {
   }).format(num)
 }
 
-function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones, esAdmin, preseleccionSku, nombreUsuario }) {
+function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones, esAdmin, preseleccionSku, nombreUsuario, modoPrueba = false }) {
   const [seleccion, setSeleccion] = useState(() => new Set())
   const [cantidades, setCantidades] = useState({})
   const [notas, setNotas] = useState('')
@@ -1084,6 +1087,9 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
         />
       </label>
 
+      {/* 23/10/2026 — modo prueba YiQi (no autorizado Live) */}
+      {modoPrueba && <AvisoModoPrueba className="mb-3" />}
+
       <div className="flex items-center justify-end gap-2">
         <button
           disabled={ocupado || items.length === 0}
@@ -1110,6 +1116,8 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
 // ============================================================
 export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPreseleccion }) {
   const permisos = usePermisos()
+  // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+  const { modoPrueba } = useModoPruebaYiqi()
 
   const [vista, setVista] = useState('lista') // lista | armar
   const [proveedores, setProveedores] = useState([])
@@ -1126,6 +1134,8 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
+  // 23/10/2026 — modo prueba YiQi (no autorizado Live): aviso neutro (gris), no verde/rojo
+  const [avisoModoPrueba, setAvisoModoPrueba] = useState(false)
   // 2/10/2026 — órdenes duplicadas (#6/#7, #12/#13, #16/#17, todas iguales y
   // con ~1 minuto de diferencia). Tres defensas:
   //  1) guardandoRef: un doble clic rápido no puede disparar dos inserts
@@ -1292,6 +1302,8 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
 
       // Si pidio enviarla a aprobacion, recien ahora cambia de estado:
       // asi los items ya estan guardados cuando Aris la ve.
+      // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+      let noEnviadaPorPrueba = false
       if (estado !== 'borrador') {
         const parche = { estado, enviada_en: new Date().toISOString() }
         // Dentro del limite: no necesita aprobacion de nadie, queda
@@ -1317,20 +1329,27 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
         // supabase/functions/enviar-oc-yiqi.
         if (estado === 'aprobada') {
           try {
-            await supabase.functions.invoke('enviar-oc-yiqi', { body: { orden_id: cab.id } })
+            const { data: respYiqi } = await supabase.functions.invoke('enviar-oc-yiqi', { body: { orden_id: cab.id } })
+            // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+            if (respYiqi?.modo_prueba) noEnviadaPorPrueba = true
           } catch (errYiqi) {
             console.error('[enviar-oc-yiqi]', errYiqi)
           }
         }
       }
 
+      // 23/10/2026 — modo prueba YiQi (no autorizado Live): si la orden quedó
+      // aprobada y (la función lo dijo, o el interruptor está apagado) no se envió a YiQi.
+      const sinYiqi = estado === 'aprobada' && (noEnviadaPorPrueba || modoPrueba)
+      setAvisoModoPrueba(sinYiqi)
       setAviso(
         estado === 'pendiente'
           ? `Orden #${cab.id} enviada a aprobación de Aris.`
           : estado === 'aprobada'
-            ? permisos.esAdmin
+            ? (permisos.esAdmin
               ? `Orden #${cab.id} confirmada directo (la armó Aris).`
-              : `Orden #${cab.id} confirmada: está dentro del límite de aprobación automática.`
+              : `Orden #${cab.id} confirmada: está dentro del límite de aprobación automática.`)
+              + (sinYiqi ? ' Modo prueba: no se envió a YiQi.' : '')
             : `Borrador #${cab.id} guardado.`
       )
       setOrdenGuardadaId(cab.id)
@@ -1370,7 +1389,7 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
 
           {aviso && (
             <BloqueAccion
-              tono="verde"
+              tono={avisoModoPrueba ? 'gris' : 'verde'}
               titulo={
                 <span className="inline-flex items-center gap-1.5">
                   <i className="ti ti-circle-check text-[15px]" /> {aviso}
@@ -1389,7 +1408,7 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
                     </a>
                   )}
                   <button
-                    onClick={() => { setAviso(null); setOrdenGuardadaId(null) }}
+                    onClick={() => { setAviso(null); setAvisoModoPrueba(false); setOrdenGuardadaId(null) }}
                     className="btn btn-sm"
                     aria-label="Cerrar"
                   >
@@ -1445,6 +1464,7 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
           esAdmin={permisos.esAdmin}
           preseleccionSku={skuPreseleccionado}
           nombreUsuario={permisos.nombreUsuario}
+          modoPrueba={modoPrueba}
         />
       ) : null}
     </div>

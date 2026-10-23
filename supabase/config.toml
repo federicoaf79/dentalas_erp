@@ -453,3 +453,9 @@ verify_jwt = false
 # service_role key, que no.
 [functions.mover-stock-yiqi]
 verify_jwt = false
+
+# 23/10/2026 -- mover-stock-reposicion usa verificarLlamador() (auth propia,
+# mismo criterio que las de arriba) y faltaba en esta lista: sin esta
+# entrada, un deploy la dejaba con verify_jwt=true (default).
+[functions.mover-stock-reposicion]
+verify_jwt = false

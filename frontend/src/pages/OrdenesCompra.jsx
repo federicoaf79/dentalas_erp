@@ -5,6 +5,9 @@ import Aviso from '../components/Aviso'
 import OrdenesPropias from '../components/OrdenesPropias'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import Pastilla from '../components/ui/Pastilla'
+// 23/10/2026 — modo prueba YiQi (no autorizado Live)
+import AvisoModoPrueba from '../components/ui/AvisoModoPrueba'
+import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
 // ============================================================
 // OrdenesCompra.jsx — v3
 // v2: leia de la tabla propia ordenes_yiqi en vez de YiQi en vivo.
@@ -146,6 +149,8 @@ function DetalleOrden({ orden }) {
 const TONO_ESTADO_YIQI = { completada: 'verde', parcial: 'amarillo', enviada: 'gris' }
 export default function OrdenesCompra({ onCambioOrdenes }) {
   const permisos = usePermisos()
+  // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+  const { modoPrueba } = useModoPruebaYiqi()
   const [ordenSola] = useState(() => {
     try {
       const n = Number(new URLSearchParams(window.location.search).get('orden'))
@@ -211,6 +216,8 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
         <EncabezadoPagina titulo={`Orden #${ordenSola}`} bajada="Detalle de una orden generada desde el sistema">
           <a href="?page=ocs" className="btn btn-sm"><i className="ti ti-arrow-left" aria-hidden="true" /> Todas las órdenes</a>
         </EncabezadoPagina>
+        {/* 23/10/2026 — modo prueba YiQi (no autorizado Live) */}
+        {modoPrueba && <AvisoModoPrueba className="mx-7 mt-4" />}
         <OrdenesPropias onCambio={onCambioOrdenes} soloOrdenId={ordenSola} />
       </div>
     )
@@ -232,6 +239,8 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
           {cargandoAlgo ? 'Actualizando…' : 'Actualizar'}
         </button>
       </EncabezadoPagina>
+      {/* 23/10/2026 — modo prueba YiQi (no autorizado Live) */}
+      {modoPrueba && <AvisoModoPrueba className="mx-7 mt-4" />}
       {/* Error de permisos: falla cerrado, no se muestra ningun dato */}
       {permisos.error && (
         <div className="mx-7 mt-4 bloque bloque-rojo">

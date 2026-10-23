@@ -52,6 +52,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verificarLlamador, respuestaAuthError } from '../_shared/auth.ts';
 import { getYiqiConfig } from '../_shared/yiqiConfig.ts';
+import { escrituraYiqiHabilitada, respuestaModoPrueba } from '../_shared/escrituraYiqi.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -116,6 +117,8 @@ Deno.serve(async (req: Request) => {
     // CUALQUIER entidad con datos mínimos antes de construir la integración
     // real. Devuelve el status y cuerpo crudo de YiQi, éxito o error.
     if (body.crear === true) {
+      // 23/10/2026 — interruptor de escritura a YiQi (Federico: no autorizado Live). Se habilita con reglas_compra.escritura_yiqi_habilitada = true.
+      if (!(await escrituraYiqiHabilitada(supabaseAdmin))) return respuestaModoPrueba(CORS_HEADERS);
       if (!body.entidad) {
         return new Response(
           JSON.stringify({ ok: false, error: 'Falta "entidad" en el body (modo crear)' }),
@@ -226,6 +229,14 @@ Deno.serve(async (req: Request) => {
     // metodo: 'GET' para solo probar si el id resuelve a un registro real
     // (diagnóstico, no toca nada), 'DELETE' (default) para borrar de verdad.
     const metodo = (body.metodo || 'DELETE').toUpperCase();
+    // 23/10/2026 — interruptor de escritura a YiQi (Federico: no autorizado Live). Se habilita con reglas_compra.escritura_yiqi_habilitada = true.
+    // Solo GET/HEAD (lectura/diagnóstico) pasan sin interruptor; cualquier otro
+    // método (DELETE por defecto, POST, PUT, PATCH...) escribe en YiQi y queda cortado.
+    if (metodo !== 'GET' && metodo !== 'HEAD') {
+      if (!(await escrituraYiqiHabilitada(supabaseAdmin))) {
+        return respuestaModoPrueba(CORS_HEADERS, { metodo });
+      }
+    }
     const config = await getYiqiConfig(supabaseAdmin, 'yiqi-borrar-oc');
 
     const url = `${config.base_url}/api/public/${entidad}/${yiqiId}?schemaId=${config.schema_id}`;

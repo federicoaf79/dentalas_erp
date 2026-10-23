@@ -33,6 +33,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { verificarLlamador, respuestaAuthError } from '../_shared/auth.ts';
 import { getYiqiConfig } from '../_shared/yiqiConfig.ts';
+import { escrituraYiqiHabilitada, respuestaModoPrueba } from '../_shared/escrituraYiqi.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -58,6 +59,9 @@ Deno.serve(async (req: Request) => {
     // así que también puede disparar esto.
     const chequeo = await verificarLlamador(req, supabaseAdmin);
     if (!chequeo.ok) return respuestaAuthError(chequeo, CORS_HEADERS);
+
+    // 23/10/2026 — interruptor de escritura a YiQi (Federico: no autorizado Live). Se habilita con reglas_compra.escritura_yiqi_habilitada = true.
+    if (!(await escrituraYiqiHabilitada(supabaseAdmin))) return respuestaModoPrueba(CORS_HEADERS);
 
     let body: { linea_id?: number };
     try {

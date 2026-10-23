@@ -4,6 +4,9 @@ import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
 import { deDeposito } from '../../lib/depositos'
 import { generarRemitoImprimible } from '../../lib/pdfRemito'
+// 23/10/2026 — modo prueba YiQi (no autorizado Live)
+import AvisoModoPrueba from '../../components/ui/AvisoModoPrueba'
+import { useModoPruebaYiqi } from '../../hooks/useModoPruebaYiqi'
 
 // ============================================================
 // pages/deposito/ConfirmarRecepcion.jsx — 7/9/2026, v2 10/9/2026
@@ -80,6 +83,8 @@ function FilaLineaDeclarada({ linea, onConfirmar, guardando }) {
 
 export default function ConfirmarRecepcion() {
   const permisos = usePermisos()
+  // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+  const { modoPrueba } = useModoPruebaYiqi()
   const [lineas, setLineas] = useState([])
   const [solicitudesPorId, setSolicitudesPorId] = useState({})
   const [loading, setLoading] = useState(true)
@@ -173,12 +178,24 @@ export default function ConfirmarRecepcion() {
       // Fire-and-forget: dispara el movimiento real en YiQi. Un error
       // acá nunca deshace el "recibido" ya confirmado (regla de oro,
       // igual que mover-stock-yiqi).
+      // 23/10/2026 — modo prueba YiQi (no autorizado Live): si la función
+      // responde modo_prueba no es un error; la recepción quedó solo en la app.
       supabase.functions
         .invoke('mover-stock-reposicion', { body: { linea_id: linea.id } })
+        .then(({ data }) => {
+          if (data?.modo_prueba) {
+            setAviso(`${linea.sku} confirmado como recibido. Modo prueba: no se movió stock en YiQi.`)
+            setTimeout(() => setAviso(null), 4000)
+          }
+        })
         .catch((e) => console.error('[mover-stock-reposicion]', e))
 
       setLineas((prev) => prev.filter((l) => l.id !== linea.id))
-      setAviso(`${linea.sku} confirmado como recibido.`)
+      setAviso(
+        modoPrueba
+          ? `${linea.sku} confirmado como recibido. Modo prueba: no se movió stock en YiQi.`
+          : `${linea.sku} confirmado como recibido.`
+      )
       setTimeout(() => setAviso(null), 4000)
     } catch (err) {
       setError(err.message)
@@ -210,6 +227,13 @@ export default function ConfirmarRecepcion() {
         Confirmá contra lo que realmente llegó. Si la cantidad no coincide, corregila acá antes de confirmar — el
         movimiento de stock real se registra recién con esta confirmación, no antes.
       </Aviso>
+
+      {/* 23/10/2026 — modo prueba YiQi (no autorizado Live) */}
+      {modoPrueba && (
+        <AvisoModoPrueba className="mx-4 mt-4">
+          Modo prueba: confirmar recepción registra lo recibido en la app, pero no mueve stock en YiQi.
+        </AvisoModoPrueba>
+      )}
 
       {error && (
         <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">

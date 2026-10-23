@@ -10,6 +10,8 @@ import BloqueAccion from './ui/BloqueAccion'
 import BarraPasos from './ui/BarraPasos'
 import InfoAyuda from './ui/InfoAyuda'
 import { renderTemplate } from '../pages/TemplatesMensajes'
+// 23/10/2026 — modo prueba YiQi (no autorizado Live)
+import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
 // ============================================================
 // OrdenesPropias.jsx
 // Órdenes generadas DESDE el sistema (tablas ordenes_propias /
@@ -31,9 +33,12 @@ import { renderTemplate } from '../pages/TemplatesMensajes'
 // ============================================================
 // Semáforo de la tarjeta (feedback Ivana 17/21): el tono sale del estado y,
 // para las aprobadas, de dónde quedaron (YiQi / WhatsApp).
-function vistaEstadoOrden(o) {
+function vistaEstadoOrden(o, modoPrueba = false) {
   if (o.estado === 'aprobada') {
-    if (!o.yiqi_id_creado) return { tono: 'rojo', label: 'No se pudo cargar en YiQi' }
+    // 23/10/2026 — modo prueba YiQi (no autorizado Live): sin yiqi_id_creado NO es un problema, es neutro (gris).
+    // Si ya se mandó al proveedor por WhatsApp se muestra como siempre.
+    if (!o.yiqi_id_creado && modoPrueba && !o.whatsapp_enviada_en) return { tono: 'gris', label: 'Modo prueba: no se envía a YiQi' }
+    if (!o.yiqi_id_creado && !modoPrueba) return { tono: 'rojo', label: 'No se pudo cargar en YiQi' }
     if (!o.whatsapp_enviada_en) return { tono: 'amarillo', label: 'Lista para enviar' }
     return { tono: 'verde', label: 'Enviada al proveedor' }
   }
@@ -154,6 +159,8 @@ const BTN_MODAL_ROJO = 'btn bg-[var(--red)]! border-[var(--red)]! text-white! ho
 // orden, con barra de pasos y bloque de acción, sin la lista.
 export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
   const permisos = usePermisos()
+  // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+  const { modoPrueba } = useModoPruebaYiqi()
   const [ordenes, setOrdenes] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
@@ -742,6 +749,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
   async function confirmarDecision() {
     if (!modal) return
     const { orden, nuevoEstado } = modal
+    let noEnviadaPorPrueba = false // 23/10/2026 — modo prueba YiQi (no autorizado Live)
     setOcupado(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -762,13 +770,20 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
       // nada más que loguearlo. Ver supabase/functions/enviar-oc-yiqi.
       if (nuevoEstado === 'aprobada') {
         try {
-          await supabase.functions.invoke('enviar-oc-yiqi', { body: { orden_id: orden.id } })
+          const { data: respYiqi } = await supabase.functions.invoke('enviar-oc-yiqi', { body: { orden_id: orden.id } })
+          // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+          if (respYiqi?.modo_prueba) noEnviadaPorPrueba = true
         } catch (errYiqi) {
           console.error('[enviar-oc-yiqi]', errYiqi)
         }
       }
 
-      setAviso(`Orden #${orden.id} ${nuevoEstado === 'aprobada' ? 'aprobada' : 'rechazada'}.`)
+      // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+      setAviso(
+        nuevoEstado === 'aprobada' && noEnviadaPorPrueba
+          ? 'Orden aprobada. Modo prueba: no se envió a YiQi.'
+          : `Orden #${orden.id} ${nuevoEstado === 'aprobada' ? 'aprobada' : 'rechazada'}.`
+      )
       setAbierta(null)
       setModal(null)
       setComentarioModal('')
@@ -791,7 +806,10 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
         body: { orden_id: orden.id },
       })
       if (error) throw new Error(error.message)
-      if (data?.ok && data?.enviada) {
+      if (data?.modo_prueba) {
+        // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+        setAviso(`Orden #${orden.id}: Modo prueba, no se envió a YiQi.`)
+      } else if (data?.ok && data?.enviada) {
         setAviso(`Orden #${orden.id} vinculada a YiQi (OC #${data.yiqi_id}).`)
       } else if (data?.ok) {
         setAviso(data?.motivo ? `Orden #${orden.id}: ${data.motivo}` : `Orden #${orden.id}: sin cambios.`)
@@ -866,6 +884,8 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
         body: { orden_id: orden.id, items },
       })
       if (error) throw new Error(error.message)
+      // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+      if (data?.modo_prueba) throw new Error('Modo prueba: no se agrega mercadería en YiQi.')
       if (!data?.ok) throw new Error(data?.error || 'No se pudo agregar la mercadería.')
 
       setAviso(`Se agregaron ${data.itemsAgregados} ítem(s) a la orden #${orden.id} y a YiQi.`)
@@ -1033,7 +1053,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
           <span className="font-bold text-[11px] uppercase tracking-[.04em] text-[#374151]">Acción requerida:</span>
           <span className="flex items-center gap-[7px]"><span className="sem sb" /><span className="font-semibold text-[var(--blu)]">Aprobar</span><span className="text-[var(--sub)]">— espera a Aris</span></span>
           <span className="flex items-center gap-[7px]"><span className="sem sy" /><span className="font-semibold text-[#92400e]">Completar o enviar</span><span className="text-[var(--sub)]">— borrador o lista para mandar al proveedor</span></span>
-          <span className="flex items-center gap-[7px]"><span className="sem sr" /><span className="font-semibold text-[var(--red)]">Problema</span><span className="text-[var(--sub)]">— rechazada o no se pudo cargar en YiQi</span></span>
+          <span className="flex items-center gap-[7px]"><span className="sem sr" /><span className="font-semibold text-[var(--red)]">Problema</span><span className="text-[var(--sub)]">{/* 23/10/2026 — modo prueba YiQi (no autorizado Live) */}{modoPrueba ? '— rechazada' : '— rechazada o no se pudo cargar en YiQi'}</span></span>
           <span className="flex items-center gap-[7px]"><span className="sem sg" /><span className="font-semibold text-[var(--grn)]">Listo</span><span className="text-[var(--sub)]">— enviada al proveedor</span></span>
         </div>
       )}
@@ -1047,7 +1067,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
         ) : (
           <div className="space-y-3.5">
             {visibles.map((o) => {
-              const vista = vistaEstadoOrden(o)
+              const vista = vistaEstadoOrden(o, modoPrueba)
               const causa = causasPorOrden[String(o.id)]
               const editable = puedeEditarItems(o)
               return (
@@ -1065,10 +1085,17 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                       {textoDecision(o) && (
                         <div className="text-[12px] text-[var(--sub)] mt-[2px]">{textoDecision(o)}</div>
                       )}
+                      {/* 23/10/2026 — modo prueba YiQi (no autorizado Live): en modo prueba el error viejo es solo un dato, en gris y sin alerta */}
                       {o.estado === 'aprobada' && !o.yiqi_id_creado && o.yiqi_error && (
-                        <div className="text-[11px] text-[var(--red)] mt-1 truncate flex items-center gap-1" title={o.yiqi_error}>
-                          <i className="ti ti-alert-triangle text-[13px]" aria-hidden="true" /> {o.yiqi_error}
-                        </div>
+                        modoPrueba ? (
+                          <div className="text-[11px] text-gray-500 mt-1 truncate" title={o.yiqi_error}>
+                            Último intento a YiQi (antes del modo prueba): {o.yiqi_error}
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-[var(--red)] mt-1 truncate flex items-center gap-1" title={o.yiqi_error}>
+                            <i className="ti ti-alert-triangle text-[13px]" aria-hidden="true" /> {o.yiqi_error}
+                          </div>
+                        )
                       )}
                       {causa && (
                         <div className="text-[11px] text-gray-500 mt-1 truncate flex items-center gap-1" title={causa.nota ?? ''}>
@@ -1160,7 +1187,8 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                         )}
                         {/* 7/9/2026 (U-4): título aclara qué hace el botón, no solo
                             por qué falló la primera vez. */}
-                        {filtro === 'activas' && permisos.esAdmin && o.estado === 'aprobada' && !o.yiqi_id_creado && (
+                        {/* 23/10/2026 — modo prueba YiQi (no autorizado Live): sin botón de reintento en modo prueba (no haría nada) */}
+                        {filtro === 'activas' && permisos.esAdmin && o.estado === 'aprobada' && !o.yiqi_id_creado && !modoPrueba && (
                           <button
                             disabled={ocupado}
                             onClick={() => reintentarEnvioYiqi(o)}
@@ -1261,13 +1289,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               },
               {
                 rotulo: 'Cargada en YiQi',
-                fecha: enYiqi ? formatoDia(abierta.yiqi_enviada_en) : null,
-                estado: enYiqi ? 'hecho' : aprobada ? 'alerta' : 'pend',
+                // 23/10/2026 — modo prueba YiQi (no autorizado Live): en modo prueba "sin cargar" es neutro (pendiente), no alerta
+                fecha: enYiqi ? formatoDia(abierta.yiqi_enviada_en) : aprobada && modoPrueba ? 'Modo prueba: no se envía a YiQi' : null,
+                estado: enYiqi ? 'hecho' : aprobada && !modoPrueba ? 'alerta' : 'pend',
               },
               {
                 rotulo: 'Enviada al proveedor',
                 fecha: enviadaProv ? formatoDia(abierta.whatsapp_enviada_en) : null,
-                estado: enviadaProv ? 'hecho' : enYiqi ? 'actual' : 'pend',
+                estado: enviadaProv ? 'hecho' : enYiqi || (aprobada && modoPrueba) ? 'actual' : 'pend', // 23/10/2026 — modo prueba YiQi (no autorizado Live)
               },
               {
                 rotulo: ing?.encontrada && ing.entregada > 0 && ing.pendiente > 0
@@ -1287,7 +1316,9 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               pendiente: 'Sigue: que Aris la apruebe o la rechace.',
               rechazada: 'La orden fue rechazada.',
             }[e] ?? (
-              !enYiqi ? 'Sigue: cargarla en YiQi (reintentar envío).'
+              // 23/10/2026 — modo prueba YiQi (no autorizado Live)
+              !enYiqi && modoPrueba ? 'Modo prueba: no se envía a YiQi. Sigue: mandarla al proveedor por WhatsApp.'
+              : !enYiqi ? 'Sigue: cargarla en YiQi (reintentar envío).'
               : !enviadaProv ? 'Sigue: mandarla al proveedor por WhatsApp.'
               : ing?.encontrada && ing.pendiente === 0 && ing.entregada > 0 ? 'Recibida completa.'
               : 'Sigue: esperar la mercadería.'
@@ -1339,7 +1370,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               {abierta.comentario_decision || 'Sin comentario.'}
             </BloqueAccion>
           )}
-          {abierta.estado === 'aprobada' && !abierta.yiqi_id_creado && (
+          {/* 23/10/2026 — modo prueba YiQi (no autorizado Live): en modo prueba, bloque gris sin "Reintentar envío" */}
+          {abierta.estado === 'aprobada' && !abierta.yiqi_id_creado && modoPrueba && (
+            <BloqueAccion tono="gris" className="mb-3" titulo="Modo prueba: no se envía a YiQi">
+              La orden quedó aprobada solo en la app.
+              {abierta.yiqi_error && <span className="block text-[11px] text-gray-500 mt-1">Último intento a YiQi (antes del modo prueba): {abierta.yiqi_error}</span>}
+            </BloqueAccion>
+          )}
+          {abierta.estado === 'aprobada' && !abierta.yiqi_id_creado && !modoPrueba && (
             <BloqueAccion
               tono="rojo"
               className="mb-3"
@@ -1565,8 +1603,9 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
           <div className="flex items-center justify-between gap-2 flex-wrap pt-4 mt-1 border-t border-[var(--border)]">
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={() => imprimir(abierta)} className="btn btn-sm"><i className="ti ti-file-text" aria-hidden="true" /> PDF de la orden</button>
+              {/* 23/10/2026 — modo prueba YiQi (no autorizado Live) */}
               {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
-                <button onClick={() => abrirAgregarMercaderia(abierta)} className="btn btn-sm"><i className="ti ti-plus" aria-hidden="true" /> Agregar mercadería</button>
+                <button onClick={() => abrirAgregarMercaderia(abierta)} disabled={modoPrueba} title={modoPrueba ? 'Modo prueba: no se agrega mercadería en YiQi' : undefined} className="btn btn-sm"><i className="ti ti-plus" aria-hidden="true" /> Agregar mercadería</button>
               )}
               <button
                 onClick={() =>
