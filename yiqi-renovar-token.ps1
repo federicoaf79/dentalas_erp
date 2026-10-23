@@ -5,22 +5,23 @@
 # (grant_type=password) y prepara el UPDATE para yiqi_config.
 #
 # COMO USARLO:
-#   1. Completa $usuario y $clave abajo (cuenta de integracion,
-#      la misma de siempre: ventas@dentalab.com.ar).
+#   1. La clave NO va en este archivo (estaba trackeada en git; sacada
+#      el 23/10/2026). Cargala solo en la consola donde lo vas a correr:
+#        $env:YIQI_CLAVE = "<la clave de ventas@dentalab.com.ar>"
+#      $usuario sigue siendo la cuenta de integracion de siempre.
 #   2. Correlo: .\yiqi-renovar-token.ps1
 #   3. El UPDATE queda copiado al portapapeles solo -- no se
 #      imprime en pantalla. Pegalo en el SQL Editor de Supabase
 #      y ejecutalo.
-#   4. Borra la contraseña de este archivo (o borra el archivo
-#      entero) apenas termines. No lo compartas ni lo pegues en
-#      el chat -- nadie mas necesita verlo.
+#   4. Cerra la consola al terminar (la variable YIQI_CLAVE muere con
+#      ella). No pegues la clave en el chat ni en ningun archivo.
 # ============================================================
 
 $usuario = "ventas@dentalab.com.ar"
-$clave   = "Unproducto345"
+$clave   = if ($env:YIQI_CLAVE) { $env:YIQI_CLAVE } else { "COMPLETAR_ACA" }
 
 if ($clave -eq "COMPLETAR_ACA") {
-    Write-Host "Falta completar la contraseña en la linea `$clave` antes de correr esto." -ForegroundColor Red
+    Write-Host "Falta la clave: corre antes `$env:YIQI_CLAVE = ""..."" en esta misma consola." -ForegroundColor Red
     exit 1
 }
 

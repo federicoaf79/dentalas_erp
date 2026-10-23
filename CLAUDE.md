@@ -31,10 +31,10 @@ Sistema de gestión de compras y stock para **Dentalab** (laboratorio dental, Ar
 
 El frontend **no llama a YiQi en vivo**. Dos capas:
 
-1. **Sync** — Edge Function `sync-yiqi` disparada por `pg_cron`: jobid 3 `sync-material-cada-15-min` (MATERIAL), jobid 4 `sync-oc-y-clientes-diario` 06:00 UTC (REPORTE_DE_OC + CLIENTE), jobid 5 `sync-ventas-diario` 06:30 UTC (REPORTE_DE_VENTAS); más stock por depósito (`stock_yiqi`, cada 15 min), último movimiento por SKU (`ultimo_movimiento_stock_yiqi`) y ventas por vendedor (`ventas_mensual_yiqi_vendedor`, `20260914090000`). Desde `9bee321` (29/9) soporta el formato nuevo de smarties pivoteadas.
+1. **Sync** — Edge Function `sync-yiqi` disparada por `pg_cron`: jobid 17 `sync-material-cada-15-min` (MATERIAL), jobid 18 `sync-oc-y-clientes-diario` 06:00 UTC (REPORTE_DE_OC + CLIENTE), jobid 19 `sync-ventas-diario` 06:30 UTC (REPORTE_DE_VENTAS). Eran los jobid 3, 4 y 5 hasta que `20260930120000` los recreó para leer la key de Vault [prod 2026-10-23]; más stock por depósito (`stock_yiqi`, cada 15 min), último movimiento por SKU (`ultimo_movimiento_stock_yiqi`) y ventas por vendedor (`ventas_mensual_yiqi_vendedor`, `20260914090000`). Desde `9bee321` (29/9) soporta el formato nuevo de smarties pivoteadas.
 2. **Lectura** — las pantallas leen las tablas propias con fetch paralelo.
 
-⚠️ `update cron.job set active=...` da permission denied en el SQL Editor → `select cron.alter_job(3, active := false);`
+⚠️ `update cron.job set active=...` da permission denied en el SQL Editor → `select cron.alter_job(17, active := false);` (17 = sync de MATERIAL)
 ⚠️ El cron "succeeded" no es señal de salud: `net.http_post` encola y no refleja la respuesta. Mirar `net._http_response` y la observabilidad persistente (sesión 20/8).
 
 ### Tablas espejo de YiQi (nunca mezclar con lógica propia)
@@ -43,7 +43,7 @@ El frontend **no llama a YiQi en vivo**. Dos capas:
 ### Tablas propias
 `usuarios_config` (admin/operador) · `usuario_proveedor` · `yiqi_config` · `ordenes_propias` + `ordenes_propias_items` (papelera reversible `archivada_en/por`; `yiqi_id_creado`/`yiqi_error`) · `reglas_compra` · `empresa_config` · `catalogo_causas` + `declaraciones_causa` (append-only, archivar/restaurar `bca7b94`) · `templates_mensaje` · `proveedores` (condiciones comerciales, `vende_en_cajas_cerradas` `e54999b`) · `composicion_articulos` (44 filas, fraccionados y combos ML) · `articulos_excluidos_alertas` · `alertas_pausadas` · `alertas_suspendidas` · `reposiciones_sugeridas` · `solicitudes_reposicion` + líneas/remitos (circuito Central↔Local, `31dfee6`).
 
-**Baseline**: `20260801000000_baseline_objetos_creados_a_mano.sql` versiona 25 tablas, funciones, vista, policies y triggers que se habían creado a mano (`aaa89e9`, 30/9). Cierra el riesgo "esquema sin migrations" de Tulkas **salvo `declaraciones_causa`**, que no tiene `CREATE TABLE` ejecutable en ninguna migración (solo comentado en `20260822000000:18`) [repo 2026-10-18].
+**Baseline**: `20260801000000_baseline_objetos_creados_a_mano.sql` versiona 25 tablas, funciones, vista, policies y triggers que se habían creado a mano (`aaa89e9`, 30/9). Cierra el riesgo "esquema sin migrations" de Tulkas **salvo `declaraciones_causa`**, que no tenía `CREATE TABLE` ejecutable en ninguna migración (solo comentado en `20260822000000:18`) [repo 2026-10-18]. Versionada el 23/10 en `20260801000100_declaraciones_causa_tabla.sql`, idempotente, con la estructura leída de producción. Producción tiene 35 tablas en `public`, y las 35 tienen ahora su `CREATE TABLE` en el repo [prod 2026-10-23].
 
 ### Las smarties en YiQi (renombrar CAMBIA el smartieId; editar columnas no)
 | Smartie | id | Entidad |
@@ -148,9 +148,15 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 - **Nombre de la pantalla "Reglas y alertas":** en el menú se llama "Reglas de compra y aprobación" (`Sidebar.jsx:64`). [repo 2026-10-18]
 
 **NUEVO**
+- **Crons:** 11 jobs, 10 activos. [prod 2026-10-23]
+  - `reintentar-oc-pendientes-yiqi` (id 6) corre cada 10 min, activo.
+  - `generar-reposicion-interna-diario` (id 10) está inactivo, coherente con "la reposición automática se reactiva solo cuando Federico lo pida".
+  - El resto: stock, movimientos y material cada 15 min; reglas de reposición Central cada 15 min; precios 06:15, OC y clientes 06:00, ventas 06:30, ventas por vendedor 06:35, candidatos de equivalencia 06:30 UTC.
+- **`composicion_articulos`:** 44 filas. [prod 2026-10-23]
 - **"OC en curso" sube sin parar:** 115 (28/9) → 137 (7/10) → 150 (18/10).
   - `sync-yiqi` hace upsert de lo que trae el reporte 2345, pero nunca saca las OC que dejan de venir. El reporte trae solo las OC con pendiente, así que una OC recibida completa queda congelada como "Enviada".
-  - Afecta el número del menú, Seguimiento, Historial y el paso "Mercadería recibida" del detalle de cada orden. [sin verificar el conteo exacto de filas congeladas — SQL pendiente]
+  - Afecta el número del menú, Seguimiento, Historial y el paso "Mercadería recibida" del detalle de cada orden.
+  - **Medido:** 125 de las 162 OC del espejo (357 líneas) no se actualizaron en el último sync del reporte. [prod 2026-10-23]
 - **Revisión de Ivana:** el documento con 8 preguntas y 19 puntos para revisar (Claude Docs, más el Word en Descargas) está sin respuestas al 18/10.
 - **Dependencias:** `npm audit --omit=dev` deja 1 vulnerabilidad alta, en `xlsx` (no hay arreglo en npm). La app solo escribe Excel (`exportarExcel.js`), no lee archivos ajenos, que es donde están las fallas. [repo 2026-10-05]
 - **Tablas en pantallas de 1536 px:** `f86b582`. [en vivo 2026-10-07, Federico en Monitor, Alertas, Proveedores y Predictor]
@@ -159,6 +165,7 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 
 - **[ABIERTO — CRITICAL] Credencial real de YiQi (`ventas@dentalab.com.ar`) en `yiqi-renovar-token.ps1`.**
   - Trackeado desde `03b6288` (20/8) y presente en HEAD y en `origin/main`. [repo 2026-10-18]
+  - 23/10: sacada del working tree. El script ahora la lee de `$env:YIQI_CLAVE`, con el guard `COMPLETAR_ACA` si falta. Sigue en el historial (`03b6288`) hasta que se purgue. [repo 2026-10-23]
   - Visibilidad del repo en GitHub: [sin verificar].
   - Remediación:
     1. Reemplazar el valor por `COMPLETAR_ACA` y commitear.
@@ -167,11 +174,12 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
   - *Texto del 9/10, DESMENTIDO el 18/10:* "`yiqi-renovar-token.ps1` sí está trackeado pero `$clave = "COMPLETAR_ACA"` es un placeholder con guard — no hay credencial real en el repo."
 - **[CERRADO]** `dentalabs_Sup_KW.txt` y `verificarschemastockyiqi.ps1`: no están trackeados y nunca entraron al historial. Siguen en la carpeta. [repo 2026-10-18, `git ls-files`]
 - **[CERRADO 7/8, reforzado 6/9]** Edge Functions sin autorización (`verificarLlamador`). Observación nueva: `mover-stock-reposicion` no está en `config.toml`, así que en un próximo deploy queda con `verify_jwt=true`. [repo 2026-10-18]
-- **[ABIERTO — HIGH] Esquema sin migrations.** El baseline `20260801000000` (30/9) cubre 25 tablas, pero `declaraciones_causa` no tiene `CREATE TABLE` ejecutable. Hace falta leer su DDL real en producción y versionarla. [repo 2026-10-18]
+- **[CERRADO en el repo 2026-10-23] Esquema sin migrations.** El baseline `20260801000000` (30/9) cubre 25 tablas. `declaraciones_causa`, la única de las 35 tablas de producción sin `CREATE TABLE`, se versionó en `20260801000100`. Es idempotente y está probada en Postgres local: con dos corridas queda igual a producción (12 columnas, 4 policies, 3 índices, 6 restricciones). [prod 2026-10-23, repo 2026-10-23]
+  - *Estado anterior, 18/10:* ABIERTO — "`declaraciones_causa` no tiene `CREATE TABLE` ejecutable".
 - **[CERRADO 6/8]** Código sin git (remoto `dentalas_erp`).
 - **[CERRADO 28/9]** Duplicados históricos de OC en YiQi. No existen en YiQi y el espejo está limpio (ver DESMENTIDO). Tulkas lo sigue listando como LOW: desactualizado.
 - **[ABIERTO] Filas congeladas en `ordenes_yiqi`.** El sync no da de baja las OC que salen del reporte 2345. Opción robusta: leer el estado por `ORDC_ASUNTO` desde `ORDEN_DE_COMPRA` (~2–3 h).
-- **[CONTRADICCIÓN SIN RESOLVER]** Federico (28/9) dice que el envío a YiQi era "construido pero sin activar". El código lo dispara al aprobar (`OrdenesPropias.jsx:683`, `NuevaOC.jsx`) y el cron de reintentos sigue activo: la #2 se reintenta con error de costo.
+- **[CONTRADICCIÓN SIN RESOLVER]** Federico (28/9) dice que el envío a YiQi era "construido pero sin activar". El código lo dispara al aprobar (`OrdenesPropias.jsx:683`, `NuevaOC.jsx`) y el cron `reintentar-oc-pendientes-yiqi` (id 6) está activo cada 10 min [prod 2026-10-23]: la #2 se reintenta con error de costo.
 - **[ACEPTADO]** Colisión de renovación de token entre los 3 crons a las 06:00 UTC, sin locking.
 - **[ABIERTO — MEDIUM]** Carpetas `_to_delete`, `_to_delete_git_locks` y `_to_delete_old` en la raíz. [repo 2026-10-18]
 - **[ABIERTO — MEDIUM]** `package-lock.json` vacío en la raíz, trackeado y sin relación con `frontend/`. [repo 2026-10-18]
@@ -180,8 +188,8 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 
 ## PENDIENTE INMEDIATO
 
-1. Sacar la credencial de `yiqi-renovar-token.ps1` (placeholder + commit) y decidir la purga del historial.
-2. Versionar `declaraciones_causa`: leer su DDL en producción y escribir la migración.
+1. Credencial de `yiqi-renovar-token.ps1`: el 23/10 se sacó del working tree (ahora la lee de `$env:YIQI_CLAVE`). Falta el commit y decidir si se purga el historial (`03b6288`).
+2. ~~Versionar `declaraciones_causa`~~: hecho el 23/10 (`20260801000100`). Falta el commit.
 3. Dar de baja en `ordenes_yiqi` las OC que salen del reporte, o leer el estado por asunto (paso "Mercadería recibida" y número "OC en curso").
 4. Resolver la contradicción del envío automático a YiQi al aprobar: dejarlo activo o ponerle un interruptor.
 5. Agregar `[functions.mover-stock-reposicion] verify_jwt = false` en `config.toml`.

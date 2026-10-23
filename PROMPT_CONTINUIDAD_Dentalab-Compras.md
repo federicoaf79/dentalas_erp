@@ -1260,3 +1260,13 @@ Desde el 9/10 este historial no se reescribe: `CLAUDE.md` es el estado operativo
 - **DESMENTIDO — duplicados históricos de OC en YiQi:** no existen desde antes del 5/9 (verificado en vivo el 28/9). Riesgo cerrado.
 - **NUEVO — órdenes propias:** 4 activas (#18, #14, #12 esperando aprobación; #2 aprobada con error de costo) y 9 en papelera. Los borradores #13, #15, #16, #17 y #19 se eliminaron entre el 3/10 y el 18/10.
 - **NUEVO — "OC en curso" sube sin parar:** 115 → 137 → 150, porque el sync nunca da de baja las OC que salen del reporte 2345.
+
+## Entrada 23/10/2026 — resultados del SQL de reconciliación (append)
+
+- **OC congeladas en el espejo:** 125 de 162, con 357 líneas.
+- **`composicion_articulos`:** 44 filas.
+- **Crons:** 11, 10 activos. Los del sync son ahora los jobid 17, 18 y 19, no 3, 4 y 5. `reintentar-oc-pendientes-yiqi` activo cada 10 min; `generar-reposicion-interna-diario` inactivo.
+- **`declaraciones_causa`:** era la única de las 35 tablas sin `CREATE TABLE`. Versionada en `20260801000100` (idempotente, probada en local).
+- **`yiqi-renovar-token.ps1`:** la clave se sacó del working tree; ahora la lee de `$env:YIQI_CLAVE`. Sigue en el historial (`03b6288`).
+
+Todas las cifras: [prod 2026-10-23]. Detalle en `CLAUDE.md`.

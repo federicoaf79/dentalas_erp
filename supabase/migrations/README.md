@@ -1,12 +1,12 @@
 # supabase/migrations
 
-**Estado al 18/10/2026:** 54 migraciones, de `20260801000000_baseline_objetos_creados_a_mano.sql` a `20261007120000_sugerencias_compra_maximo.sql`. [repo 2026-10-18]
+**Estado al 23/10/2026:** 55 migraciones, de `20260801000000_baseline_objetos_creados_a_mano.sql` a `20261007120000_sugerencias_compra_maximo.sql`. Las 35 tablas de `public` en producción tienen su `CREATE TABLE` en esta carpeta. [repo 2026-10-23, prod 2026-10-23]
 
 ## Historia corta
 
 - **5/8/2026:** la carpeta estaba vacía a propósito. Todo el esquema se había aplicado a mano en el SQL Editor y la sesión no podía leer producción para escribir un baseline real.
 - **30/9/2026:** se versionó el baseline (`20260801000000`, commit `aaa89e9`). Cubre 25 tablas, funciones, vista, policies y triggers creados a mano. Lleva la fecha 1/8 para que quede primero.
-- **Excepción conocida:** `declaraciones_causa` no tiene `CREATE TABLE` ejecutable en ninguna migración. Solo aparece comentado en `20260822000000_declaraciones_causa.sql:18`, y el baseline no la incluye. Pendiente: leer su DDL en producción y versionarla. [repo 2026-10-18]
+- **`declaraciones_causa`:** era la única tabla sin `CREATE TABLE` ejecutable (solo estaba comentada en `20260822000000_declaraciones_causa.sql:18`). Se versionó el 23/10 en `20260801000100_declaraciones_causa_tabla.sql`, con la estructura leída de producción. Es idempotente: en producción no cambia nada.
 
 ## Cómo se aplican
 
