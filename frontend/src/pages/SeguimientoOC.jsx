@@ -4,14 +4,19 @@ import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import DeclararCausaModal from '../components/DeclararCausaModal'
 import { ultimasCausasPorReferencia } from '../lib/causas'
-import { ESTADO_OC_YIQI } from '../lib/estados'
+import { ESTADO_OC_YIQI, ESTADO_OC_PROPIA } from '../lib/estados'
+import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import Pastilla from '../components/ui/Pastilla'
 import BloqueAccion from '../components/ui/BloqueAccion'
 import BarraPasos from '../components/ui/BarraPasos'
 
 // ============================================================
-// SeguimientoOC.jsx — v6
+// SeguimientoOC.jsx — v7
+// v7 (23/10/2026, pedido de Ivana, pregunta 5): bloque "Órdenes de la app"
+// con las órdenes propias que todavía no están en YiQi (borrador, esperando
+// aprobación, aprobadas sin vincular). Las vinculadas a YiQi ya aparecen abajo
+// por el espejo (asunto "Dentalab-Compras #<id>"), por eso no se repiten.
 // v6 (23/10/2026, punto 3 "Recibida confiable"): estado "Cerrada en YiQi" para las OC que
 // dejaron de venir en el reporte de YiQi (ordenes_yiqi.cerrada_en_yiqi). Ya no cuentan como
 // Demoradas ni en curso; se listan abajo junto con las recibidas completas.
@@ -346,10 +351,99 @@ function TarjetaOrden({ o, abierta, onToggle, causa, onCausa, compacta = false }
   )
 }
 
+// 23/10/2026 — órdenes propias que todavía no están en YiQi. Las rechazadas y
+// las de la papelera no se muestran (no están en curso). Si la consulta falla
+// la pantalla sigue funcionando sin este bloque.
+async function traerOrdenesPropiasEnCurso() {
+  const { data, error } = await supabase
+    .from('ordenes_propias')
+    .select('id, estado, proveedor_nombre, total_estimado, creada_en, creada_por, decidida_por, decidida_en, yiqi_id_creado, whatsapp_enviada_en, archivada_en, ordenes_propias_items(count)')
+    .is('archivada_en', null)
+    .is('yiqi_id_creado', null)
+    .in('estado', ['borrador', 'pendiente', 'aprobada'])
+    .order('id', { ascending: false })
+  if (error) throw new Error(error.message)
+  const filas = (data ?? []).map((o) => ({ ...o, cant_items: o.ordenes_propias_items?.[0]?.count ?? 0 }))
+  const ids = [...new Set(filas.flatMap((o) => [o.creada_por, o.decidida_por]).filter(Boolean))]
+  let nombres = {}
+  if (ids.length > 0) {
+    const { data: n, error: errN } = await supabase.rpc('nombres_usuarios', { p_ids: ids })
+    if (errN) console.error('[nombres_usuarios]', errN)
+    else nombres = Object.fromEntries((n ?? []).map((x) => [x.user_id, x.nombre]))
+  }
+  return filas.map((o) => ({
+    ...o,
+    creador_nombre: o.creada_por ? (nombres[o.creada_por] ?? null) : null,
+    decisor_nombre: o.decidida_por ? (nombres[o.decidida_por] ?? null) : null,
+  }))
+}
+
+function estadoOrdenPropia(o, modoPrueba) {
+  if (o.estado === 'aprobada') {
+    if (o.whatsapp_enviada_en) return { tono: 'verde', label: 'Enviada al proveedor (WhatsApp)' }
+    if (modoPrueba) return { tono: 'gris', label: 'Aprobada · modo prueba: no se envía a YiQi' }
+    return { tono: 'amarillo', label: 'Aprobada · lista para enviar' }
+  }
+  const e = ESTADO_OC_PROPIA[o.estado]
+  return e ? { tono: o.estado === 'borrador' ? 'amarillo' : e.tono, label: e.label } : { tono: 'gris', label: o.estado }
+}
+
+function textoQuien(o) {
+  const partes = []
+  if (o.creador_nombre) partes.push(`Generada por ${o.creador_nombre}`)
+  if (o.estado === 'aprobada' && !o.decidida_por) partes.push('orden directa (sin aprobación)')
+  else if (o.estado === 'aprobada' && o.decidida_por) {
+    const dia = o.decidida_en ? formatoFecha(String(o.decidida_en).slice(0, 10)) : null
+    partes.push(`aprobada${o.decisor_nombre ? ` por ${o.decisor_nombre}` : ''}${dia ? ` el ${dia}` : ''}`)
+  }
+  return partes.join(' · ')
+}
+
+function TarjetaOrdenPropia({ o, modoPrueba }) {
+  const e = estadoOrdenPropia(o, modoPrueba)
+  const quien = textoQuien(o)
+  return (
+    <div className={`card card-${e.tono}`}>
+      <div className="flex items-center gap-4 px-5 py-4">
+        <div className="flex flex-col gap-[3px] min-w-[110px]">
+          <span className="text-[14px] font-bold text-[var(--ind)]">Orden #{o.id}</span>
+          <span className="text-[11px] text-[var(--sub)]">{o.creada_en ? formatoFecha(String(o.creada_en).slice(0, 10)) : '—'}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14px] font-semibold text-[var(--text)] truncate">{o.proveedor_nombre || '—'}</div>
+          <div className="text-[12px] text-[var(--sub)] mt-0.5 truncate">
+            {o.cant_items} {o.cant_items === 1 ? 'artículo' : 'artículos'}
+            {quien && <> · {quien}</>}
+          </div>
+        </div>
+        <div className="text-[14px] font-bold text-[var(--text)] min-w-[90px] text-right tabular-nums">
+          {formatoMoneda(o.total_estimado)}
+        </div>
+        <div className="min-w-[220px] flex flex-wrap items-center justify-end gap-1.5">
+          <Pastilla tono={e.tono}>{e.label}</Pastilla>
+        </div>
+        <a
+          href={`?page=ocs&orden=${o.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="btn btn-sm"
+          title="Abrir el detalle de la orden en una pestaña nueva"
+        >
+          Ver <i className="ti ti-external-link" />
+        </a>
+      </div>
+    </div>
+  )
+}
+
 export default function SeguimientoOC() {
   const permisos = usePermisos()
+  // 23/10/2026 — modo prueba YiQi (no autorizado Live), para el rótulo de las órdenes propias aprobadas.
+  const { modoPrueba } = useModoPruebaYiqi()
 
   const [ordenes, setOrdenes] = useState([])
+  // 23/10/2026 — órdenes de la app que todavía no están en YiQi. null = no se pudieron leer.
+  const [propias, setPropias] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filtroEstado, setFiltroEstado] = useState('todas')
@@ -371,9 +465,13 @@ export default function SeguimientoOC() {
     setLoading(true)
     setError(null)
     try {
-      const filas = await traerOrdenesLocal(permisos)
+      const [filas, resPropias] = await Promise.all([
+        traerOrdenesLocal(permisos),
+        traerOrdenesPropiasEnCurso().catch((e) => { console.error('[ordenes_propias]', e); return null }),
+      ])
       const agrupadas = agruparPorOrden(filas)
       setOrdenes(agrupadas)
+      setPropias(resPropias)
       // 23/10/2026 — feedback Ivana: UNA sola consulta de dias_entrega para los proveedores
       // de las OC no completadas. Si falla, se ignora y no se muestran fechas.
       try {
@@ -425,7 +523,20 @@ export default function SeguimientoOC() {
     [ordenes, plazos]
   )
 
+  // 23/10/2026 — órdenes de la app: se ven con "Todas" y con su propio chip; las
+  // fechas Desde/Hasta se aplican sobre la fecha de creación.
+  const propiasFiltradas = useMemo(() => {
+    if (!propias || !(filtroEstado === 'todas' || filtroEstado === 'app')) return []
+    return propias.filter((o) => {
+      const dia = o.creada_en ? String(o.creada_en).slice(0, 10) : null
+      if (fechaDesde && dia && dia < fechaDesde) return false
+      if (fechaHasta && dia && dia > fechaHasta) return false
+      return true
+    })
+  }, [propias, filtroEstado, fechaDesde, fechaHasta])
+
   const ordenesFiltradas = useMemo(() => {
+    if (filtroEstado === 'app') return []
     return ordenesConEstado.filter((o) => {
       // 23/10/2026 — feedback Ivana: filtro "Demoradas" (cruza estados; no toca los demás).
       if (filtroEstado === 'demorada') {
@@ -444,7 +555,8 @@ export default function SeguimientoOC() {
     completada: ordenesConEstado.filter((o) => o._estado.key === 'completada').length,
     cerrada: ordenesConEstado.filter((o) => o._estado.key === 'cerrada').length, // 23/10/2026 — punto 3
     demorada: ordenesConEstado.filter((o) => o._llegada?.demorada).length, // 23/10/2026 — feedback Ivana
-  }), [ordenesConEstado])
+    app: propias?.length ?? 0, // 23/10/2026 — órdenes de la app todavía no en YiQi
+  }), [ordenesConEstado, propias])
 
   // 23/10/2026: meses y días del más reciente al más viejo (antes salían en el orden de
   // llegada de la base: Agosto, Septiembre, Julio…). La fecha se arma en hora local.
@@ -534,7 +646,7 @@ export default function SeguimientoOC() {
     <div className="flex-1 overflow-y-auto">
       <EncabezadoPagina
         titulo="Seguimiento de OC"
-        bajada={`OC enviadas a proveedores, según YiQi · ${contadores.enviada + contadores.parcial} en curso`}
+        bajada={`OC enviadas a proveedores, según YiQi · ${contadores.enviada + contadores.parcial} en curso${contadores.app > 0 ? ` · ${contadores.app} ${contadores.app === 1 ? 'orden' : 'órdenes'} de la app todavía sin YiQi` : ''}`}
       >
         <button onClick={cargar} className="btn btn-sm"><i className="ti ti-refresh" /> Actualizar</button>
       </EncabezadoPagina>
@@ -575,7 +687,8 @@ export default function SeguimientoOC() {
         {/* Filtros por estado + fechas */}
         <div className="flex flex-wrap items-center gap-2 mb-5">
           {[
-            { key: 'todas', label: `Todas (${contadores.todas})` },
+            { key: 'todas', label: `Todas (${contadores.todas + contadores.app})` },
+            { key: 'app', label: `De la app (${contadores.app})` }, // 23/10/2026 — pedido de Ivana
             { key: 'enviada', label: `Enviadas (${contadores.enviada})` },
             { key: 'parcial', label: `Ingreso parcial (${contadores.parcial})` },
             { key: 'completada', label: `Completadas (${contadores.completada})` },
@@ -612,7 +725,27 @@ export default function SeguimientoOC() {
           </div>
         </div>
 
+        {/* 23/10/2026 — pedido de Ivana: órdenes de la app que todavía no están en YiQi */}
+        {propiasFiltradas.length > 0 && (
+          <div className="mb-8">
+            <div className="text-[12px] font-bold text-[var(--sub)] uppercase tracking-wide mb-2">
+              Órdenes de la app · todavía no están en YiQi
+            </div>
+            <div className="space-y-3.5">
+              {propiasFiltradas.map((o) => (
+                <TarjetaOrdenPropia key={`p${o.id}`} o={o} modoPrueba={modoPrueba} />
+              ))}
+            </div>
+          </div>
+        )}
+        {filtroEstado === 'app' && propiasFiltradas.length === 0 && (
+          <p className="text-[13px] text-gray-400 mb-8">
+            {propias === null ? 'No se pudieron leer las órdenes de la app.' : 'No hay órdenes de la app en curso en este filtro.'}
+          </p>
+        )}
+
         {/* OC en curso: enviadas y parciales */}
+        {filtroEstado !== 'app' && (
         <div className="space-y-3.5 mb-8">
           {noCompletadas.map((o) => (
             <TarjetaOrden
@@ -628,6 +761,7 @@ export default function SeguimientoOC() {
             <p className="text-[13px] text-gray-400">No hay órdenes enviadas o con ingreso parcial en este filtro.</p>
           )}
         </div>
+        )}
 
         {/* OC completadas: agrupadas por mes > día (colapsables) */}
         {Object.keys(completadasAgrupadas).length > 0 && (

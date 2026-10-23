@@ -232,6 +232,21 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
   - Las carpetas van de Octubre 2026 a Enero 2024.
   - Evidencia: [en vivo 2026-10-23, Federico en /?page=seguimiento]
 
+- **Limpieza etapa 1, verificada en la app** [en vivo 2026-10-23, Federico (admin) en /?page=reposicion-central-local y /?page=ocs]:
+  - Reposición Central-Local: "Activas" vacío; "Todas" muestra 11 (9 anuladas: REP-0002 y REP-0008..0015; 2 completas: REP-0007 y REP-M0907213806).
+  - Órdenes de compra: Órdenes (3), Papelera (13) = #2–#12, #18, #21.
+- **Punto 4, máximos: de dónde sale el número** [en vivo 2026-10-23, Ventas Online en /view/MATERIAL, artículo 1999-0.25 (MEGADENTAL), id 11565]:
+  - YiQi tiene 4 campos de "punto de pedido", **todos de solo lectura** (los calcula YiQi):
+    - "Punto de pedido" = 10;
+    - "Punto de pedido máximo" = 20;
+    - "Punto máximo de pedido" = 10;
+    - "# a Reponer Máx" = 10.
+  - Editables: Stock Seguridad 10, Tiempo de reposición 8 días, Lead Time Máximo 15 días.
+  - La app muestra "Mín. 10 · Máx. 20": el máximo es "Punto de pedido máximo" (`MATE_PUNTO_PEDIDO_MAX`, smartie 2344).
+  - **La app no calcula ningún máximo.** "Lo genera el sistema" se refiere a YiQi.
+  - Contradicción sin cerrar: cuál de los dos "máximos" de YiQi espera ver Ivana [preguntarle].
+  - Una segunda muestra (artículos de MEGADENTAL) no se pudo leer: la pestaña de YiQi dejó de responder.
+
 **DESMENTIDO**
 - **"La smartie 2345 tiene una ventana de fechas acotada"** (comentario LIMITACIÓN de `20260928190000`): falso. Las OC vigentes van del 27/01/2024 al 22/10/2026; lo que la filtra es que la OC tenga algo pendiente [prod 2026-10-23].
 - **"Recibida = remito procesado" (opción A del feedback):** no sirve. YiQi no vincula remitos a OC [en vivo 2026-10-23].
@@ -300,9 +315,11 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
    - las OC vaciadas o borradas en YiQi aparecen "Cerradas en YiQi" y ya no son Demoradas;
    - "en camino" ya no descuenta lo de esas OC, así que en Alertas puede haber críticos nuevos.
    - Revisar 2 o 3 casos con Ivana.
-2. Punto 4 (máximos): abrir en YiQi un artículo de MEGADENTAL con "Mín. 6 · Máx. 6" y comparar con la smartie 2344. Es para resolver la contradicción "el máximo lo genera el sistema". ~30 min con Claude in Chrome, Ventas Online.
-3. Órdenes propias (borrador / esperando aprobación / aprobadas) en Seguimiento de OC. Pedido de Ivana (pregunta 5), ~3–4 h.
-4. Verificación visual de la limpieza etapa 1 en la app: Reposición Central-Local sin pedidos "en preparación"; #2 y #12 en la papelera.
+2. ~~Punto 4 (máximos): comparar con YiQi~~ — hecho el 23/10. El máximo es el "Punto de pedido máximo" que calcula YiQi. Queda la pregunta a Ivana (ver ESPERA).
+3. Órdenes propias en Seguimiento de OC (pedido de Ivana, pregunta 5): construido el 23/10.
+   - Bloque "Órdenes de la app · todavía no están en YiQi" + chip "De la app".
+   - Falta el push y la validación en vivo.
+4. ~~Verificación visual de la limpieza etapa 1~~ — hecho el 23/10 (ver HECHO).
 5. Credenciales en el historial de git: la clave de YiQi (`03b6288`) y la clave común de las cuentas reales (`PROMPT_CONTINUIDAD`, desde el 21/8).
    - Decidir si se purgan con `git filter-repo`.
    - Pedirles a Aris e Ivana que cambien su clave.
@@ -319,6 +336,7 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 |---|---|---|
 | ¿La #21 (DENTAL MEDRANO, $10,5 M) fue prueba o compra real? Destraba la limpieza etapa 2 (borrado definitivo de #3–#11 con respaldo) | Aris | 23/10/2026 |
 | Máximos y fraccionados: fórmula actual ("3 meses"), dónde debe vivir el mín/máx calculado (app o YiQi) y qué artículos entran | Ivana / Aris | 23/10/2026 |
+| ¿Qué "máximo" de YiQi espera ver: "Punto de pedido máximo" (el que usa la app; 20 en el 1999-0.25) o "Punto máximo de pedido" / "# a Reponer Máx" (10)? Los cuatro los calcula YiQi | Ivana | 23/10/2026 |
 | ¿Vacía la OC en YiQi también cuando se cancela un pedido? ¿Qué pasó con la 2700 (DROVER, vacía, sin asunto)? | Ivana | 23/10/2026 |
 | Qué ve mal en "Detalle de una sola orden" (checklist, "A corregir") | Ivana | 23/10/2026 |
 | ¿Las 8 causas declaradas entre el 22/8 y el 3/9 son reales o de prueba? ¿Revisa en YiQi los 4 movimientos de stock de septiembre (1437281, 1437282, 1438963, 1440204)? | Ivana | 23/10/2026 |
