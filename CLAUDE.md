@@ -318,7 +318,8 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 2. ~~Punto 4 (máximos): comparar con YiQi~~ — hecho el 23/10. El máximo es el "Punto de pedido máximo" que calcula YiQi. Queda la pregunta a Ivana (ver ESPERA).
 3. Órdenes propias en Seguimiento de OC (pedido de Ivana, pregunta 5): construido el 23/10.
    - Bloque "Órdenes de la app · todavía no están en YiQi" + chip "De la app".
-   - Falta el push y la validación en vivo.
+   - Push `f44de29`.
+   - Validado [en vivo 2026-10-23, Federico (admin) en /?page=seguimiento]: aparecen #23 DROVER (Borrador, generada por Ivana), #22 DIS DEN (Borrador, Aris) y #14 PESCIO (Esperando aprobación, Ivana). Chips: "Todas (165)" y "De la app (3)". El chip "De la app" muestra solo esas 3.
 4. ~~Verificación visual de la limpieza etapa 1~~ — hecho el 23/10 (ver HECHO).
 5. Credenciales en el historial de git: la clave de YiQi (`03b6288`) y la clave común de las cuentas reales (`PROMPT_CONTINUIDAD`, desde el 21/8).
    - Decidir si se purgan con `git filter-repo`.
