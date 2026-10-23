@@ -179,7 +179,13 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 - **[CERRADO 6/8]** Código sin git (remoto `dentalas_erp`).
 - **[CERRADO 28/9]** Duplicados históricos de OC en YiQi. No existen en YiQi y el espejo está limpio (ver DESMENTIDO). Tulkas lo sigue listando como LOW: desactualizado.
 - **[ABIERTO] Filas congeladas en `ordenes_yiqi`.** El sync no da de baja las OC que salen del reporte 2345. Opción robusta: leer el estado por `ORDC_ASUNTO` desde `ORDEN_DE_COMPRA` (~2–3 h).
-- **[CONTRADICCIÓN SIN RESOLVER]** Federico (28/9) dice que el envío a YiQi era "construido pero sin activar". El código lo dispara al aprobar (`OrdenesPropias.jsx:683`, `NuevaOC.jsx`) y el cron `reintentar-oc-pendientes-yiqi` (id 6) está activo cada 10 min [prod 2026-10-23]: la #2 se reintenta con error de costo.
+- **[RESUELTO 2026-10-23 — MODO PRUEBA]** Decisión de Federico (23/10): "No autorizamos a pasar a Live la herramienta de momento".
+  - Cron `reintentar-oc-pendientes-yiqi` pausado y barrido sin archivadas (`20261023150000`) [prod 2026-10-23, `cron_activo = false`].
+  - Interruptor general `reglas_compra.escritura_yiqi_habilitada = false` (`20261023160000`) [prod 2026-10-23]. Las 5 funciones que escriben en YiQi (`enviar-oc-yiqi`, `editar-oc-yiqi`, `mover-stock-reposicion`, `mover-stock-yiqi`, `yiqi-borrar-oc` en modo escritura) responden `modo_prueba` sin tocar la base ni YiQi; fail-closed. Deployadas el 23/10.
+  - Aviso "Modo prueba" en la app: commit `ff8eb62` [en vivo 2026-10-23, Federico en /?page=ocs].
+  - Para habilitar: `update public.reglas_compra set escritura_yiqi_habilitada = true where id = 1;`
+  - Investigación: `claude/INVESTIGACION_escrituras_YiQi_23-10-2026.md` (proyecto). La #21 (Aris, 20/10, $10,5 M) se intentó crear y YiQi respondió 400 ("El pre…"); el cron la reintentó cada 10 min hasta el 23/10 16:20 UTC.
+  - *Texto anterior:* [CONTRADICCIÓN SIN RESOLVER] Federico (28/9) dice que el envío a YiQi era "construido pero sin activar". El código lo dispara al aprobar (`OrdenesPropias.jsx:683`, `NuevaOC.jsx`) y el cron `reintentar-oc-pendientes-yiqi` (id 6) está activo cada 10 min [prod 2026-10-23]: la #2 se reintenta con error de costo.
 - **[ACEPTADO]** Colisión de renovación de token entre los 3 crons a las 06:00 UTC, sin locking.
 - **[ABIERTO — MEDIUM]** Carpetas `_to_delete`, `_to_delete_git_locks` y `_to_delete_old` en la raíz. [repo 2026-10-18]
 - **[ABIERTO — MEDIUM]** `package-lock.json` vacío en la raíz, trackeado y sin relación con `frontend/`. [repo 2026-10-18]
@@ -191,8 +197,8 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 1. Credencial de `yiqi-renovar-token.ps1`: el 23/10 se sacó del working tree (ahora la lee de `$env:YIQI_CLAVE`). Falta el commit y decidir si se purga el historial (`03b6288`).
 2. ~~Versionar `declaraciones_causa`~~: hecho el 23/10 (`20260801000100`). Falta el commit.
 3. Dar de baja en `ordenes_yiqi` las OC que salen del reporte, o leer el estado por asunto (paso "Mercadería recibida" y número "OC en curso").
-4. Resolver la contradicción del envío automático a YiQi al aprobar: dejarlo activo o ponerle un interruptor.
-5. Agregar `[functions.mover-stock-reposicion] verify_jwt = false` en `config.toml`.
+4. ~~Envío automático a YiQi~~: resuelto el 23/10 con el modo prueba (interruptor apagado).
+5. ~~`mover-stock-reposicion` en `config.toml`~~: agregado y deployado el 23/10.
 6. Mover `dentalabs_Sup_KW.txt` fuera del repo y borrar `_to_delete*` y el `package-lock.json` de la raíz.
 7. Capacitación de Ivana (criterio 7 del MVP).
 8. Automatizar la regla "3 años sin movimiento" sobre `ultimo_movimiento_stock_yiqi`.
