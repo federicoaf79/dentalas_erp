@@ -69,6 +69,54 @@ function formatoDia(f) {
     return new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   } catch { return null }
 }
+// 23/10/2026 — feedback Ivana: dd/mm corto para "Aprobada por X el dd/mm" y "Llega el dd/mm".
+function formatoDiaMes(f) {
+  if (!f) return null
+  try {
+    const d = f instanceof Date ? f : new Date(f)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+  } catch { return null }
+}
+// 23/10/2026 — feedback Ivana: quién generó / quién decidió la orden.
+// Aprobada sin decidida_por = orden directa de Aris (sin circuito de aprobación).
+function textoDecision(o) {
+  if (o.estado === 'aprobada' && !o.decidida_por) return 'Orden directa (sin aprobación)'
+  if ((o.estado === 'aprobada' || o.estado === 'rechazada') && o.decidida_por) {
+    const verbo = o.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'
+    const dia = formatoDiaMes(o.decidida_en)
+    return `${verbo}${o.decisor_nombre ? ` por ${o.decisor_nombre}` : ''}${dia ? ` el ${dia}` : ''}`
+  }
+  return null
+}
+// 23/10/2026 — feedback Ivana: fecha estimada de llegada = envío al proveedor
+// (WhatsApp) + dias_entrega del proveedor (días corridos). null si falta algún dato.
+function fechaEstimadaLlegada(o, diasPorProv) {
+  if (o.estado !== 'aprobada' || !o.whatsapp_enviada_en) return null
+  const dias = diasPorProv?.[o.proveedor_nombre]
+  if (dias == null || !Number.isFinite(Number(dias))) return null
+  const d = new Date(o.whatsapp_enviada_en)
+  if (Number.isNaN(d.getTime())) return null
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + Math.round(Number(dias)))
+  return d
+}
+// Mismo criterio que el paso "Mercadería recibida" de la barra de pasos.
+function mercaderiaRecibida(ing) {
+  return !!(ing?.encontrada && ing.cantidad > 0 && ing.pendiente === 0 && ing.entregada > 0)
+}
+// recibida: true/false si se sabe (detalle), null si no se sabe (tarjetas de la lista,
+// que no cruzan con YiQi). Devuelve null si no hay nada para mostrar.
+function vistaLlegada(o, diasPorProv, recibida) {
+  const f = fechaEstimadaLlegada(o, diasPorProv)
+  if (!f || recibida === true) return null
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  const dm = formatoDiaMes(f)
+  if (f >= hoy) return { tono: 'azul', texto: `Llega el ${dm}`, dm }
+  if (recibida === false) return { tono: 'rojo', texto: `Demorada desde el ${dm}`, dm }
+  // Fecha vencida pero no sabemos si ya se recibió: no se pinta de rojo en la lista.
+  return { tono: 'gris', texto: `Debía llegar el ${dm}`, dm }
+}
 function formatoNumero(n) {
   if (n == null) return '—'
   const num = Number(n)
@@ -120,6 +168,8 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
   // Cruce con el espejo de YiQi por Asunto "Dentalab-Compras #<id>" (la única
   // clave confiable, ver FEEDBACK_IVANA_2-10-2026 punto 22). null = no buscado.
   const [ingresoYiqi, setIngresoYiqi] = useState(null)
+  // 23/10/2026 — feedback Ivana: { [clie_nombre]: dias_entrega } de los proveedores de las órdenes visibles.
+  const [diasEntregaPorProv, setDiasEntregaPorProv] = useState({})
   const [empresa, setEmpresa] = useState(null)
   // Modal propio para aprobar/rechazar/eliminar, en reemplazo de
   // window.prompt/window.confirm: esos diálogos nativos no se pueden
@@ -421,7 +471,11 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
       // mostraria el nombre de nadie mas que uno mismo. Se resuelve con
       // nombres_usuarios(), la funcion SECURITY DEFINER de la migration
       // 20260810150000 que expone solo el nombre, nada sensible.
-      const idsCreadores = [...new Set(filas.map((o) => o.creada_por).filter(Boolean))]
+      // 23/10/2026 — feedback Ivana: se suman los decisores (decidida_por) a la
+      // MISMA llamada a nombres_usuarios, no hay una RPC extra por orden.
+      const idsCreadores = [...new Set(
+        filas.flatMap((o) => [o.creada_por, o.decidida_por]).filter(Boolean)
+      )]
       let nombresPorId = {}
       if (idsCreadores.length > 0) {
         const { data: nombresData, error: errNombres } = await supabase.rpc('nombres_usuarios', {
@@ -439,7 +493,35 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
       setOrdenes(filas.map((o) => ({
         ...o,
         creador_nombre: o.creada_por ? (nombresPorId[o.creada_por] ?? null) : null,
+        // 23/10/2026 — feedback Ivana: nombre de quien aprobó/rechazó.
+        decisor_nombre: o.decidida_por ? (nombresPorId[o.decidida_por] ?? null) : null,
       })))
+
+      // 23/10/2026 — feedback Ivana: "Llega el dd/mm". Una sola consulta con los
+      // proveedores de las órdenes aprobadas ya enviadas al proveedor.
+      // No es crítico: si falla, simplemente no se muestra la fecha de llegada.
+      const provsEnviadas = [...new Set(
+        filas.filter((o) => o.estado === 'aprobada' && o.whatsapp_enviada_en && o.proveedor_nombre)
+          .map((o) => o.proveedor_nombre)
+      )]
+      if (provsEnviadas.length > 0) {
+        const { data: provsDias, error: errDias } = await supabase
+          .from('proveedores')
+          .select('clie_nombre, dias_entrega')
+          .in('clie_nombre', provsEnviadas)
+        if (errDias) {
+          console.error('[proveedores.dias_entrega]', errDias)
+          setDiasEntregaPorProv({})
+        } else {
+          const mapa = {}
+          for (const p of provsDias ?? []) {
+            if (p.dias_entrega != null && mapa[p.clie_nombre] == null) mapa[p.clie_nombre] = Number(p.dias_entrega)
+          }
+          setDiasEntregaPorProv(mapa)
+        }
+      } else {
+        setDiasEntregaPorProv({})
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -975,9 +1057,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                     <div className="flex-1 min-w-0">
                       <div className="text-[15px] font-bold text-[var(--text)] truncate">{o.proveedor_nombre}</div>
                       <div className="text-[12px] text-[var(--sub)] mt-[3px]">
-                        Orden #{o.id} · {o.creador_nombre ?? '—'} · {formatoDia(o.creada_en)} · {o.cant_items ?? 0} {(o.cant_items ?? 0) === 1 ? 'ítem' : 'ítems'}
+                        {/* 23/10/2026 — feedback Ivana: "Generada por" explícito */}
+                        Orden #{o.id} · Generada por {o.creador_nombre ?? '—'} · {formatoDia(o.creada_en)} · {o.cant_items ?? 0} {(o.cant_items ?? 0) === 1 ? 'ítem' : 'ítems'}
                         {o.items_sin_costo > 0 && <span className="text-[#92400e] font-semibold"> · {o.items_sin_costo} sin costo</span>}
                       </div>
+                      {/* 23/10/2026 — feedback Ivana: Aprobada/Rechazada por X el dd/mm, u orden directa */}
+                      {textoDecision(o) && (
+                        <div className="text-[12px] text-[var(--sub)] mt-[2px]">{textoDecision(o)}</div>
+                      )}
                       {o.estado === 'aprobada' && !o.yiqi_id_creado && o.yiqi_error && (
                         <div className="text-[11px] text-[var(--red)] mt-1 truncate flex items-center gap-1" title={o.yiqi_error}>
                           <i className="ti ti-alert-triangle text-[13px]" aria-hidden="true" /> {o.yiqi_error}
@@ -989,6 +1076,14 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                         </div>
                       )}
                     </div>
+                    {/* 23/10/2026 — feedback Ivana: "Llega el dd/mm" / "Demorada desde el dd/mm".
+                        En la lista no se sabe si ya se recibió; en la abierta sí (ingresoYiqi). */}
+                    {(() => {
+                      const ll = vistaLlegada(o, diasEntregaPorProv, abierta?.id === o.id && ingresoYiqi ? mercaderiaRecibida(ingresoYiqi) : null)
+                      return ll ? (
+                        <Pastilla tono={ll.tono} title={ll.tono === 'gris' ? 'Pasó el plazo de entrega; la lista no cruza con YiQi para saber si ya se recibió. Abrí la orden para verlo.' : undefined}>{ll.texto}</Pastilla>
+                      ) : null
+                    })()}
                     <Pastilla tono={vista.tono}>{vista.label}</Pastilla>
                     <div className={`text-[15px] font-bold tabular-nums whitespace-nowrap text-right ${COLOR_TOTAL[vista.tono]}`}>
                       {o.total_estimado != null ? formatoMoneda(o.total_estimado) : '—'}
@@ -1123,9 +1218,24 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               </div>
               <div className="text-[15px] font-bold text-[var(--text)] mt-1">{abierta.proveedor_nombre}</div>
               <div className="text-[12px] text-[var(--sub)] mt-[3px]">
-                Creada {formatoFecha(abierta.creada_en)}
+                {/* 23/10/2026 — feedback Ivana: "Generada por" explícito */}
+                Generada por {abierta.creador_nombre ?? '—'} · Creada {formatoFecha(abierta.creada_en)}
                 {abierta.items_sin_costo > 0 && ` · ${abierta.items_sin_costo} artículos sin costo cargado`}
               </div>
+              {/* 23/10/2026 — feedback Ivana: Aprobada/Rechazada por X el dd/mm, u orden directa */}
+              {textoDecision(abierta) && (
+                <div className="text-[12px] text-[var(--sub)] mt-[2px]">{textoDecision(abierta)}</div>
+              )}
+              {/* 23/10/2026 — feedback Ivana: fecha estimada de llegada (plazo de Condiciones comerciales) */}
+              {(() => {
+                if (abierta.estado !== 'aprobada' || !abierta.whatsapp_enviada_en) return null
+                const ll = vistaLlegada(abierta, diasEntregaPorProv, ingresoYiqi ? mercaderiaRecibida(ingresoYiqi) : null)
+                if (ll) return <div className="mt-1.5"><Pastilla tono={ll.tono}>{ll.texto}</Pastilla></div>
+                if (fechaEstimadaLlegada(abierta, diasEntregaPorProv) == null && diasEntregaPorProv[abierta.proveedor_nombre] == null) {
+                  return <div className="text-[11px] text-gray-500 mt-1">Sin plazo de entrega cargado</div>
+                }
+                return null
+              })()}
             </div>
             <div className="text-right flex-shrink-0">
               <div className="text-[26px] font-bold text-[var(--text)] tabular-nums leading-none">
@@ -1166,6 +1276,10 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                 estado: ing?.encontrada && ing.cantidad > 0 && ing.pendiente === 0 && ing.entregada > 0
                   ? 'hecho'
                   : ing?.encontrada && ing.entregada > 0 ? 'actual' : 'pend',
+                // 23/10/2026 — feedback Ivana: fecha estimada debajo del paso (no cambia la lógica de los pasos)
+                fecha: !mercaderiaRecibida(ing) && fechaEstimadaLlegada(abierta, diasEntregaPorProv)
+                  ? `est. ${formatoDiaMes(fechaEstimadaLlegada(abierta, diasEntregaPorProv))}`
+                  : null,
               },
             ]
             const sigue = {

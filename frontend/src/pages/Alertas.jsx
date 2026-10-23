@@ -411,17 +411,28 @@ export default function Alertas({ onArmarOC }) {
       .filter((a) => !codigosExcluidos.has(a.mate_codigo) && !codigosPausadosVigentes.has(a.mate_codigo))
   }, [articulos, codigosExcluidos, codigosPausadosVigentes])
 
-  const criticas = useMemo(() => conAlertaTodas.filter((a) => a._alerta.nivel === 'critica').length, [conAlertaTodas])
-  const preventivas = useMemo(
-    () => conAlertaTodas.filter((a) => a._alerta.nivel === 'preventiva').length,
-    [conAlertaTodas]
+  // 23/10/2026 (feedback Ivana 23/10): el filtro de proveedor se aplica
+  // acá, una sola vez, para que tarjetas y contadores de chips se
+  // calculen sobre el conjunto filtrado (igual que Monitor de stock).
+  // La búsqueda de texto NO entra: sigue afectando solo a la tabla.
+  const conProveedor = useMemo(
+    () => aplicarFiltroProveedor(conAlertaTodas, filtroProveedor),
+    [conAlertaTodas, filtroProveedor]
+  )
+
+  // 23/10/2026 (feedback Ivana 23/10): contadores filtrados por proveedor
+  // para las tarjetas Preventivas/Críticas y los chips Alertas/Todas/
+  // Críticas/Preventivas.
+  const criticasFiltradas = useMemo(() => conProveedor.filter((a) => a._alerta.nivel === 'critica').length, [conProveedor])
+  const preventivasFiltradas = useMemo(
+    () => conProveedor.filter((a) => a._alerta.nivel === 'preventiva').length,
+    [conProveedor]
   )
 
   const filtradas = useMemo(() => {
-    // Filtro de proveedores (punto 1) se aplica primero, como capa
-    // extra sobre lo ya visible para este usuario -- después nivel y
-    // búsqueda de texto, igual que antes.
-    const conProveedor = aplicarFiltroProveedor(conAlertaTodas, filtroProveedor)
+    // Filtro de proveedores (punto 1) se aplica primero (ver
+    // `conProveedor`), como capa extra sobre lo ya visible para este
+    // usuario -- después nivel y búsqueda de texto, igual que antes.
     return conProveedor.filter((a) => {
       if (filtroNivel !== 'todas' && a._alerta.nivel !== filtroNivel) return false
       if (busqueda) {
@@ -434,7 +445,7 @@ export default function Alertas({ onArmarOC }) {
       }
       return true
     })
-  }, [conAlertaTodas, filtroProveedor, filtroNivel, busqueda])
+  }, [conProveedor, filtroNivel, busqueda])
 
   const ordenPorDefecto = useMemo(() => {
     return [...filtradas].sort((a, b) => {
@@ -584,7 +595,7 @@ export default function Alertas({ onArmarOC }) {
         bajada={
           cargandoAlgo
             ? 'Cargando…'
-            : `${criticas} críticas · ${preventivas} preventivas · sincronizado ${formatoFechaHora(ultimaSync)}`
+            : `${criticasFiltradas} críticas · ${preventivasFiltradas} preventivas · sincronizado ${formatoFechaHora(ultimaSync)}`
         }
         info={
           <>
@@ -609,12 +620,12 @@ export default function Alertas({ onArmarOC }) {
         <div className="metricas mb-5">
           <div className="metrica">
             <div className="metrica-rot">Preventivas</div>
-            <div className="metrica-val text-[#b8860b]">{cargandoAlgo ? '—' : preventivas}</div>
+            <div className="metrica-val text-[#b8860b]">{cargandoAlgo ? '—' : preventivasFiltradas}</div>
             <div className="metrica-sub">tiempo para actuar</div>
           </div>
           <div className="metrica">
             <div className="metrica-rot">Críticas</div>
-            <div className="metrica-val text-[var(--red)]">{cargandoAlgo ? '—' : criticas}</div>
+            <div className="metrica-val text-[var(--red)]">{cargandoAlgo ? '—' : criticasFiltradas}</div>
             <div className="metrica-sub">acción inmediata</div>
           </div>
           <div className="metrica">
@@ -695,7 +706,7 @@ export default function Alertas({ onArmarOC }) {
       {/* Pestañas: Alertas / Excluidos (admin) / Pausadas */}
       <div className="flex items-center gap-2 flex-wrap">
         {[
-          { key: 'alertas', label: `Alertas (${criticas + preventivas})` },
+          { key: 'alertas', label: `Alertas (${criticasFiltradas + preventivasFiltradas})` },
           ...(permisos.esAdmin ? [{ key: 'excluidos', label: `Excluidos (${excluidos.length})` }] : []),
           {
             key: 'pausadas',
@@ -720,9 +731,9 @@ export default function Alertas({ onArmarOC }) {
           {/* Filtros por nivel */}
           <div className="pt-3 flex items-center gap-2 flex-wrap">
             {[
-              { key: 'todas', label: `Todas (${criticas + preventivas})` },
-              { key: 'critica', label: `Críticas (${criticas})` },
-              { key: 'preventiva', label: `Preventivas (${preventivas})` },
+              { key: 'todas', label: `Todas (${criticasFiltradas + preventivasFiltradas})` },
+              { key: 'critica', label: `Críticas (${criticasFiltradas})` },
+              { key: 'preventiva', label: `Preventivas (${preventivasFiltradas})` },
             ].map((f) => (
               <button
                 key={f.key}

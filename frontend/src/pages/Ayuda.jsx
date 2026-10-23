@@ -5,7 +5,7 @@ import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 // Ayuda.jsx — manual de uso in-app, pantalla por pantalla.
 //
 // Contenido derivado del código real de cada pantalla (no inventado),
-// revisado por última vez el 7/10/2026. Si una pantalla cambia, este
+// revisado por última vez el 23/10/2026. Si una pantalla cambia, este
 // archivo puede quedar desactualizado — no hay ninguna sincronización
 // automática entre el código de una pantalla y su texto acá.
 //
@@ -183,6 +183,7 @@ const MODULOS = [
         comoSeUsa: [
           'Chips arriba: Activas / Completas / Todas. Botón "↻ Actualizar".',
           'Tabla con una fila por solicitud (remito): circuito (origen → destino), si se generó por regla automática o a pedido manual del depósito, fecha, estado resumido y cantidad de líneas.',
+          'Al expandir una fila aparece una **barra de pasos** (Solicitada → En preparación → En tránsito → Recibida) con la fecha de cada paso, y en la fila cerrada se ve "Paso N de 4".',
           'Click en una fila la expande y muestra el detalle línea por línea: SKU, producto, cantidad pedida, estado, cuánto se declaró que se envía, faltante y motivo si no se mandó todo, cuánto se confirmó recibido, y si el movimiento ya quedó registrado en YiQi (o si dio error).',
         ],
         reglas: [
@@ -286,7 +287,7 @@ const MODULOS = [
         necesitas: ['Mismo criterio de sesión/permisos que Monitor de stock. No requiere nada más — el sync es automático.'],
         comoSeUsa: [
           'Arriba, cuatro tarjetas: **Preventivas** (tiempo para actuar), **Críticas** (acción inmediata), **Pausadas** y **Excluidos** (permanentes, solo Aris).',
-          'Pestañas: "Alertas" (la vista de siempre), "Pausadas" y "Excluidos" (esta última solo para Aris). Dentro de Alertas, chips "Todas" / "Críticas" / "Preventivas", buscador y filtro **Proveedor ▾** (Es / No es; acá no está "Sin proveedor asignado", porque un artículo sin proveedor nunca genera alerta).',
+          'Pestañas: "Alertas" (la vista de siempre), "Pausadas" y "Excluidos" (esta última solo para Aris). Dentro de Alertas, chips "Todas" / "Críticas" / "Preventivas", buscador y filtro **Proveedor ▾** (Es / No es; acá no está "Sin proveedor asignado", porque un artículo sin proveedor nunca genera alerta). Con un proveedor elegido, las tarjetas de arriba, el subtítulo y los chips cuentan solo ese proveedor.',
           'La columna **Stock / Mín. / Máx.** es la misma barra que en Monitor de stock. **Estado OC** muestra si ya está pedido y cuánto viene en camino.',
           {
             ul: [
@@ -323,7 +324,7 @@ const MODULOS = [
               'Ningún artículo viene tildado por defecto — el sistema sugiere, vos decidís qué entra en la orden. Las cantidades sí vienen precargadas con la sugerencia calculada.',
               'Los botones **− / +** al lado de "Cantidad a pedir" saltan de a bulto (o de a 1 si el artículo no tiene bulto). Sumar con "+" también tilda el artículo.',
               'Lo que ya tildaste queda fijo arriba, en el bloque **"Ya seleccionados (N)"**, aunque pases de página: ahí podés cambiar la cantidad o sacarlo con "×".',
-              'Tildes "Ocultar sin historial" (artículos sin ventas para sugerir cantidad) y "Ocultar con mínimo en 0" (mínimo en 0 o sin cargar en YiQi).',
+              'Tildes "Ocultar sin historial" (artículos sin ventas para sugerir cantidad) y "Ocultar con mínimo en 0" (solo los que tienen el mínimo cargado en 0; los que no tienen mínimo cargado se siguen viendo).',
               'Campo "Notas" para dejar algo escrito (para el proveedor o para Aris).',
               'Botón "Enviar por WhatsApp" (si el proveedor tiene WhatsApp cargado en Condiciones comerciales): abre WhatsApp con el texto ya armado — funciona incluso antes de guardar la orden.',
               'Para guardar: "Guardar borrador" (para retomar después) o "Enviar a aprobación" / "Confirmar orden" (el texto cambia solo según si requiere aprobación o no). Al guardar aparece un aviso verde con "Ver orden #N" y la pantalla sube sola, para que se vea que quedó guardada.',
@@ -357,7 +358,7 @@ const MODULOS = [
           'Para aprobar o rechazar una orden propia hace falta ser Aris.',
         ],
         comoSeUsa: [
-          '**Tarjetas de órdenes propias**: proveedor, número de orden, quién la armó, fecha, cantidad de ítems, total y una pastilla con el estado. El color dice qué hay que hacer: **azul** = esperando que Aris la apruebe; **amarillo** = falta algo que hacés vos (completar o enviar); **rojo** = problema (rechazada o error al cargar en YiQi); **verde** = listo. Arriba hay una leyenda "Acción requerida" con el significado de cada color.',
+          '**Tarjetas de órdenes propias**: proveedor, número de orden, "Generada por" (quién la armó), fecha, cantidad de ítems, total y una pastilla con el estado. Si ya se decidió, dice "Aprobada por …" / "Rechazada por …" con la fecha, u "Orden directa (sin aprobación)". El color dice qué hay que hacer: **azul** = esperando que Aris la apruebe; **amarillo** = falta algo que hacés vos (completar o enviar); **rojo** = problema (rechazada o error al cargar en YiQi); **verde** = listo. Arriba hay una leyenda "Acción requerida" con el significado de cada color.',
           'Chips "Órdenes" (activas) y "Papelera" (solo visible para Aris).',
           'Botones al pie de cada tarjeta según su estado y tu rol: **Editar ↗** o **Ver ↗** (abre la orden sola en una pestaña nueva), PDF, Causa, WhatsApp / Reenviar (aprobadas), Aprobar / Rechazar (solo Aris, si está esperando aprobación), Enviar / Eliminar (tu borrador), Reintentar envío (solo Aris, si falló YiQi), y archivar.',
           {
@@ -368,6 +369,7 @@ const MODULOS = [
               'Archivar manda una orden a la papelera — es reversible, tiene botón "Restaurar". "Eliminar definitivamente" desde la papelera sí es irreversible.',
             ],
           },
+          '**Llega el dd/mm**: en las órdenes ya enviadas al proveedor por WhatsApp, la fecha estimada de llegada = fecha de envío + "Días de entrega" del proveedor (se carga en Condiciones comerciales). Si ya pasó la fecha y no figura recibida, dice "Demorada desde el dd/mm" en rojo. Sin días de entrega cargados, no se muestra.',
           '**Detalle de una orden** (pestaña nueva): solo esa orden, con una **barra de pasos** (Borrador → Aprobación → Cargada en YiQi → Enviada al proveedor → Mercadería recibida), un bloque de color que dice qué sigue y con el botón para hacerlo, la tabla de artículos con costo unitario y **Subtotal**, y el total.',
           {
             tip: '**Editar una orden** (desde el detalle, "Editar orden"): cambiar cantidades con − / + (saltan de a bulto), quitar artículos, y agregar artículos nuevos del mismo proveedor con un buscador. Quien la armó puede editarla en Borrador o Esperando aprobación; si estaba esperando aprobación, al guardar **vuelve a Borrador** y hay que enviarla de nuevo. Aris puede editar cualquier orden que no esté aprobada.',
@@ -397,6 +399,7 @@ const MODULOS = [
           'Chips de estado arriba: Todas / Enviadas / Ingreso parcial / Completadas, cada uno con contador. Filtro de fechas Desde / Hasta. Botón "↻ Actualizar".',
           'Si hay órdenes con ingreso parcial, un aviso amarillo arriba lo resalta.',
           'Las órdenes en curso aparecen en tarjetas, las más recientes primero, con un borde de color: **gris** = enviada, todavía sin ingresos; **amarillo** = llegó una parte; **verde** = recibida completa. Cada tarjeta muestra proveedor, cantidad de artículos y asunto, fecha, total, la pastilla de estado (por ejemplo "Ingreso parcial · 12 u pendientes") y la causa declarada si hay una.',
+          '**Llega el dd/mm**: fecha de la OC + "Días de entrega" del proveedor (Condiciones comerciales). Si ya pasó, "Demorada desde el dd/mm" en rojo; el chip **Demoradas (N)** las junta. Sin días de entrega cargados no se muestra.',
           '"Ver" en una tarjeta despliega la **barra de pasos** (Enviada al proveedor → Ingreso de mercadería → Recibida completa) y el detalle por artículo: pedido, entregado y pendiente.',
           'Botón "Causa" / "Ver causa": mismo modal que en Alertas y Órdenes de compra, con historial acumulado.',
           'Abajo, "Recibidas completas": carpetas colapsables por mes y, dentro de cada mes, por día.',

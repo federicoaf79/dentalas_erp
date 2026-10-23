@@ -51,6 +51,14 @@ function formatoNumero(n) {
   return num % 1 === 0 ? String(num) : num.toFixed(1)
 }
 
+// 23/10/2026 (feedback Ivana 23/10): true solo si el umbral es un número
+// igual a 0. null/undefined/'' (sin mínimo cargado) NO cuentan como 0.
+function esUmbralCero(umbral) {
+  if (umbral == null || umbral === '') return false
+  const n = Number(umbral)
+  return Number.isFinite(n) && n === 0
+}
+
 // Bloqueo de "cantidad a pedir" que no es múltiplo del bulto (sprint
 // 5/9/2026, ítem de la reunión con Dentalab: Farmadental/SKU1007,
 // regla de Pescio). sugerencias_compra() ya redondea la cantidad
@@ -387,7 +395,10 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   const filtradas = useMemo(() => {
     let out = filas
     if (ocultarSinHistorial) out = out.filter((s) => s.cantidad_sugerida != null)
-    if (ocultarSinMinimo) out = out.filter((s) => Number(s.umbral) > 0)
+    // 23/10/2026 (feedback Ivana 23/10): "Ocultar con mínimo en 0" oculta
+    // SOLO los de umbral numérico igual a 0; los vacíos (null/undefined/'')
+    // se siguen viendo. Antes también ocultaba los sin mínimo cargado.
+    if (ocultarSinMinimo) out = out.filter((s) => !esUmbralCero(s.umbral))
     if (busqueda) {
       const t = busqueda.toLowerCase()
       out = out.filter(
@@ -413,8 +424,10 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
     () => filas.filter((s) => s.cantidad_sugerida == null).length,
     [filas]
   )
+  // 23/10/2026 (feedback Ivana 23/10): cuenta solo los de umbral = 0
+  // (los vacíos no se ocultan, así que no entran en el contador).
   const sinMinimoTotal = useMemo(
-    () => filas.filter((s) => !(Number(s.umbral) > 0)).length,
+    () => filas.filter((s) => esUmbralCero(s.umbral)).length,
     [filas]
   )
 
@@ -750,7 +763,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
             </label>
           )}
           {sinMinimoTotal > 0 && (
-            <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer" title="Artículos con mínimo en 0 o sin mínimo cargado en YiQi">
+            <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer" title="Artículos con el mínimo cargado en 0 en YiQi (los que no tienen mínimo cargado se siguen viendo)">
               <input
                 type="checkbox"
                 checked={ocultarSinMinimo}

@@ -84,6 +84,31 @@ function formatoFecha(fechaStr) {
   }
 }
 
+// 23/10/2026 — feedback Ivana: fecha estimada de llegada = fecha de la OC + dias_entrega
+// (días corridos). Se arma con año/mes/día locales (sin pasar por UTC) para no correr un día.
+function sumarDias(fechaStr, dias) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(fechaStr ?? ''))
+  if (!m) return null
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + dias)
+}
+
+function formatoDiaMes(d) {
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// 23/10/2026 — feedback Ivana: devuelve null si la OC está completada o si todavía no
+// sabemos el plazo (consulta fallida). Si el proveedor no tiene dias_entrega: { sinPlazo: true }.
+function calcularLlegada(orden, estado, plazos) {
+  if (estado.key === 'completada' || plazos == null) return null
+  const dias = plazos[orden.proveedor]
+  if (dias == null) return { sinPlazo: true, demorada: false }
+  const est = sumarDias(orden.fecha, dias)
+  if (!est) return { sinPlazo: true, demorada: false }
+  const hoy = new Date()
+  const hoy0 = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+  return { sinPlazo: false, demorada: est < hoy0, texto: formatoDiaMes(est) }
+}
+
 function agruparPorOrden(filas) {
   const porNroOC = new Map()
 
@@ -143,6 +168,8 @@ function etiquetaEstado(e) {
 function pasosDeOrden(orden) {
   const e = orden._estado
   const fecha = formatoFecha(orden.fecha)
+  // 23/10/2026 — feedback Ivana: "est. dd/mm" en el paso de recepción (solo si hay plazo).
+  const estLlegada = orden._llegada && !orden._llegada.sinPlazo ? `est. ${orden._llegada.texto}` : undefined
   if (e.key === 'completada') {
     return {
       pasos: [
@@ -158,7 +185,7 @@ function pasosDeOrden(orden) {
       pasos: [
         { rotulo: 'Enviada al proveedor', fecha, estado: 'hecho' },
         { rotulo: `Ingreso parcial (${e.totalEntregado} de ${e.totalCantidad} u)`, estado: 'actual' },
-        { rotulo: 'Recibida completa', estado: 'pend' },
+        { rotulo: 'Recibida completa', fecha: estLlegada, estado: 'pend' },
       ],
       sigue: e.totalPendiente < 0
         ? `Se recibieron ${-e.totalPendiente} u más de lo pedido.`
@@ -169,7 +196,7 @@ function pasosDeOrden(orden) {
     pasos: [
       { rotulo: 'Enviada al proveedor', fecha, estado: 'hecho' },
       { rotulo: 'Ingreso de mercadería', estado: 'espera' },
-      { rotulo: 'Recibida completa', estado: 'pend' },
+      { rotulo: 'Recibida completa', fecha: estLlegada, estado: 'pend' },
     ],
     sigue: 'Esperando que llegue la mercadería.',
   }
@@ -183,6 +210,12 @@ function DetalleOrden({ orden }) {
       <div className="pb-2 [&_.paso-punto]:w-9! [&_.paso-punto]:h-9! [&_.paso-punto]:text-[15px]! [&_.paso]:gap-2! [&_.paso:not(:last-child)]:after:top-[18px]! [&_.paso:not(:last-child)]:after:left-[calc(50%+20px)]! [&_.paso:not(:last-child)]:after:right-[calc(-50%+20px)]!">
         <BarraPasos pasos={pasos} sigue={sigue} />
       </div>
+      {/* 23/10/2026 — feedback Ivana: aviso cuando el proveedor no tiene plazo cargado. */}
+      {orden._llegada?.sinPlazo && (
+        <div className="mt-2 text-[11px] text-[#9ca3af]">
+          Sin plazo de entrega cargado en Condiciones comerciales
+        </div>
+      )}
       <div className="mt-4 text-[12px] font-bold text-[#374151] mb-2">Detalle por artículo</div>
       <div className="tw">
         <table className="tabla">
@@ -253,7 +286,14 @@ function TarjetaOrden({ o, abierta, onToggle, causa, onCausa, compacta = false }
         <div className="text-[14px] font-bold text-[var(--text)] min-w-[90px] text-right tabular-nums">
           {formatoMoneda(o.total)}
         </div>
-        <div className="min-w-[220px] text-right">
+        <div className="min-w-[220px] flex flex-wrap items-center justify-end gap-1.5">
+          {/* 23/10/2026 — feedback Ivana: "Llega el dd/mm" / "Demorada desde el dd/mm" (sin plazo: nada). */}
+          {o._llegada && !o._llegada.sinPlazo && (
+            <Pastilla tono={o._llegada.demorada ? 'rojo' : 'gris'}>
+              <i className={`ti ${o._llegada.demorada ? 'ti-clock' : 'ti-truck-delivery'}`} />
+              {o._llegada.demorada ? `Demorada desde el ${o._llegada.texto}` : `Llega el ${o._llegada.texto}`}
+            </Pastilla>
+          )}
           <Pastilla tono={e.tono}>
             {e.key === 'parcial' && <i className="ti ti-alert-triangle" />}
             {etiquetaEstado(e)}
@@ -277,6 +317,9 @@ export default function SeguimientoOC() {
   const [fechaHasta, setFechaHasta] = useState('')
   const [filaExpandida, setFilaExpandida] = useState(null)
   const [carpetasAbiertas, setCarpetasAbiertas] = useState({})
+  // 23/10/2026 — feedback Ivana: { [clie_nombre]: dias_entrega|null }. null = la consulta falló
+  // (la pantalla sigue andando sin fechas estimadas).
+  const [plazos, setPlazos] = useState(null)
 
   // Ítem 7 (22/8/2026) — causa vigente declarada por OC (ámbito
   // 'entrega', referencia = nro_oc). Ver frontend/src/lib/causas.js.
@@ -289,7 +332,32 @@ export default function SeguimientoOC() {
     setError(null)
     try {
       const filas = await traerOrdenesLocal(permisos)
-      setOrdenes(agruparPorOrden(filas))
+      const agrupadas = agruparPorOrden(filas)
+      setOrdenes(agrupadas)
+      // 23/10/2026 — feedback Ivana: UNA sola consulta de dias_entrega para los proveedores
+      // de las OC no completadas. Si falla, se ignora y no se muestran fechas.
+      try {
+        const nombres = [...new Set(
+          agrupadas.filter((o) => calcularEstado(o).key !== 'completada' && o.proveedor).map((o) => o.proveedor)
+        )]
+        if (nombres.length === 0) {
+          setPlazos({})
+        } else {
+          const { data, error: errPlazos } = await supabase
+            .from('proveedores')
+            .select('clie_nombre, dias_entrega')
+            .in('clie_nombre', nombres)
+          if (errPlazos) throw errPlazos
+          const mapa = {}
+          for (const p of data ?? []) {
+            const n = p.dias_entrega == null || p.dias_entrega === '' ? NaN : Number(p.dias_entrega)
+            mapa[p.clie_nombre] = Number.isFinite(n) && n >= 0 ? Math.round(n) : null
+          }
+          setPlazos(mapa)
+        }
+      } catch {
+        setPlazos(null)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -310,13 +378,19 @@ export default function SeguimientoOC() {
   }, [claveFiltro])
 
   const ordenesConEstado = useMemo(
-    () => ordenes.map((o) => ({ ...o, _estado: calcularEstado(o) })),
-    [ordenes]
+    () => ordenes.map((o) => {
+      const _estado = calcularEstado(o)
+      return { ...o, _estado, _llegada: calcularLlegada(o, _estado, plazos) }
+    }),
+    [ordenes, plazos]
   )
 
   const ordenesFiltradas = useMemo(() => {
     return ordenesConEstado.filter((o) => {
-      if (filtroEstado !== 'todas' && o._estado.key !== filtroEstado) return false
+      // 23/10/2026 — feedback Ivana: filtro "Demoradas" (cruza estados; no toca los demás).
+      if (filtroEstado === 'demorada') {
+        if (!o._llegada?.demorada) return false
+      } else if (filtroEstado !== 'todas' && o._estado.key !== filtroEstado) return false
       if (fechaDesde && o.fecha && new Date(o.fecha) < new Date(fechaDesde)) return false
       if (fechaHasta && o.fecha && new Date(o.fecha) > new Date(fechaHasta)) return false
       return true
@@ -328,6 +402,7 @@ export default function SeguimientoOC() {
     enviada: ordenesConEstado.filter((o) => o._estado.key === 'enviada').length,
     parcial: ordenesConEstado.filter((o) => o._estado.key === 'parcial').length,
     completada: ordenesConEstado.filter((o) => o._estado.key === 'completada').length,
+    demorada: ordenesConEstado.filter((o) => o._llegada?.demorada).length, // 23/10/2026 — feedback Ivana
   }), [ordenesConEstado])
 
   const completadasAgrupadas = useMemo(() => {
@@ -459,6 +534,7 @@ export default function SeguimientoOC() {
             { key: 'enviada', label: `Enviadas (${contadores.enviada})` },
             { key: 'parcial', label: `Ingreso parcial (${contadores.parcial})` },
             { key: 'completada', label: `Completadas (${contadores.completada})` },
+            { key: 'demorada', label: `Demoradas (${contadores.demorada})` }, // 23/10/2026 — feedback Ivana
           ].map((f) => (
             <button
               key={f.key}
