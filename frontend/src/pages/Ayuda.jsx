@@ -167,7 +167,7 @@ const MODULOS = [
         reglas: [
           { warn: 'Es de solo lectura. No hay forma de cambiar Punto de Pedido ni Stock de Seguridad desde acá — eso se carga directamente en YiQi.' },
           'Una fila queda "sin config." (y no genera ninguna alerta) si el artículo no tiene ni Punto de Pedido ni Stock de Seguridad cargado en YiQi.',
-          'Las unidades que ya vienen en una OC aprobada o enviada se descuentan del faltante: un artículo ya pedido deja de figurar como Crítico por lo que está en camino.',
+          'Las unidades que ya vienen en una OC aprobada o enviada se descuentan del faltante: un artículo ya pedido deja de figurar como Crítico por lo que está en camino. Solo cuentan las OC que siguen con pendientes en YiQi: una OC "Cerrada en YiQi" ya no suma (desde el 23/10/2026).',
           'Igual que en Alertas: un artículo nunca cuenta para las alertas de esta pantalla si es código administrativo, publicación de Mercado Libre, está marcado discontinuado, es de producción propia (proveedor "Dentalab"), o es de la línea Acritone/NewcryL (excluida del sistema el 26/8/2026, a pedido de Aris).',
         ],
         noHace: ['No exporta a Excel ni PDF.', 'No permite editar datos del artículo — eso se hace en YiQi.'],
@@ -383,6 +383,7 @@ const MODULOS = [
           { warn: 'Si una orden esperando aprobación tiene algún ítem sin costo cargado, "Aprobar" no abre el modal normal: abre un aviso explicando que YiQi rechaza cualquier OC con un ítem sin precio, y sugiere rechazarla y volver a cargarla con el costo completo. No hay forma de forzar la aprobación mientras falte ese dato.' },
           'Si la orden se aprueba pero el envío a YiQi falla, la aprobación NO se deshace: queda aprobada en rojo con el error visible, y Aris puede reintentarlo con "Reintentar envío" (no duplica nada en YiQi si ya se había mandado bien).',
           'El paso "Mercadería recibida" se marca con lo que informa YiQi. Una orden recibida completa deja de venir en el reporte de YiQi, así que ese paso puede no marcarse aunque la mercadería haya llegado.',
+          'El bloque de YiQi no muestra las OC **cerradas en YiQi** (las que Ivana ya vació al recibirlas, o que se eliminaron): esas se ven en "Seguimiento de OC" e "Historial de OC" con la pastilla "Cerrada en YiQi".',
           'El bloque de YiQi solo muestra OC activas (no completadas) — para ver el historial completo están "Historial de OC" y "Seguimiento de OC".',
         ],
         noHace: [
@@ -396,17 +397,18 @@ const MODULOS = [
         queEs: ['Pensada para el día a día de "qué falta que llegue": muestra las órdenes cargadas en YiQi, separa lo que todavía está en curso de lo ya recibido completo, y agrupa lo recibido por mes y día.'],
         necesitas: ['Mismo criterio de permisos que las demás pantallas de OC (vista filtrada a tus proveedores si no sos admin).'],
         comoSeUsa: [
-          'Chips de estado arriba: Todas / Enviadas / Ingreso parcial / Completadas, cada uno con contador. Filtro de fechas Desde / Hasta. Botón "↻ Actualizar".',
+          'Chips de estado arriba: Todas / Enviadas / Ingreso parcial / Completadas / Cerradas en YiQi / Demoradas, cada uno con contador. Filtro de fechas Desde / Hasta. Botón "↻ Actualizar".',
           'Si hay órdenes con ingreso parcial, un aviso amarillo arriba lo resalta.',
           'Las órdenes en curso aparecen en tarjetas, las más recientes primero, con un borde de color: **gris** = enviada, todavía sin ingresos; **amarillo** = llegó una parte; **verde** = recibida completa. Cada tarjeta muestra proveedor, cantidad de artículos y asunto, fecha, total, la pastilla de estado (por ejemplo "Ingreso parcial · 12 u pendientes") y la causa declarada si hay una.',
           '**Llega el dd/mm**: fecha de la OC + "Días de entrega" del proveedor (Condiciones comerciales). Si ya pasó, "Demorada desde el dd/mm" en rojo; el chip **Demoradas (N)** las junta. Sin días de entrega cargados no se muestra.',
           '"Ver" en una tarjeta despliega la **barra de pasos** (Enviada al proveedor → Ingreso de mercadería → Recibida completa) y el detalle por artículo: pedido, entregado y pendiente.',
           'Botón "Causa" / "Ver causa": mismo modal que en Alertas y Órdenes de compra, con historial acumulado.',
-          'Abajo, "Recibidas completas": carpetas colapsables por mes y, dentro de cada mes, por día.',
+          'Abajo, "Recibidas completas y cerradas en YiQi": carpetas colapsables por mes y, dentro de cada mes, por día.',
         ],
         reglas: [
           'Acá la "causa" declarada es de ámbito Entregas (por ejemplo, demora del proveedor), distinta de la que se declara sobre un artículo en Alertas.',
           'Si llegaron más unidades de las pedidas, la tarjeta dice "Ingreso con exceso" con la diferencia.',
+          '**Cerrada en YiQi** (desde el 23/10/2026): YiQi no registra la recepción en la OC (el remito de compra no se vincula a la orden). Lo que sí pasa es que, cuando llega la mercadería, Ivana vacía la OC en YiQi y le pone "Listo" en el asunto; desde ese momento la OC deja de venir en el reporte de pendientes. La app detecta eso en la sincronización diaria y la marca "Cerrada en YiQi": ya no cuenta como en curso ni como Demorada. También queda así una OC que se eliminó en YiQi. Si la OC vuelve a tener pendientes en YiQi, se reabre sola en la siguiente sincronización.',
           'Solo muestra órdenes que ya están en YiQi. Las órdenes propias en borrador, esperando aprobación o listas para enviar se ven en "Órdenes de compra".',
         ],
         noHace: ['No tiene paginado (a diferencia de Historial de OC) — todo lo activo se lista entero.', 'No permite exportar ni imprimir desde acá.'],

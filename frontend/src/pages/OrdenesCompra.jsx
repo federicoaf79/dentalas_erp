@@ -19,10 +19,13 @@ import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
 // (solo las ve el admin) — hoy hay 1 linea en esa condicion.
 // ============================================================
 const TAMANIO_LOTE = 1000
+// 23/10/2026 — punto 3: esta pantalla es de OC activas; las cerradas en YiQi (dejaron de
+// venir en el reporte de pendientes) no se traen.
 async function traerOrdenesLocal(permisos) {
   let consultaInicial = supabase
     .from('ordenes_yiqi')
     .select('*', { count: 'exact' })
+    .eq('cerrada_en_yiqi', false)
     .range(0, TAMANIO_LOTE - 1)
   consultaInicial = filtrarOrdenes(consultaInicial, permisos)
   const primera = await consultaInicial
@@ -37,6 +40,7 @@ async function traerOrdenesLocal(permisos) {
       let consultaPagina = supabase
         .from('ordenes_yiqi')
         .select('*')
+        .eq('cerrada_en_yiqi', false)
         .range(desde, desde + TAMANIO_LOTE - 1)
       consultaPagina = filtrarOrdenes(consultaPagina, permisos)
       promesas.push(consultaPagina)

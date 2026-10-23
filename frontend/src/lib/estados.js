@@ -18,6 +18,8 @@ export const ESTADO_OC_YIQI = {
   enviada:    { tono: 'gris',     label: 'Enviada al proveedor' },
   parcial:    { tono: 'amarillo', label: 'Ingreso parcial' },
   completada: { tono: 'verde',    label: 'Recibida completa' },
+  // 23/10/2026 — punto 3: ya no figura con pendientes en YiQi (vaciada al recibir, o eliminada).
+  cerrada:    { tono: 'verde',    label: 'Cerrada en YiQi' },
 }
 
 // OC generadas desde el sistema (ordenes_propias)

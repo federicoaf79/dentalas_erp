@@ -67,6 +67,9 @@ async function traerOrdenesYiqiActivas(permisos) {
       .from('ordenes_yiqi')
       .select('sku, cantidad_entregada, cantidad_pendiente')
       .gt('cantidad_pendiente', 0)
+      // 23/10/2026 — punto 3: una OC que ya no figura en YiQi (cerrada) no está "en camino".
+      // Antes sumaba ~9.700 u de 125 OC congeladas y escondía críticos en Alertas/Monitor.
+      .eq('cerrada_en_yiqi', false)
       .range(desde, desde + TAMANIO_LOTE - 1)
     consulta = filtrarOrdenes(consulta, permisos)
     const { data, error } = await consulta

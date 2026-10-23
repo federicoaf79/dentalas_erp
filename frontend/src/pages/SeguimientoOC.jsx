@@ -11,7 +11,10 @@ import BloqueAccion from '../components/ui/BloqueAccion'
 import BarraPasos from '../components/ui/BarraPasos'
 
 // ============================================================
-// SeguimientoOC.jsx — v5
+// SeguimientoOC.jsx — v6
+// v6 (23/10/2026, punto 3 "Recibida confiable"): estado "Cerrada en YiQi" para las OC que
+// dejaron de venir en el reporte de YiQi (ordenes_yiqi.cerrada_en_yiqi). Ya no cuentan como
+// Demoradas ni en curso; se listan abajo junto con las recibidas completas.
 // v5 (2/10/2026, feedback Ivana 17/19/21): estilo prototipo v7 —
 // encabezado blanco, tarjetas con borde de color por estado, barra de
 // pasos al desplegar y código de color único (lib/estados.js).
@@ -98,8 +101,11 @@ function formatoDiaMes(d) {
 
 // 23/10/2026 — feedback Ivana: devuelve null si la OC está completada o si todavía no
 // sabemos el plazo (consulta fallida). Si el proveedor no tiene dias_entrega: { sinPlazo: true }.
+// Estados terminales: no esperan mercadería (sin fecha estimada, abajo en la lista).
+const TERMINALES = new Set(['completada', 'cerrada'])
+
 function calcularLlegada(orden, estado, plazos) {
-  if (estado.key === 'completada' || plazos == null) return null
+  if (TERMINALES.has(estado.key) || plazos == null) return null
   const dias = plazos[orden.proveedor]
   if (dias == null) return { sinPlazo: true, demorada: false }
   const est = sumarDias(orden.fecha, dias)
@@ -124,9 +130,17 @@ function agruparPorOrden(filas) {
         subtotal: 0,
         total: 0,
         lineas: [],
+        cerradaEnYiqi: true,
+        vistoHasta: null,
       })
     }
     const orden = porNroOC.get(nro)
+    // 23/10/2026 — punto 3: cerrada en YiQi = dejó de venir en el reporte de OC pendientes
+    // (Ivana la vació al recibirla, o se eliminó). Ver migración 20261023180000.
+    orden.cerradaEnYiqi = orden.cerradaEnYiqi && fila.cerrada_en_yiqi === true
+    if (fila.sincronizado_en && (!orden.vistoHasta || fila.sincronizado_en > orden.vistoHasta)) {
+      orden.vistoHasta = fila.sincronizado_en
+    }
     orden.subtotal += fila.subtotal ?? 0
     orden.total += fila.total ?? 0
     orden.lineas.push({
@@ -146,6 +160,10 @@ function calcularEstado(orden) {
   const totalEntregado = orden.lineas.reduce((acc, l) => acc + l.entregada, 0)
   const totalPendiente = orden.lineas.reduce((acc, l) => acc + l.pendiente, 0)
   const base = { totalCantidad, totalEntregado, totalPendiente }
+
+  if (orden.cerradaEnYiqi) {
+    return { key: 'cerrada', ...ESTADO_OC_YIQI.cerrada, ...base }
+  }
 
   if (totalCantidad > 0 && totalPendiente === 0) {
     return { key: 'completada', ...ESTADO_OC_YIQI.completada, ...base }
@@ -170,6 +188,16 @@ function pasosDeOrden(orden) {
   const fecha = formatoFecha(orden.fecha)
   // 23/10/2026 — feedback Ivana: "est. dd/mm" en el paso de recepción (solo si hay plazo).
   const estLlegada = orden._llegada && !orden._llegada.sinPlazo ? `est. ${orden._llegada.texto}` : undefined
+  if (e.key === 'cerrada') {
+    const visto = orden.vistoHasta ? formatoFecha(orden.vistoHasta) : null
+    return {
+      pasos: [
+        { rotulo: 'Enviada al proveedor', fecha, estado: 'hecho' },
+        { rotulo: 'Cerrada en YiQi', fecha: visto ? `después del ${visto}` : undefined, estado: 'hecho' },
+      ],
+      sigue: 'Ya no tiene nada pendiente en YiQi: se vació al recibirla o se eliminó.',
+    }
+  }
   if (e.key === 'completada') {
     return {
       pasos: [
@@ -216,6 +244,12 @@ function DetalleOrden({ orden }) {
           Sin plazo de entrega cargado en Condiciones comerciales
         </div>
       )}
+      {orden._estado.key === 'cerrada' && (
+        <div className="mt-2 text-[11px] text-[#9ca3af]">
+          El detalle muestra cómo figuraba la OC la última vez que tenía pendientes en YiQi
+          {orden.vistoHasta ? ` (${formatoFecha(orden.vistoHasta)})` : ''}. Hoy ya no tiene nada pendiente.
+        </div>
+      )}
       <div className="mt-4 text-[12px] font-bold text-[#374151] mb-2">Detalle por artículo</div>
       <div className="tw">
         <table className="tabla">
@@ -238,7 +272,9 @@ function DetalleOrden({ orden }) {
                   <td className="text-right tabular-nums">{l.cantidad} u</td>
                   <td className="text-right tabular-nums text-[var(--grn)] font-bold">{l.entregada} u</td>
                   <td className="text-right tabular-nums">
-                    {pend > 0 ? <Pastilla tono="amarillo">{pend} u</Pastilla> : <span className="text-[#9ca3af]">—</span>}
+                    {pend > 0 && orden._estado.key !== 'cerrada'
+                      ? <Pastilla tono="amarillo">{pend} u</Pastilla>
+                      : <span className="text-[#9ca3af]">{pend > 0 ? `${pend} u` : '—'}</span>}
                   </td>
                 </tr>
               )
@@ -338,7 +374,7 @@ export default function SeguimientoOC() {
       // de las OC no completadas. Si falla, se ignora y no se muestran fechas.
       try {
         const nombres = [...new Set(
-          agrupadas.filter((o) => calcularEstado(o).key !== 'completada' && o.proveedor).map((o) => o.proveedor)
+          agrupadas.filter((o) => !TERMINALES.has(calcularEstado(o).key) && o.proveedor).map((o) => o.proveedor)
         )]
         if (nombres.length === 0) {
           setPlazos({})
@@ -402,11 +438,12 @@ export default function SeguimientoOC() {
     enviada: ordenesConEstado.filter((o) => o._estado.key === 'enviada').length,
     parcial: ordenesConEstado.filter((o) => o._estado.key === 'parcial').length,
     completada: ordenesConEstado.filter((o) => o._estado.key === 'completada').length,
+    cerrada: ordenesConEstado.filter((o) => o._estado.key === 'cerrada').length, // 23/10/2026 — punto 3
     demorada: ordenesConEstado.filter((o) => o._llegada?.demorada).length, // 23/10/2026 — feedback Ivana
   }), [ordenesConEstado])
 
   const completadasAgrupadas = useMemo(() => {
-    const completadas = ordenesFiltradas.filter((o) => o._estado.key === 'completada' && o.fecha)
+    const completadas = ordenesFiltradas.filter((o) => TERMINALES.has(o._estado.key) && o.fecha)
     const porMes = {}
     for (const oc of completadas) {
       const fecha = new Date(oc.fecha)
@@ -423,7 +460,7 @@ export default function SeguimientoOC() {
   const noCompletadas = useMemo(
     () =>
       ordenesFiltradas
-        .filter((o) => o._estado.key !== 'completada')
+        .filter((o) => !TERMINALES.has(o._estado.key))
         .sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? '') || String(b.nroOC).localeCompare(String(a.nroOC), undefined, { numeric: true })),
     [ordenesFiltradas]
   )
@@ -534,6 +571,7 @@ export default function SeguimientoOC() {
             { key: 'enviada', label: `Enviadas (${contadores.enviada})` },
             { key: 'parcial', label: `Ingreso parcial (${contadores.parcial})` },
             { key: 'completada', label: `Completadas (${contadores.completada})` },
+            { key: 'cerrada', label: `Cerradas en YiQi (${contadores.cerrada})` }, // 23/10/2026 — punto 3
             { key: 'demorada', label: `Demoradas (${contadores.demorada})` }, // 23/10/2026 — feedback Ivana
           ].map((f) => (
             <button
@@ -586,7 +624,7 @@ export default function SeguimientoOC() {
         {/* OC completadas: agrupadas por mes > día (colapsables) */}
         {Object.keys(completadasAgrupadas).length > 0 && (
           <div>
-            <div className="text-[12px] font-bold text-[var(--sub)] uppercase tracking-wide mb-2">Recibidas completas</div>
+            <div className="text-[12px] font-bold text-[var(--sub)] uppercase tracking-wide mb-2">Recibidas completas y cerradas en YiQi</div>
             {Object.entries(completadasAgrupadas).map(([mes, dias]) => (
               <div key={mes} className="mb-2">
                 <button

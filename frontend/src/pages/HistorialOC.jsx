@@ -95,8 +95,8 @@ function claveMes(fechaStr) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-const TONO_ESTADO = { completada: 'verde', parcial: 'amarillo', enviada: 'gris' }
-const ICONO_ESTADO = { completada: 'ti-check', parcial: 'ti-alert-triangle', enviada: null }
+const TONO_ESTADO = { completada: 'verde', cerrada: 'verde', parcial: 'amarillo', enviada: 'gris' }
+const ICONO_ESTADO = { completada: 'ti-check', cerrada: 'ti-check', parcial: 'ti-alert-triangle', enviada: null }
 
 function agruparPorOrden(filas) {
   const porNroOC = new Map()
@@ -113,9 +113,17 @@ function agruparPorOrden(filas) {
         subtotal: 0,
         total: 0,
         lineas: [],
+        cerradaEnYiqi: true,
+        vistoHasta: null,
       })
     }
     const orden = porNroOC.get(nro)
+    // 23/10/2026 — punto 3: cerrada en YiQi = dejó de venir en el reporte de OC pendientes
+    // (Ivana la vació al recibirla, o se eliminó). Ver migración 20261023180000.
+    orden.cerradaEnYiqi = orden.cerradaEnYiqi && fila.cerrada_en_yiqi === true
+    if (fila.sincronizado_en && (!orden.vistoHasta || fila.sincronizado_en > orden.vistoHasta)) {
+      orden.vistoHasta = fila.sincronizado_en
+    }
     orden.subtotal += fila.subtotal ?? 0
     orden.total += fila.total ?? 0
     orden.lineas.push({
@@ -135,6 +143,9 @@ function calcularEstado(orden) {
   const totalEntregado = orden.lineas.reduce((acc, l) => acc + l.entregada, 0)
   const totalPendiente = orden.lineas.reduce((acc, l) => acc + l.pendiente, 0)
 
+  if (orden.cerradaEnYiqi) {
+    return { key: 'cerrada', label: 'Cerrada en YiQi', clase: 'bg-[var(--grn-bg)] text-[var(--grn)]' }
+  }
   if (totalCantidad > 0 && totalPendiente === 0) {
     return { key: 'completada', label: 'Completada', clase: 'bg-[var(--grn-bg)] text-[var(--grn)]' }
   }
@@ -263,7 +274,8 @@ export default function HistorialOC() {
     const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
     const delMes = ordenes.filter((o) => claveMes(o.fecha) === mesActual)
     return {
-      completadas: delMes.filter((o) => o._estado.key === 'completada').length,
+      // 23/10/2026 — punto 3: también cuentan las cerradas en YiQi (vaciadas al recibir).
+      completadas: delMes.filter((o) => o._estado.key === 'completada' || o._estado.key === 'cerrada').length,
       enviadas: delMes.length,
       gasto: delMes.reduce((acc, o) => acc + (o.total ?? 0), 0),
       parciales: delMes.filter((o) => o._estado.key === 'parcial').length,
@@ -345,7 +357,7 @@ export default function HistorialOC() {
             <div className="metrica">
               <div className="metrica-rot">Completadas este mes</div>
               <div className="metrica-val text-[var(--grn)]">{metricasMes.completadas}</div>
-              <div className="metrica-sub">OC del mes ya recibidas</div>
+              <div className="metrica-sub">recibidas completas o cerradas en YiQi</div>
             </div>
             <div className="metrica">
               <div className="metrica-rot">Enviadas este mes</div>
@@ -408,6 +420,7 @@ export default function HistorialOC() {
               <option value="enviada">Enviada</option>
               <option value="parcial">Ingreso parcial</option>
               <option value="completada">Completada</option>
+              <option value="cerrada">Cerrada en YiQi</option>
             </select>
           </div>
 
