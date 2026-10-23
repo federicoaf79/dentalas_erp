@@ -248,6 +248,10 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
   - Una segunda muestra (artículos de MEGADENTAL) no se pudo leer: la pestaña de YiQi dejó de responder.
 
 **DESMENTIDO**
+- **"#14, #21, #22 y #23 son uso real porque las cargaron las cuentas reales de Aris e Ivana"** (`INVESTIGACION` y `LIMPIEZA` del 23/10, y ESPERA desde el 26/9): falso como criterio.
+  - La app no está aprobada para uso real (Federico, 23/10). Todo lo que está en ella (órdenes, causas, pedidos de reposición) es dato de prueba.
+  - Que lo haya cargado una cuenta real solo dice quién estaba probando.
+  - Lo único con efecto real son las escrituras a YiQi de septiembre: los 4 movimientos de stock y las OC #3–#11, que ya no existen en YiQi.
 - **"La smartie 2345 tiene una ventana de fechas acotada"** (comentario LIMITACIÓN de `20260928190000`): falso. Las OC vigentes van del 27/01/2024 al 22/10/2026; lo que la filtra es que la OC tenga algo pendiente [prod 2026-10-23].
 - **"Recibida = remito procesado" (opción A del feedback):** no sirve. YiQi no vincula remitos a OC [en vivo 2026-10-23].
 - **"'Listo' en el asunto = recibida"** (hipótesis del 23/10): falso. "Listo - dsps borrar contenido" es el pedido hecho; la recepción se ve cuando la OC queda vacía. Ivana ya lo había explicado el 16/9 (`PROMPT_CONTINUIDAD_RESUMEN`, ítem 12).
@@ -335,14 +339,14 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 
 | Qué | De quién | Desde |
 |---|---|---|
-| ¿La #21 (DENTAL MEDRANO, $10,5 M) fue prueba o compra real? Destraba la limpieza etapa 2 (borrado definitivo de #3–#11 con respaldo) | Aris | 23/10/2026 |
+| ~~¿La #21 fue prueba o compra real?~~ Mal planteado (Federico, 23/10): la app no está aprobada para uso real, así que todo lo que está en ella es dato de prueba, lo haya cargado quien lo haya cargado. La #21 nunca llegó a YiQi. La limpieza etapa 2 no depende de Aris | — | cerrado 23/10/2026 |
 | Máximos y fraccionados: fórmula actual ("3 meses"), dónde debe vivir el mín/máx calculado (app o YiQi) y qué artículos entran | Ivana / Aris | 23/10/2026 |
 | ¿Qué "máximo" de YiQi espera ver: "Punto de pedido máximo" (el que usa la app; 20 en el 1999-0.25) o "Punto máximo de pedido" / "# a Reponer Máx" (10)? Los cuatro los calcula YiQi | Ivana | 23/10/2026 |
 | ¿Vacía la OC en YiQi también cuando se cancela un pedido? ¿Qué pasó con la 2700 (DROVER, vacía, sin asunto)? | Ivana | 23/10/2026 |
 | Qué ve mal en "Detalle de una sola orden" (checklist, "A corregir") | Ivana | 23/10/2026 |
-| ¿Las 8 causas declaradas entre el 22/8 y el 3/9 son reales o de prueba? ¿Revisa en YiQi los 4 movimientos de stock de septiembre (1437281, 1437282, 1438963, 1440204)? | Ivana | 23/10/2026 |
+| ¿Revisa en YiQi los 4 movimientos de stock de septiembre que escribieron las pruebas de la app (1437281, 1437282, 1438963, 1440204)? Es lo único de las pruebas que tocó datos reales. (Las 8 causas del 22/8 al 3/9 son datos de la app: prueba por definición, no se pregunta) | Ivana | 23/10/2026 |
 | Cargar "Días de entrega" en Condiciones comerciales (alimenta "Llega el") | Ivana / Aris | 23/10/2026 |
-| Aprobar o rechazar la #14 (PESCIO) | Aris | 26/9/2026 |
+| ~~Aprobar o rechazar la #14 (PESCIO)~~ Mal planteado: es una orden de prueba de la app, no un pedido pendiente de Aris | — | cerrado 23/10/2026 |
 | Prueba con su usuario: editar una orden suya esperando aprobación → vuelve a borrador. En el checklist marcó "Bien" el punto 14 [sin verificar que la haya probado con una orden suya] | Ivana | 3/10/2026 |
 | Condiciones comerciales reales (hoy 31 de 104 cargadas) | Aris | 6/8/2026 |
 | WhatsApp de pedidos de los proveedores reales | Aris / Ivana | 20/8/2026 |
