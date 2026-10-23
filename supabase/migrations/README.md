@@ -1,31 +1,28 @@
-# supabase/migrations — baseline PENDIENTE
+# supabase/migrations
 
-**Estado al 5/8/2026: esta carpeta está vacía a propósito.**
+**Estado al 18/10/2026:** 54 migraciones, de `20260801000000_baseline_objetos_creados_a_mano.sql` a `20261007120000_sugerencias_compra_maximo.sql`. [repo 2026-10-18]
 
-Todo el esquema de `hsfudsnmooaesrzdwecg` (tablas espejo `material_yiqi`, `ordenes_yiqi`,
-`clientes_yiqi`, `ventas_mensual_yiqi`; tablas propias `usuarios_config`, `usuario_proveedor`,
-`yiqi_config`, `ordenes_propias`, `ordenes_propias_items`, `reglas_compra`, `empresa_config`,
-`catalogo_causas`, `declaraciones_causa`, `templates_mensaje`, `proveedores`; las funciones
-`es_admin()`, `mis_codigos_proveedor()`, `mis_nombres_proveedor()`, `contadores_sidebar()`,
-`historial_ventas()`, `historial_ventas_json()`, `sugerencias_compra()`,
-`proveedores_con_alertas()`, `es_comprable()`; las políticas RLS y los 3 cron jobs de `pg_cron`)
-fue aplicado **a mano en producción** y nunca se versionó.
+## Historia corta
 
-## Por qué no hay un baseline escrito acá
+- **5/8/2026:** la carpeta estaba vacía a propósito. Todo el esquema se había aplicado a mano en el SQL Editor y la sesión no podía leer producción para escribir un baseline real.
+- **30/9/2026:** se versionó el baseline (`20260801000000`, commit `aaa89e9`). Cubre 25 tablas, funciones, vista, policies y triggers creados a mano. Lleva la fecha 1/8 para que quede primero.
+- **Excepción conocida:** `declaraciones_causa` no tiene `CREATE TABLE` ejecutable en ninguna migración. Solo aparece comentado en `20260822000000_declaraciones_causa.sql:18`, y el baseline no la incluye. Pendiente: leer su DDL en producción y versionarla. [repo 2026-10-18]
 
-La sesión del 5/8/2026 no pudo alcanzar producción: el entorno bloquea la salida a
-`supabase.co`. Escribir el DDL "de memoria" a partir de la documentación habría producido
-migrations que **no describen la base real** — exactamente el problema que esta carpeta
-existe para resolver. Se prefirió dejar el hueco visible.
+## Cómo se aplican
 
-## Cómo cerrarlo (5 minutos, desde PowerShell)
+- **A mano, en el SQL Editor de Supabase** (proyecto `hsfudsnmooaesrzdwecg`), pegando el archivo. No se usa `supabase db push`.
+  - Por eso `supabase migration list` no sirve: la tabla de control del CLI nunca se llenó.
+- **Para comprobar que lo del repo está aplicado** se pregunta directo al catálogo de Postgres:
+  - `scripts/verificar_migraciones_21_8.sql` (28/28 objetos y 6/6 versiones, 21/8).
+  - `scripts/verificar_migraciones_10_9.sql`.
+  - `scripts/radiografia_esquema_30_9.sql` y `scripts/radiografia_funciones_30_9.sql`.
+- **Últimas dos, verificadas en producción:**
+  - `20261003100000` (policies `crear/editar/borrar items` y trigger `trg_items_vuelve_a_borrador`). [prod 2026-10-03]
+  - `20261007120000` (`sugerencias_compra` devuelve `maximo`, EXECUTE solo `authenticated`). [prod 2026-10-07]
 
-    .\scripts\capturar-baseline.ps1
+## Reglas
 
-Genera `supabase/migrations/<timestamp>_baseline.sql` con el esquema real, sin datos.
-Después de correrlo, **borrar este README** y commitear el baseline.
-
-## Regla desde acá en adelante
-
-Ningún cambio de esquema se aplica desde el SQL Editor sin su archivo en esta carpeta.
-Si se aplica a mano por urgencia, se escribe la migration en la misma sesión.
+- Ningún cambio de esquema se aplica desde el SQL Editor sin su archivo en esta carpeta. Si se aplica a mano por urgencia, la migración se escribe en la misma sesión.
+- Una función `RETURNS TABLE` a la que se le agrega una columna necesita `DROP FUNCTION` antes (error 42P13). El DROP borra los GRANT: hay que volver a otorgarlos, igual que en `20260930130000_permisos_funciones.sql` (revoke a `public, anon` y grant a `authenticated`).
+- Las keys de los crons se leen de Vault (`20260930120000_crons_sync_a_vault.sql`). Nunca escribir una key en un archivo de esta carpeta: GitHub Push Protection ya bloqueó un commit por eso (28/9).
+- Nombre: `AAAAMMDDhhmmss_descripcion_corta.sql`.

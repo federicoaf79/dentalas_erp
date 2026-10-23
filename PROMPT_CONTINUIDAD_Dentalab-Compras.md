@@ -1247,3 +1247,16 @@ Se presentó el hallazgo a Federico con `AskUserQuestion` antes de tocar nada �
 **No se tocaron** los ítems 7 y 13 (confirmados como genuinamente pendientes en la sección 6) ni la pequeña discrepancia de 925 vs. 926 en "Órdenes de compra" (se verificó que es un dato que cambia en vivo entre una carga de pantalla y otra, no un bug — "Seguimiento de OC" mostró 925 "Enviadas" de forma consistente con el sidebar en la misma carga).
 
 **Verificación de que las 24 migraciones del repo (10/8 al 21/8/2026) están realmente aplicadas en producción.** Pedido de Federico, al cerrar esta sección: no alcanza con confiar en que cada sesión "aplicó lo que dijo aplicar" — hay que confirmarlo contra la base. Como casi todas se aplicaron pegando el SQL a mano en el SQL Editor (no con `supabase db push`), `supabase migration list` no sirve — la tabla que usa el CLI para llevar la cuenta nunca se llenó. Se armó en cambio `scripts/verificar_migraciones_21_8.sql`, que pregunta directo al catálogo de Postgres: existencia de las 8 tablas y 20 funciones que las migraciones crean, más 6 chequeos de que la versión VIVA de las funciones que se reemplazaron varias veces (`sugerencias_compra`, `reposicion_interna`, `contadores_sidebar`, `candidatos_equivalencia_precios`, las 2 de movimientos de stock) tiene el fix de la migración más reciente y no una versión vieja. `[prod 2026-08-21]` Federico lo corrió en el SQL Editor: **28/28 objetos existen, 6/6 chequeos de versión dieron `true`.** Las 24 migraciones están aplicadas y son las vigentes — no hay ninguna que haya quedado pendiente o pisada por una versión anterior.
+
+---
+
+## Entrada 18/10/2026 — reconciliación (append; el estado vigente está en `CLAUDE.md`)
+
+Desde el 9/10 este historial no se reescribe: `CLAUDE.md` es el estado operativo vigente. Esta entrada solo deja constancia de la reconciliación del 18/10 (producción en vivo, repo, `CLAUDE.md` y Tulkas). El detalle está en `CLAUDE.md`, sección "Reconciliación 2026-10-18".
+
+- **Repo:** HEAD `8c9a98e` = `origin/main`. Último commit de código: `f86b582` (7/10). 54 migraciones.
+- **DESMENTIDO — credencial de YiQi:** `yiqi-renovar-token.ps1` tiene la clave real de YiQi en el working tree, en HEAD y en `03b6288` (20/8). El `CLAUDE.md` del 9/10 la daba por placeholder. Riesgo CRITICAL abierto.
+- **DESMENTIDO — `declaraciones_causa`:** no tiene `CREATE TABLE` ejecutable en ninguna migración. El baseline no cerraba del todo el riesgo "esquema sin migrations".
+- **DESMENTIDO — duplicados históricos de OC en YiQi:** no existen desde antes del 5/9 (verificado en vivo el 28/9). Riesgo cerrado.
+- **NUEVO — órdenes propias:** 4 activas (#18, #14, #12 esperando aprobación; #2 aprobada con error de costo) y 9 en papelera. Los borradores #13, #15, #16, #17 y #19 se eliminaron entre el 3/10 y el 18/10.
+- **NUEVO — "OC en curso" sube sin parar:** 115 → 137 → 150, porque el sync nunca da de baja las OC que salen del reporte 2345.

@@ -1,6 +1,7 @@
 # CLAUDE.md — Dentalab-Compras
 
 > **Creado 2026-10-09** por reconciliación entre `PROMPT_CONTINUIDAD_Dentalab-Compras.md` (historial de sesiones hasta el 21/8/2026), `DEFINICIONES_PENDIENTES_Dentalab.md`, `git log` (111 commits, último `f86b582` 2026-10-07) y `supabase/migrations/` (55 archivos).
+> **Actualizado 2026-10-18** con la reconciliación de producción (en vivo), repo (HEAD `8c9a98e` = `origin/main`) y Tulkas — ver la sección "Reconciliación 2026-10-18".
 > **Este archivo es el estado operativo vigente.** `PROMPT_CONTINUIDAD` queda como historial (append-only, no se reescribe). Ante contradicción gana lo verificado; lo marcado **[sin verificar]** no fue probado en vivo.
 > Reglas compartidas del ecosistema: `.claude/skills/tulkas-stack.md`, `karpathy-guidelines.md`, `anthropic-best-practices.md`.
 
@@ -20,9 +21,9 @@ Sistema de gestión de compras y stock para **Dentalab** (laboratorio dental, Ar
 |---|---|
 | Repo local | `C:\dentalab-compras\` — `frontend\` (React 19 + Vite 8 + Tailwind 4), `supabase\functions\`, `supabase\migrations\` |
 | Remoto | `github.com/federicoaf79/dentalas_erp`, rama `main`. Vercel conectado a Git desde el 19/8 (auto-deploy al push) |
-| Producción | `https://dentalab-compras.vercel.app` — deploy manual alternativo: `cd C:\dentalab-compras\frontend ; vercel --prod` |
+| Producción | `https://dentalab-compras.vercel.app` — se despliega solo con el push a `main`. `vercel --prod` falla ("Could not retrieve Project Settings") [en vivo 2026-10-02] |
 | Supabase | proyecto `hsfudsnmooaesrzdwecg` (org UrbanTales, plan Pro). SQL Editor para migraciones y `pg_get_functiondef` |
-| Edge Functions | `admin-usuarios`, `yiqi-connector`, `sync-yiqi`, `enviar-oc-yiqi`, `editar-oc-yiqi`, `yiqi-borrar-oc`, `mover-stock-yiqi`, `mover-stock-reposicion`, `_shared/yiqiConfig.ts` (renovación automática del token). Todas con `verify_jwt=false` y validación propia (`e837a58`, `b93f735`) |
+| Edge Functions | `admin-usuarios`, `yiqi-connector`, `sync-yiqi`, `enviar-oc-yiqi`, `editar-oc-yiqi`, `yiqi-borrar-oc`, `mover-stock-yiqi`, `mover-stock-reposicion`, `_shared/yiqiConfig.ts` (renovación automática del token). Validación propia con `verificarLlamador()` (`e837a58`, `b93f735`). `verify_jwt=false` en `config.toml` para 7 de 8; falta `mover-stock-reposicion` [repo 2026-10-18] |
 | Credenciales | Token YiQi en tabla `yiqi_config` (se renueva solo, 2 h antes de vencer, `expires_in` ≈ 24 h). Keys de los crons en **Vault** (`20260930120000`). Nunca pedir tokens por chat |
 | PowerShell | Siempre con `cd C:\dentalab-compras` al inicio. `Read-Host` falla seguido: leer la anon key de `frontend\.env.local` |
 
@@ -40,9 +41,9 @@ El frontend **no llama a YiQi en vivo**. Dos capas:
 `material_yiqi` (incluye `mate_crm` costo neto y `mate_crm_final`) · `ordenes_yiqi` (**una fila por línea de OC** desde `20260928190000`) · `clientes_yiqi` (solo logueados desde `20260930121000`) · `ventas_mensual_yiqi` (36.660 filas, `periodo` date) · `ventas_mensual_yiqi_vendedor` · `stock_yiqi` · `ultimo_movimiento_stock_yiqi`.
 
 ### Tablas propias
-`usuarios_config` (admin/operador) · `usuario_proveedor` · `yiqi_config` · `ordenes_propias` + `ordenes_propias_items` (papelera reversible `archivada_en/por`; `yiqi_id_creado`/`yiqi_error`) · `reglas_compra` · `empresa_config` · `catalogo_causas` + `declaraciones_causa` (append-only, archivar/restaurar `bca7b94`) · `templates_mensaje` · `proveedores` (condiciones comerciales, `vende_en_cajas_cerradas` `e54999b`) · `composicion_articulos` (44 filas, fraccionados y combos ML) · `articulos_excluidos_alertas` · `alertas_pausadas` · `alertas_suspendidas` · `reposiciones_sugeridas` · `solicitudes_reposicion` + líneas/remitos (circuito Central↔Local, `31dfee6`) · `sugerencias_compra` con máximo (`20261007120000`).
+`usuarios_config` (admin/operador) · `usuario_proveedor` · `yiqi_config` · `ordenes_propias` + `ordenes_propias_items` (papelera reversible `archivada_en/por`; `yiqi_id_creado`/`yiqi_error`) · `reglas_compra` · `empresa_config` · `catalogo_causas` + `declaraciones_causa` (append-only, archivar/restaurar `bca7b94`) · `templates_mensaje` · `proveedores` (condiciones comerciales, `vende_en_cajas_cerradas` `e54999b`) · `composicion_articulos` (44 filas, fraccionados y combos ML) · `articulos_excluidos_alertas` · `alertas_pausadas` · `alertas_suspendidas` · `reposiciones_sugeridas` · `solicitudes_reposicion` + líneas/remitos (circuito Central↔Local, `31dfee6`).
 
-**Baseline**: `20260801000000_baseline_objetos_creados_a_mano.sql` versiona 25 tablas, funciones, vista, policies y triggers que se habían creado a mano (`aaa89e9`, 30/9). Cierra el riesgo "esquema sin migrations" de Tulkas.
+**Baseline**: `20260801000000_baseline_objetos_creados_a_mano.sql` versiona 25 tablas, funciones, vista, policies y triggers que se habían creado a mano (`aaa89e9`, 30/9). Cierra el riesgo "esquema sin migrations" de Tulkas **salvo `declaraciones_causa`**, que no tiene `CREATE TABLE` ejecutable en ninguna migración (solo comentado en `20260822000000:18`) [repo 2026-10-18].
 
 ### Las smarties en YiQi (renombrar CAMBIA el smartieId; editar columnas no)
 | Smartie | id | Entidad |
@@ -67,7 +68,7 @@ Máximo 100 registros por página. El sufijo "NO BORRAR" no protege de ediciones
 
 ## Funciones de negocio en Postgres
 
-`contadores_sidebar()` (badges; sin SECURITY DEFINER a propósito; excluye excluidos/pausados/Acritone-NewcryL) · `historial_ventas(p_meses)` y `historial_ventas_json` (esquiva el tope de 1.000 filas de PostgREST) · `sugerencias_compra(p_proveedor)` (lee `reglas_compra`, `composicion_articulos`, excluye `es_administrativo`) · `proveedores_con_alertas()` (por demanda en riesgo) · `es_comprable(nombre, proveedor)` (excluye `###` ML, discontinuados, producción propia Dentalab, Acritone/NewcryL `37b465d`) · `es_administrativo(sku)` (889/890/99999) · `es_para_fraccionar(nombre)` · `reposicion_interna()` (Local↔Central, ABC, 8 prioridades; excluye a Patricia `20260911180000`, Pareto sin administrativos `20260914150000`) · `evaluar_reglas_reposicion_central()` (`20260916140000`) · `calcular_punto_equilibrio` (fix DELETE sin WHERE que congeló ventas desde el 8/9, `9bee321`) · `buscar_articulos_proveedor()`.
+`contadores_sidebar()` (badges; sin SECURITY DEFINER a propósito; excluye excluidos/pausados/Acritone-NewcryL) · `historial_ventas(p_meses)` y `historial_ventas_json` (esquiva el tope de 1.000 filas de PostgREST) · `sugerencias_compra(p_proveedor)` (lee `reglas_compra`, `composicion_articulos`, excluye `es_administrativo`; desde `20261007120000` devuelve `maximo` = `mate_punto_pedido_max`) · `proveedores_con_alertas()` (por demanda en riesgo) · `es_comprable(nombre, proveedor)` (excluye `###` ML, discontinuados, producción propia Dentalab, Acritone/NewcryL `37b465d`) · `es_administrativo(sku)` (889/890/99999) · `es_para_fraccionar(nombre)` · `reposicion_interna()` (Local↔Central, ABC, 8 prioridades; excluye a Patricia `20260911180000`, Pareto sin administrativos `20260914150000`) · `evaluar_reglas_reposicion_central()` (`20260916140000`) · `calcular_punto_equilibrio` (fix DELETE sin WHERE que congeló ventas desde el 8/9, `9bee321`) · `buscar_articulos_proveedor()`.
 
 ⚠️ PostgREST corta respuestas tipo TABLA en 1.000 filas (tope de servidor): devolver jsonb. ⚠️ `AVG()` miente en `ventas_mensual_yiqi`: usar `SUM()/N_meses`.
 
@@ -95,7 +96,7 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 
 ## Pantallas
 
-**Compras/Stock** (`App.jsx`, navegación por estado `currentPage`, sin router): Monitor de stock · Alertas · Nueva OC · Órdenes de compra · Seguimiento de OC · Historial de OC · Predictor de demanda · Comparación de precios · Revisar equivalencias · Reposición Central-Local (supervisión admin) · Proveedores · Condiciones comerciales · Usuarios y accesos · Datos de la empresa · Catálogo de causas · Reglas y alertas · Templates de mensajes · Conector YiQi · Ayuda. Reposición interna salió del menú de Aris/Ivana (`07986d6`).
+**Compras/Stock** (`App.jsx`, navegación por estado `currentPage`, sin router): Monitor de stock · Alertas · Nueva OC · Órdenes de compra · Seguimiento de OC · Historial de OC · Predictor de demanda · Comparación de precios · Revisar equivalencias · Reposición Central-Local (supervisión admin) · Proveedores · Condiciones comerciales · Usuarios y accesos · Datos de la empresa · Catálogo de causas · Reglas de compra y aprobación · Templates de mensajes · Conector YiQi · Ayuda. Reposición interna salió del menú de Aris/Ivana (`07986d6`).
 **Depósito** (`AppDeposito.jsx`, `pages/deposito/`): Solicitudes para preparar · Confirmar recepción · Pedir al otro depósito · Ayuda. Clase ABC congelada en la línea del remito (`54523b8`).
 
 ## Actualizaciones 22 ago → 7 oct 2026 (70 commits) — [repo 2026-10-09]
@@ -109,30 +110,97 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 - **Sync y seguridad** — ventas por vendedor (`20260911170000`, cron `20260914090000`, suma por clave antes de las tandas `24cb355`); formato nuevo de smarties pivoteadas + fix ventas congeladas desde 8/9 (`9bee321`); crons leen key de Vault con timeout 120 s (`48d6741`); lectura solo logueados (`20260930121000`); permisos de funciones (`20260930130000`); baseline de 25 objetos creados a mano (`aaa89e9`); cambio de clave propio, sin clave por defecto en el bundle (`24cb355`); migraciones del 11–16/9 que estaban aplicadas sin commitear, versionadas (`3e3e0cc`); jspdf 4 + autotable 5, audit fix (`af9210f`).
 - **UX / estética v7 (feedback de Ivana, fases A–E, 2/10)** — base visual del prototipo v7, código de color único (`8804f80`); Editar/Ver según permiso, filtro Sin proveedor (`2a51f1b`); detalle de OC con barra de pasos (`2c791b2`); tablas aireadas, pastillas unificadas (`70c4d1b`, `30e4b7e`); órdenes como tarjetas con semáforo, Monitor con KPIs accionables (`446004e`, `021d97b`); iconos Tabler (`3ab7af4`); tablas que entran en 1536 px (`f86b582`); PDF A4 centrado, fix congelamiento al imprimir (`ab34e4f`, `8b6cd5a`); auditorías de usabilidad 6/9 y 7/9 (`f3423f9`, `f4f98a9`); Ayuda actualizada al 7/10 (`58fa466`).
 
-## Riesgos — estado real [repo 2026-10-09]
+## Reconciliación 2026-10-18 — producción + repo + MD + Tulkas
 
-- Credenciales en la raíz del repo [repo 2026-10-09, `git ls-files` + lectura del script]: `dentalabs_Sup_KW.txt` y `verificarschemastockyiqi.ps1` **NO están trackeados** (quedaron fuera con `f1d246b`). `yiqi-renovar-token.ps1` sí está trackeado pero `$clave = "COMPLETAR_ACA"` es un placeholder con guard — **no hay credencial real en el repo**. Los riesgos de Tulkas "credencial YiQi en texto plano" y "password-yiqi-en-yiqi-renovar-token" quedan **DESMENTIDOS** para el working tree; `git log --all` confirma que `dentalabs_Sup_KW.txt` y `verificarschemastockyiqi.ps1` **nunca entraron al historial**. Riesgo cerrado del todo.
-- Edge Functions sin autorización → **cerrado** 7/8 (`verificarLlamador`) y reforzado con `verify_jwt=false` + validación propia 6/9. Tulkas lo sigue listando: desactualizado.
-- Esquema sin migrations → **cerrado** con baseline `20260801000000` (30/9). Tulkas desactualizado.
-- Código sin git → **cerrado** 6/8 (remoto `dentalas_erp`). Tulkas desactualizado.
-- Duplicados históricos de OC en YiQi sin reconciliar → abierto; herramienta `yiqi-borrar-oc` lista, decisión de Aris pendiente.
-- Colisión de renovación de token entre los 3 crons a las 06:00 UTC → aceptado, sin locking.
-- Carpetas `_to_delete`, `_to_delete_git_locks`, `_to_delete_old` en la raíz → pendientes de borrar a mano.
+> Fuentes cruzadas el 18/10/2026:
+> - **Repo:** HEAD `8c9a98e` = `origin/main`, último commit de código `f86b582` (7/10), ningún archivo modificado después del 9/10, 54 migraciones `.sql`.
+> - **Producción en vivo:** Claude in Chrome, Federico (admin) en `dentalab-compras.vercel.app`, solo lectura.
+> - **Tulkas:** `get_risks`.
+> - **Este archivo.**
+
+**HECHO**
+- **Sync de MATERIAL al día:** "Conectado a YiQi", última sincronización 18/10/2026 21:31:11, con el reloj del navegador a las 21:32. [en vivo 2026-10-18, Federico en /?page=yiqi]
+- **Órdenes propias:** 4 activas y 9 en papelera (#3–#11).
+  - Activas: #18 DENTAL MEDRANO, #14 PESCIO y #12 PREMIUM DENTAL esperando aprobación; #2 BUDA PABLO aprobada con error de YiQi (artículos 51006 y 51007 sin costo).
+  - Evidencia: [en vivo 2026-10-18, Federico en /?page=ocs]
+- **Números de Monitor:** 2224 críticas / 394 preventivas, OC en curso 150, artículos 7.319, requieren aprobación 3. Seguimiento: Todas 156 (Enviadas 149, Ingreso parcial 1, Completadas 6). [en vivo 2026-10-18, Federico en /?page=stock y /?page=seguimiento]
+- **Reglas:** límite $1.000.000, 2 bultos por producto, 2 meses de cobertura. **Condiciones comerciales:** 31 de 104 proveedores cargados, 19 "pasan siempre por Aris". [en vivo 2026-10-18, Federico en /?page=reglas y /?page=condiciones]
+- **Migraciones 3/10 y 7/10:** `20261003100000` (editar órdenes pendientes) [prod 2026-10-03, policies y trigger verificados en el SQL Editor] y `20261007120000` (`sugerencias_compra` con `maximo`) [prod 2026-10-07, MEGADENTAL: 25 de 46 filas con máximo en Nueva OC] están aplicadas.
+- **Envío automático a YiQi al aprobar:** sigue activo en el código, `OrdenesPropias.jsx:683` (`supabase.functions.invoke('enviar-oc-yiqi')`). [repo 2026-10-18]
+
+**DESMENTIDO**
+- **Credencial de YiQi:**
+  - El 9/10 este archivo decía que `yiqi-renovar-token.ps1` tenía un placeholder y que el riesgo estaba cerrado. **Es falso.**
+  - La línea `$clave` tiene un valor real (13 caracteres, no es `COMPLETAR_ACA`) en el working tree, en HEAD y en el único commit que tocó el archivo (`03b6288`, 20/8), que está en `origin/main`.
+  - La confusión vino del guard de la línea 22 (`if ($clave -eq "COMPLETAR_ACA")`).
+  - Tulkas tenía razón (CRITICAL). [repo 2026-10-18, verificado sin imprimir el valor]
+- **"Esquema sin migrations → cerrado con baseline":** **parcialmente falso.** `declaraciones_causa` no tiene `CREATE TABLE` ejecutable en ninguna migración; solo aparece comentado en `20260822000000_declaraciones_causa.sql:18`, y el baseline no la incluye. Tulkas tenía razón (HIGH). [repo 2026-10-18]
+- **"Edge Functions: todas con `verify_jwt=false`":** falso para 1 de 8. `supabase/config.toml` lista 7; `mover-stock-reposicion` no figura, aunque usa `verificarLlamador()`. [repo 2026-10-18]
+- **"Deploy manual alternativo: `vercel --prod`":** falla ("Could not retrieve Project Settings", `.vercel` viejo). El push a `main` despliega solo. [en vivo 2026-10-02]
+- **"Duplicados históricos de OC en YiQi sin reconciliar → abierto, decisión de Aris":** falso.
+  - Las 859 OC duplicadas que creó `enviar-oc-yiqi` el 18–20/8 ya no existían en YiQi el 28/9: los números 1746–2148, 2150–2563 y 2567–2608 no existen. [en vivo 2026-09-28, Ventas Online en me.yiqi.com.ar/view/ORDEN_DE_COMPRA]
+  - El espejo se limpió (`delete from ordenes_yiqi where asunto like 'Dentalab-Compras #%'`, restantes = 0). [prod 2026-09-28]
+  - Las 7 OC aprobadas de la app (#5–#11) tampoco existen en YiQi; se archivaron. [en vivo 2026-10-02]
+- **"Ivana tiene que elegir qué borrador queda de cada par duplicado":** ya no aplica.
+  - #13, #16 y #17 (los dos pares), y también #15 y #19, no figuran ni activas ni en la papelera: se eliminaron definitivamente entre el 3/10 y el 18/10.
+  - Quién los eliminó: [sin verificar].
+  - Evidencia: [en vivo 2026-10-18, Federico en /?page=ocs, chips "Órdenes (4)" / "Papelera (9)"]
+- **Nombre de la pantalla "Reglas y alertas":** en el menú se llama "Reglas de compra y aprobación" (`Sidebar.jsx:64`). [repo 2026-10-18]
+
+**NUEVO**
+- **"OC en curso" sube sin parar:** 115 (28/9) → 137 (7/10) → 150 (18/10).
+  - `sync-yiqi` hace upsert de lo que trae el reporte 2345, pero nunca saca las OC que dejan de venir. El reporte trae solo las OC con pendiente, así que una OC recibida completa queda congelada como "Enviada".
+  - Afecta el número del menú, Seguimiento, Historial y el paso "Mercadería recibida" del detalle de cada orden. [sin verificar el conteo exacto de filas congeladas — SQL pendiente]
+- **Revisión de Ivana:** el documento con 8 preguntas y 19 puntos para revisar (Claude Docs, más el Word en Descargas) está sin respuestas al 18/10.
+- **Dependencias:** `npm audit --omit=dev` deja 1 vulnerabilidad alta, en `xlsx` (no hay arreglo en npm). La app solo escribe Excel (`exportarExcel.js`), no lee archivos ajenos, que es donde están las fallas. [repo 2026-10-05]
+- **Tablas en pantallas de 1536 px:** `f86b582`. [en vivo 2026-10-07, Federico en Monitor, Alertas, Proveedores y Predictor]
+
+## Riesgos — estado real [actualizado 2026-10-18]
+
+- **[ABIERTO — CRITICAL] Credencial real de YiQi (`ventas@dentalab.com.ar`) en `yiqi-renovar-token.ps1`.**
+  - Trackeado desde `03b6288` (20/8) y presente en HEAD y en `origin/main`. [repo 2026-10-18]
+  - Visibilidad del repo en GitHub: [sin verificar].
+  - Remediación:
+    1. Reemplazar el valor por `COMPLETAR_ACA` y commitear.
+    2. Purgar el historial (`git filter-repo`).
+    3. Rotar la clave. Decisión vigente de Federico: la clave de YiQi no se cambia por ahora.
+  - *Texto del 9/10, DESMENTIDO el 18/10:* "`yiqi-renovar-token.ps1` sí está trackeado pero `$clave = "COMPLETAR_ACA"` es un placeholder con guard — no hay credencial real en el repo."
+- **[CERRADO]** `dentalabs_Sup_KW.txt` y `verificarschemastockyiqi.ps1`: no están trackeados y nunca entraron al historial. Siguen en la carpeta. [repo 2026-10-18, `git ls-files`]
+- **[CERRADO 7/8, reforzado 6/9]** Edge Functions sin autorización (`verificarLlamador`). Observación nueva: `mover-stock-reposicion` no está en `config.toml`, así que en un próximo deploy queda con `verify_jwt=true`. [repo 2026-10-18]
+- **[ABIERTO — HIGH] Esquema sin migrations.** El baseline `20260801000000` (30/9) cubre 25 tablas, pero `declaraciones_causa` no tiene `CREATE TABLE` ejecutable. Hace falta leer su DDL real en producción y versionarla. [repo 2026-10-18]
+- **[CERRADO 6/8]** Código sin git (remoto `dentalas_erp`).
+- **[CERRADO 28/9]** Duplicados históricos de OC en YiQi. No existen en YiQi y el espejo está limpio (ver DESMENTIDO). Tulkas lo sigue listando como LOW: desactualizado.
+- **[ABIERTO] Filas congeladas en `ordenes_yiqi`.** El sync no da de baja las OC que salen del reporte 2345. Opción robusta: leer el estado por `ORDC_ASUNTO` desde `ORDEN_DE_COMPRA` (~2–3 h).
+- **[CONTRADICCIÓN SIN RESOLVER]** Federico (28/9) dice que el envío a YiQi era "construido pero sin activar". El código lo dispara al aprobar (`OrdenesPropias.jsx:683`, `NuevaOC.jsx`) y el cron de reintentos sigue activo: la #2 se reintenta con error de costo.
+- **[ACEPTADO]** Colisión de renovación de token entre los 3 crons a las 06:00 UTC, sin locking.
+- **[ABIERTO — MEDIUM]** Carpetas `_to_delete`, `_to_delete_git_locks` y `_to_delete_old` en la raíz. [repo 2026-10-18]
+- **[ABIERTO — MEDIUM]** `package-lock.json` vacío en la raíz, trackeado y sin relación con `frontend/`. [repo 2026-10-18]
+- **[POR DISEÑO]** `alertas_pausadas_write_authenticated` (FOR ALL, `using (true)`) en el baseline, línea 1230: coincide con la regla "pausa de 15 días por cualquier usuario".
+- **[ABIERTO — BAJO]** `xlsx` sin arreglo en npm. La app solo escribe Excel.
 
 ## PENDIENTE INMEDIATO
 
-1. Mover `dentalabs_Sup_KW.txt` fuera del repo (está sin trackear pero sigue en la carpeta; cualquier `git add .` descuidado lo sube).
-2. Capacitación de Ivana (criterio 7 del MVP).
-3. Borrar las carpetas `_to_delete*` de la raíz.
-4. Automatizar la regla "3 años sin movimiento" sobre `ultimo_movimiento_stock_yiqi` (hoy exclusión manual).
-5. Envío de OC por email (Resend) — no pedido, no construir sin pedido.
+1. Sacar la credencial de `yiqi-renovar-token.ps1` (placeholder + commit) y decidir la purga del historial.
+2. Versionar `declaraciones_causa`: leer su DDL en producción y escribir la migración.
+3. Dar de baja en `ordenes_yiqi` las OC que salen del reporte, o leer el estado por asunto (paso "Mercadería recibida" y número "OC en curso").
+4. Resolver la contradicción del envío automático a YiQi al aprobar: dejarlo activo o ponerle un interruptor.
+5. Agregar `[functions.mover-stock-reposicion] verify_jwt = false` en `config.toml`.
+6. Mover `dentalabs_Sup_KW.txt` fuera del repo y borrar `_to_delete*` y el `package-lock.json` de la raíz.
+7. Capacitación de Ivana (criterio 7 del MVP).
+8. Automatizar la regla "3 años sin movimiento" sobre `ultimo_movimiento_stock_yiqi`.
+
+Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). No fue pedido; no construir sin pedido.
 
 ## ESPERA A OTRA PERSONA
 
 | Qué | De quién | Desde |
 |---|---|---|
-| Condiciones comerciales reales de los 15–20 proveedores principales | Aris | 6/8/2026 |
+| Respuestas al documento "Revisión para Ivana" (8 preguntas: colores, mínimo vacío, duplicados —ya resueltos—, máximos de YiQi, Seguimiento, columnas de Monitor, Reposición con pasos, plazo de entrega) y el checklist de 19 puntos | Ivana | 7/10/2026 |
+| Prueba con su usuario: editar una orden suya esperando aprobación → vuelve a borrador | Ivana | 3/10/2026 |
+| Aprobar o rechazar #18, #14 y #12 | Aris | 26/9–2/10/2026 |
+| Costo de los artículos 51006 y 51007 en YiQi, o rechazar la #2 (BUDA PABLO) | Aris / Ivana | 20/8/2026 |
+| Condiciones comerciales reales (hoy 31 de 104 cargadas) | Aris | 6/8/2026 |
 | WhatsApp de pedidos de los proveedores reales | Aris / Ivana | 20/8/2026 |
-| Decisión sobre OC duplicadas en YiQi (orden #2) | Aris | 20/8/2026 |
-| Datos reales de "Datos de la empresa" (membrete del PDF) | Aris | 21/8/2026 |
-| Que nadie edite las smarties "NO BORRAR" (o usuario YiQi propio del sistema) | Aris | 31/7/2026 |
+| Datos reales de "Datos de la empresa" (membrete del PDF) | Aris | 21/8/2026 [sin verificar si ya se cargaron] |
+| Que nadie edite las smarties "NO BORRAR" (o un usuario YiQi propio del sistema) | Aris | 31/7/2026 |
+| ~~Decisión sobre OC duplicadas en YiQi (orden #2)~~ — cerrado: no existen en YiQi (28/9); la #2 tiene otro problema (costos) | Aris | 20/8/2026 → cerrado 18/10/2026 |

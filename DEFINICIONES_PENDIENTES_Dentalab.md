@@ -1,4 +1,28 @@
 # Definiciones pendientes — Dentalab-Compras
+
+## Estado al 18/10/2026 (reconciliación)
+
+> El documento original del 31/7/2026 queda abajo sin cambios, como registro de lo que se preguntó. Esta tabla dice qué pasó con cada punto. El estado operativo vigente está en `CLAUDE.md`.
+
+| Punto | Estado al 18/10/2026 | Evidencia |
+|---|---|---|
+| A. Condiciones comerciales | **Construido y en uso parcial.** Pantalla "Condiciones comerciales" con mínimo, plazo, contacto, WhatsApp, límite propio y "siempre requiere aprobación". Cargados 31 de 104 proveedores. Faltan los datos reales del resto. | [en vivo 2026-10-18, Federico en /?page=condiciones] |
+| B. Límite de aprobación | **Construido.** Límite general $1.000.000; límite propio por proveedor; 19 proveedores "pasan siempre por Aris". | [en vivo 2026-10-18, Federico en /?page=reglas y /?page=condiciones] |
+| C. Combos ML y fraccionados | **Construido.** Tabla `composicion_articulos` (44 filas según `CLAUDE.md`), usada por `sugerencias_compra()` para sumar el consumo al artículo base. | [repo 2026-10-18, `20260810000000_composicion_articulos.sql`]; cantidad de filas [sin verificar hoy] |
+| D. Smarties "NO BORRAR" | **Sigue abierto.** El sistema usa 6 smarties (2344, 2345, 2346, 2353, 2359, 2360, según `CLAUDE.md`); la pantalla Conector YiQi lista solo 3 (2344, 2345, 2346). No hay usuario de YiQi propio del sistema. | [en vivo 2026-10-18, Federico en /?page=yiqi]; decisión de Aris pendiente |
+| E. Producción propia | **Decidido y construido.** "Dentalab" como proveedor queda fuera de las sugerencias (`es_comprable`). Orden de producción: no construida. | [repo 2026-10-18] |
+| F. Artículo 1002, tránsito −58 | **Sin resolver.** La app muestra Local 97 · Central 187 · Jorge 34 · ML Full 45 (stock 284) y no lee la ubicación "En tránsito" para este cálculo. | [en vivo 2026-10-18, Federico en /?page=stock]; dato en YiQi [sin verificar] |
+| G. Campo "Asunto" de las OC | **Respondido en la práctica.** Ivana escribe el estado real en el Asunto ("Listo", "Revisión-enviado") porque todas las OC quedan "En preparación" en YiQi. "Cantidad en camino" (16–17/9) reemplazó la marca manual. | [en vivo 2026-10-02, Ventas Online en me.yiqi.com.ar]; [repo `fe2c185`] |
+| H. Catálogo de causas | **Construido.** Ámbitos Stock / Compras / Entregas, declaraciones append-only, archivar y restaurar. Validación de las categorías por Ivana: [sin verificar]. | [repo `b6f9dd8`, `bca7b94`] |
+| I. Forma de trabajo de Ivana | **Parcialmente respondido** por su feedback (28/9 y 2/10): arma por proveedor desde Nueva OC y envía por WhatsApp. Frecuencia de pedidos: [sin verificar]. | `claude/FEEDBACK_IVANA_*.md` (proyecto) |
+| Parte 3 — Envío de la OC al proveedor | **WhatsApp semiautomático** (PDF + texto con plantilla). Email: no construido. | [repo 2026-10-18] |
+| Parte 3 — Escritura de la OC en YiQi | **Funciona** (`POST /ORDEN_DE_COMPRA`, OC #9 el 19/8). Ver en `CLAUDE.md` la contradicción sobre si debe estar activa al aprobar. | [repo `OrdenesPropias.jsx:683`] |
+| Parte 3 — Comparación de precios | **Construido** ("Comparar precios" y "Revisar equivalencias"). | [repo 2026-10-18] |
+| Parte 3 — Capacitación de Ivana | **Pendiente.** | — |
+
+---
+
+# Documento original (31/7/2026)
 **31 de julio de 2026**
 
 Este documento tiene dos partes: lo que necesitamos **de Aris** (decisiones y datos comerciales) y lo que necesitamos **de Ivana** (detalle de la operación diaria). Al final, una nota sobre qué queda pendiente por nuestro lado, que no depende de estas respuestas.
