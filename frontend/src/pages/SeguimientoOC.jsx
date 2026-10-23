@@ -80,6 +80,10 @@ function formatoMoneda(n) {
 
 function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
+  // 23/10/2026: una fecha sola 'AAAA-MM-DD' se arma en hora local. new Date() la toma
+  // como UTC y en Argentina mostraba el día anterior (OC 2681: 06/10 se veía 5/10).
+  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fechaStr))
+  if (soloFecha) return `${Number(soloFecha[3])}/${Number(soloFecha[2])}/${soloFecha[1]}`
   try {
     return new Date(fechaStr).toLocaleDateString('es-AR')
   } catch {
@@ -442,13 +446,17 @@ export default function SeguimientoOC() {
     demorada: ordenesConEstado.filter((o) => o._llegada?.demorada).length, // 23/10/2026 — feedback Ivana
   }), [ordenesConEstado])
 
+  // 23/10/2026: meses y días del más reciente al más viejo (antes salían en el orden de
+  // llegada de la base: Agosto, Septiembre, Julio…). La fecha se arma en hora local.
   const completadasAgrupadas = useMemo(() => {
-    const completadas = ordenesFiltradas.filter((o) => TERMINALES.has(o._estado.key) && o.fecha)
+    const completadas = ordenesFiltradas
+      .filter((o) => TERMINALES.has(o._estado.key) && /^\d{4}-\d{2}-\d{2}/.test(String(o.fecha ?? '')))
+      .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || String(b.nroOC).localeCompare(String(a.nroOC), undefined, { numeric: true }))
     const porMes = {}
     for (const oc of completadas) {
-      const fecha = new Date(oc.fecha)
-      const claveMes = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`
-      const claveDia = fecha.toLocaleDateString('es-AR')
+      const [anio, mes] = String(oc.fecha).slice(0, 10).split('-').map(Number)
+      const claveMes = `${MESES[mes - 1]} ${anio}`
+      const claveDia = formatoFecha(String(oc.fecha).slice(0, 10))
       porMes[claveMes] ??= {}
       porMes[claveMes][claveDia] ??= []
       porMes[claveMes][claveDia].push(oc)

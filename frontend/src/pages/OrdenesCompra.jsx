@@ -63,6 +63,10 @@ function formatoMoneda(n) {
 }
 function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
+  // 23/10/2026: una fecha sola 'AAAA-MM-DD' se arma en hora local. new Date() la toma
+  // como UTC y en Argentina mostraba el día anterior (OC 2681: 06/10 se veía 5/10).
+  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fechaStr))
+  if (soloFecha) return `${Number(soloFecha[3])}/${Number(soloFecha[2])}/${soloFecha[1]}`
   try {
     return new Date(fechaStr).toLocaleDateString('es-AR')
   } catch {
