@@ -316,11 +316,19 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 ## PENDIENTE INMEDIATO
 
 0. **Respuestas de Ivana del 26/10** (`claude/FEEDBACK_IVANA_23-10-2026.md`, proyecto):
-   - Construido y falta el push: días hábiles en "Llega el" y zonas de color en la barra Stock/Mín/Máx.
-   - **Decisión de Federico: máximos.**
-     - A: la app los calcula, con el promedio de 3 meses cerrados, los "-F" sumados al código base y redondeo a la presentación. ~3–4 h.
-     - B: sincronizar "Uso mensual" de YiQi, donde los cargan a mano. Hay que agregar la columna a la smartie 2344.
-     - Las dos.
+   - **Hecho:** días hábiles en "Llega el" y zonas de color en la barra (`5a5b1a6`).
+   - **Hecho: máximo calculado por la app** (opción A, decisión de Federico del 26/10). Migración `20261026120000` y commit `e5c1928`.
+     - Fórmula: promedio de 3 meses cerrados, fraccionados/combos sumados con `composicion_articulos`, redondeo al bulto, ⚠ en los picos. Solo lectura.
+     - Verificación: 2.868 SKU con máximo y 832 con pico [prod 2026-10-26]. El 1999-0.25 no tuvo ventas jul–sep, así que no tiene máximo calculado.
+     - Validado en Alertas y en Nueva OC (MEGADENTAL), con el tooltip mes a mes [en vivo 2026-10-26, Federico (admin) en /?page=alertas y /?page=nueva-oc].
+   - **Faltan respuestas de Ivana:**
+     - ¿El máximo cubre 1 mes o más? Hay casos con Mín. 30 > Máx. 20.
+     - ¿Los picos se excluyen solos?
+     - Completar los factores de 160 "-F" sin conversión (planilla `Fraccionados_para_completar_Ivana_26-10-2026.xlsx`; 130 con sugerencia deducida del nombre).
+     - La OC 2700 de YiQi.
+     - Los 4 Nro Movimiento.
+     - Feriados.
+   - **Para revisar:** el criterio de pico (más del doble de la mediana con ≥ 3 u) marca el 29 % de los SKU. Probablemente sea demasiado sensible con volúmenes bajos.
 1. Avisarles a Ivana y a Aris del cambio del 23/10:
    - las OC vaciadas o borradas en YiQi aparecen "Cerradas en YiQi" y ya no son Demoradas;
    - "en camino" ya no descuenta lo de esas OC, así que en Alertas puede haber críticos nuevos.
