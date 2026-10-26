@@ -156,7 +156,8 @@ const MODULOS = [
           {
             ul: [
               '**Filtro Proveedor ▾**: "Es" (solo ese proveedor), "No es" (todos menos ese) o "Sin proveedor asignado" (artículos que no tienen proveedor en YiQi), más una lista para excluir proveedores puntuales. "✕ Limpiar" saca el filtro. No se guarda: al volver a entrar arranca limpio.',
-              '**Columna Stock**: una barra con el número de stock arriba, una marca marrón en el mínimo y una gris en el máximo (si el máximo está cargado en YiQi). Roja si el stock está en o bajo el mínimo, verde entre mínimo y máximo, índigo si pasó el máximo. Debajo, el desglose por depósito (Local / Central).',
+              '**Columna Stock**: una barra con el número de stock arriba, una marca marrón en el mínimo y una gris en el máximo. De fondo, las tres zonas: rojo hasta el mínimo, verde entre mínimo y máximo, índigo por encima del máximo. Debajo, el desglose por depósito (Local / Central).',
+              '**Máx. calculado** (desde el 26/10/2026): el máximo lo calcula el sistema, no YiQi. Es el promedio de ventas de los últimos 3 meses cerrados (sin el mes en curso), con las ventas de fraccionados y combos sumadas al artículo que se compra, redondeado al bulto si está cargado. Pasando el mouse por la barra se ve el detalle mes por mes. Si un mes vendió mucho más que los otros aparece un ⚠ (pico) para revisar el número. Es solo de referencia: no cambia la cantidad sugerida ni las alertas.',
               '**Estado OC**: si el artículo ya está pedido ("Solicitada" o "Entrega parcial") y cuántas unidades vienen en camino, por ejemplo "Solicitada (+40)".',
               '**Notas**: la nota sobre el punto de pedido que se cargó en YiQi para ese artículo.',
             ],
@@ -330,7 +331,7 @@ const MODULOS = [
               'Para guardar: "Guardar borrador" (para retomar después) o "Enviar a aprobación" / "Confirmar orden" (el texto cambia solo según si requiere aprobación o no). Al guardar aparece un aviso verde con "Ver orden #N" y la pantalla sube sola, para que se vea que quedó guardada.',
             ],
           },
-          'La columna **Stock** muestra la misma barra que Monitor de stock y Alertas: stock, marca del mínimo y del máximo (si está cargado en YiQi). La columna **Mín.** sigue al lado, con el número.',
+          'La columna **Stock** muestra la misma barra que Monitor de stock y Alertas: stock, marca del mínimo y del **máximo calculado por el sistema** (promedio de los últimos 3 meses cerrados; ver Monitor de stock). La columna **Mín.** sigue al lado, con el número.',
         ],
         reglas: [
           { warn: 'Quién arma la orden importa mucho: si la arma Aris, queda confirmada directo, sin pasar por ningún control. Si la arma Ivana, la orden queda esperando que Aris la apruebe cuando pasa cualquiera de estas tres cosas: el total supera el límite de aprobación (propio del proveedor o el general), algún artículo quedó sin costo cargado, o el proveedor está marcado "siempre requiere mi aprobación".' },

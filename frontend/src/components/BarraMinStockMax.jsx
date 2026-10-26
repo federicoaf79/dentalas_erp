@@ -12,7 +12,9 @@
 // Ivana pidió lo mismo para Nueva OC (ver FEEDBACK_IVANA_28-9-2026.md,
 // punto 11) -- aplicado ahí el 7/10/2026 (columna Stock).
 // ============================================================
-export default function BarraMinStockMax({ stock, min, max }) {
+// 26/10/2026 — máximo calculado por la app (lib/maximos.js): `detalleMax` va al
+// tooltip y `pico` agrega un aviso para revisar el número.
+export default function BarraMinStockMax({ stock, min, max, detalleMax = null, pico = false }) {
   const s = Number(stock) || 0
   const mn = min != null && Number(min) > 0 ? Number(min) : null
   const mx = max != null && Number(max) > 0 ? Number(max) : null
@@ -38,11 +40,15 @@ export default function BarraMinStockMax({ stock, min, max }) {
   return (
     <div
       className="w-28"
-      title={`Stock ${s}${mn != null ? ` · Mín. ${mn}` : ''}${mx != null ? ` · Máx. ${mx}` : ''}\nRojo: hasta el mínimo · Verde: entre mínimo y máximo · Índigo: por encima del máximo`}
+      title={`Stock ${s}${mn != null ? ` · Mín. ${mn}` : ''}${mx != null ? ` · Máx. ${mx}` : ''}${detalleMax ? `\n${detalleMax}` : ''}\nRojo: hasta el mínimo · Verde: entre mínimo y máximo · Índigo: por encima del máximo`}
     >
       <div className="flex items-baseline justify-between text-[11px] mb-0.5">
         <span className="font-bold text-gray-700">{s}</span>
-        {mx != null && <span className="text-gray-300">máx {mx}</span>}
+        {mx != null && (
+          <span className={pico ? 'text-[#92400e]' : 'text-gray-400'}>
+            máx {mx}{pico && <i className="ti ti-alert-triangle ml-0.5 align-[-1px]" />}
+          </span>
+        )}
       </div>
       <div className="relative h-1.5 bg-gray-100 rounded-full overflow-visible">
         {/* 26/10/2026 — Ivana: "solo veo el bordó". En Nueva OC casi todo está bajo el

@@ -11,6 +11,7 @@ import { aplicarFiltroProveedor, FILTRO_PROVEEDOR_INICIAL } from '../lib/filtroP
 import { TONO_DE_COLOR } from '../lib/estados'
 import FiltroProveedor from '../components/FiltroProveedor'
 import BarraMinStockMax from '../components/BarraMinStockMax'
+import { useMaximosCalculados, textoMaximoCalculado } from '../lib/maximos'
 
 // ============================================================
 // MonitorStock.jsx — v7
@@ -241,6 +242,8 @@ function FlechaOrden({ activa, dir }) {
 // contadores = los mismos del sidebar (App.jsx); onArmarOC / onIrA vienen de App.
 export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
   const permisos = usePermisos()
+  // 26/10/2026 — máximo calculado por la app (opción A): promedio de 3 meses cerrados.
+  const maximosCalc = useMaximosCalculados()
 
   const [articulos, setArticulos] = useState([])
   const [stockPorSku, setStockPorSku] = useState({})
@@ -628,7 +631,9 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                         <BarraMinStockMax
                           stock={a.mate_stock_disponible}
                           min={a.mate_punto_de_pedido > 0 ? a.mate_punto_de_pedido : a.mate_stock_seguridad}
-                          max={a.mate_punto_pedido_max}
+                          max={maximosCalc?.[a.mate_codigo]?.max ?? null}
+                          pico={!!maximosCalc?.[a.mate_codigo]?.pico}
+                          detalleMax={maximosCalc ? textoMaximoCalculado(maximosCalc[a.mate_codigo], a.mate_punto_pedido_max) : null}
                         />
                         {(() => {
                           const desglose = textoDesgloseStock(stockPorSku[a.mate_codigo])

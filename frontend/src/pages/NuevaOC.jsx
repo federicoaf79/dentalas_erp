@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import BarraMinStockMax from '../components/BarraMinStockMax'
+import { useMaximosCalculados, textoMaximoCalculado } from '../lib/maximos'
 import BloqueAccion from '../components/ui/BloqueAccion'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import InfoAyuda from '../components/ui/InfoAyuda'
@@ -275,6 +276,8 @@ function formatoMoneda(n) {
 }
 
 function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, ocupado, condiciones, esAdmin, preseleccionSku, nombreUsuario, modoPrueba = false }) {
+  // 26/10/2026 — máximo calculado por la app (opción A): promedio de 3 meses cerrados.
+  const maximosCalc = useMaximosCalculados(proveedor ?? null, !!proveedor)
   const [seleccion, setSeleccion] = useState(() => new Set())
   const [cantidades, setCantidades] = useState({})
   const [notas, setNotas] = useState('')
@@ -915,7 +918,14 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         mismo componente que Alertas y Monitor. El Máx. viene de
                         sugerencias_compra().maximo (migración 20261007120000). */}
                     <td>
-                      <BarraMinStockMax stock={s.stock} min={s.umbral} max={s.maximo} />
+                      {/* 26/10/2026 — Máx. calculado por la app (Ivana no usa el de YiQi). */}
+                      <BarraMinStockMax
+                        stock={s.stock}
+                        min={s.umbral}
+                        max={maximosCalc?.[s.mate_codigo]?.max ?? null}
+                        pico={!!maximosCalc?.[s.mate_codigo]?.pico}
+                        detalleMax={maximosCalc ? textoMaximoCalculado(maximosCalc[s.mate_codigo], s.maximo) : null}
+                      />
                       {(() => {
                         const desglose = textoDesgloseStock(stockPorSku[s.mate_codigo])
                         if (!desglose) return null
