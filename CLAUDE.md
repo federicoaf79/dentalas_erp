@@ -315,6 +315,12 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
 
 ## PENDIENTE INMEDIATO
 
+0. **Respuestas de Ivana del 26/10** (`claude/FEEDBACK_IVANA_23-10-2026.md`, proyecto):
+   - Construido y falta el push: días hábiles en "Llega el" y zonas de color en la barra Stock/Mín/Máx.
+   - **Decisión de Federico: máximos.**
+     - A: la app los calcula, con el promedio de 3 meses cerrados, los "-F" sumados al código base y redondeo a la presentación. ~3–4 h.
+     - B: sincronizar "Uso mensual" de YiQi, donde los cargan a mano. Hay que agregar la columna a la smartie 2344.
+     - Las dos.
 1. Avisarles a Ivana y a Aris del cambio del 23/10:
    - las OC vaciadas o borradas en YiQi aparecen "Cerradas en YiQi" y ya no son Demoradas;
    - "en camino" ya no descuenta lo de esas OC, así que en Alertas puede haber críticos nuevos.
@@ -341,10 +347,10 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 |---|---|---|
 | ~~¿La #21 fue prueba o compra real?~~ Mal planteado (Federico, 23/10): la app no está aprobada para uso real, así que todo lo que está en ella es dato de prueba, lo haya cargado quien lo haya cargado. La #21 nunca llegó a YiQi. La limpieza etapa 2 no depende de Aris | — | cerrado 23/10/2026 |
 | Máximos y fraccionados: fórmula actual ("3 meses"), dónde debe vivir el mín/máx calculado (app o YiQi) y qué artículos entran | Ivana / Aris | 23/10/2026 |
-| ¿Qué "máximo" de YiQi espera ver: "Punto de pedido máximo" (el que usa la app; 20 en el 1999-0.25) o "Punto máximo de pedido" / "# a Reponer Máx" (10)? Los cuatro los calcula YiQi | Ivana | 23/10/2026 |
+| ~~¿Qué "máximo" de YiQi espera ver?~~ Respondido el 26/10: ninguno de los que calcula YiQi. Lo cargan a mano en "Uso mensual" y quieren que la app lo calcule (ver PENDIENTE) | Ivana | cerrado 26/10/2026 |
 | ¿Vacía la OC en YiQi también cuando se cancela un pedido? ¿Qué pasó con la 2700 (DROVER, vacía, sin asunto)? | Ivana | 23/10/2026 |
 | Qué ve mal en "Detalle de una sola orden" (checklist, "A corregir") | Ivana | 23/10/2026 |
-| ¿Revisa en YiQi los 4 movimientos de stock de septiembre que escribieron las pruebas de la app (1437281, 1437282, 1438963, 1440204)? Es lo único de las pruebas que tocó datos reales. (Las 8 causas del 22/8 al 3/9 son datos de la app: prueba por definición, no se pregunta) | Ivana | 23/10/2026 |
+| ¿Revisa en YiQi los 4 movimientos de stock de septiembre que escribieron las pruebas de la app? **Ojo:** los números que le pasamos eran ids de la API. Los "Nro Movimiento" visibles en YiQi son 1430138, 1430139, 1431820 y 1433061 [en vivo 2026-10-26]. Lo consulta con el encargado de stock. Es lo único de las pruebas que tocó datos reales. (Las 8 causas del 22/8 al 3/9 son datos de la app: prueba por definición, no se pregunta) | Ivana | 23/10/2026 |
 | Cargar "Días de entrega" en Condiciones comerciales (alimenta "Llega el") | Ivana / Aris | 23/10/2026 |
 | ~~Aprobar o rechazar la #14 (PESCIO)~~ Mal planteado: es una orden de prueba de la app, no un pedido pendiente de Aris | — | cerrado 23/10/2026 |
 | Prueba con su usuario: editar una orden suya esperando aprobación → vuelve a borrador. En el checklist marcó "Bien" el punto 14 [sin verificar que la haya probado con una orden suya] | Ivana | 3/10/2026 |

@@ -1,5 +1,5 @@
 // ============================================================
-// BarraMinStockMax.jsx — 28/9/2026
+// BarraMinStockMax.jsx — 28/9/2026 (zonas de color de fondo: 26/10/2026)
 // ============================================================
 // Gráfico más intuitivo para Mín./Stock/Máx. (feedback del cliente,
 // punto 3): una barra horizontal en vez de 3 números en columnas
@@ -36,13 +36,30 @@ export default function BarraMinStockMax({ stock, min, max }) {
   else if (mx != null && s > mx) colorBarra = 'bg-[var(--ind,#4338ca)]'
 
   return (
-    <div className="w-28" title={`Stock ${s}${mn != null ? ` · Mín. ${mn}` : ''}${mx != null ? ` · Máx. ${mx}` : ''}`}>
+    <div
+      className="w-28"
+      title={`Stock ${s}${mn != null ? ` · Mín. ${mn}` : ''}${mx != null ? ` · Máx. ${mx}` : ''}\nRojo: hasta el mínimo · Verde: entre mínimo y máximo · Índigo: por encima del máximo`}
+    >
       <div className="flex items-baseline justify-between text-[11px] mb-0.5">
         <span className="font-bold text-gray-700">{s}</span>
         {mx != null && <span className="text-gray-300">máx {mx}</span>}
       </div>
-      <div className="relative h-1.5 bg-gray-100 rounded-full">
-        <div className={`h-1.5 rounded-full ${colorBarra}`} style={{ width: `${pctStock}%` }} />
+      <div className="relative h-1.5 bg-gray-100 rounded-full overflow-visible">
+        {/* 26/10/2026 — Ivana: "solo veo el bordó". En Nueva OC casi todo está bajo el
+            mínimo (stock 0 → barra vacía), así que se pintan de fondo las tres zonas:
+            rojo claro hasta el mínimo, verde claro entre mínimo y máximo, índigo claro
+            por encima del máximo. La barra del stock va encima con su color fuerte. */}
+        {pctMin != null && (
+          <div className="absolute inset-y-0 left-0 rounded-l-full bg-[#fde2e2]" style={{ width: `${pctMin}%` }} />
+        )}
+        <div
+          className="absolute inset-y-0 bg-[#dcf2e6]"
+          style={{ left: `${pctMin ?? 0}%`, width: `${Math.max(0, (pctMax ?? 100) - (pctMin ?? 0))}%` }}
+        />
+        {pctMax != null && pctMax < 100 && (
+          <div className="absolute inset-y-0 right-0 rounded-r-full bg-[#e3e1fb]" style={{ left: `${pctMax}%` }} />
+        )}
+        <div className={`relative h-1.5 rounded-full ${colorBarra}`} style={{ width: `${pctStock}%` }} />
         {pctMin != null && (
           <div
             className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3 bg-[#92400e]"

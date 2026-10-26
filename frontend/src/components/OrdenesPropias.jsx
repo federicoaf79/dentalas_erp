@@ -5,6 +5,7 @@ import DeclararCausaModal from './DeclararCausaModal'
 import { ultimasCausasPorReferencia } from '../lib/causas'
 import { generarPdfOrden, generarPdfOrdenDescargable, subtotalLinea } from '../lib/pdfOrden'
 import { ESTADO_OC_PROPIA } from '../lib/estados'
+import { sumarDiasHabiles } from '../lib/fechas'
 import Pastilla from './ui/Pastilla'
 import BloqueAccion from './ui/BloqueAccion'
 import BarraPasos from './ui/BarraPasos'
@@ -95,16 +96,15 @@ function textoDecision(o) {
   return null
 }
 // 23/10/2026 — feedback Ivana: fecha estimada de llegada = envío al proveedor
-// (WhatsApp) + dias_entrega del proveedor (días corridos). null si falta algún dato.
+// (WhatsApp) + dias_entrega del proveedor. 26/10/2026 — Ivana: días HÁBILES
+// (lunes a viernes; feriados no se descuentan). null si falta algún dato.
 function fechaEstimadaLlegada(o, diasPorProv) {
   if (o.estado !== 'aprobada' || !o.whatsapp_enviada_en) return null
   const dias = diasPorProv?.[o.proveedor_nombre]
   if (dias == null || !Number.isFinite(Number(dias))) return null
   const d = new Date(o.whatsapp_enviada_en)
   if (Number.isNaN(d.getTime())) return null
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() + Math.round(Number(dias)))
-  return d
+  return sumarDiasHabiles(d, dias)
 }
 // Mismo criterio que el paso "Mercadería recibida" de la barra de pasos.
 function mercaderiaRecibida(ing) {

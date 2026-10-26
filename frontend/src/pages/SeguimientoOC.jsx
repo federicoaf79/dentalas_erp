@@ -6,6 +6,7 @@ import DeclararCausaModal from '../components/DeclararCausaModal'
 import { ultimasCausasPorReferencia } from '../lib/causas'
 import { ESTADO_OC_YIQI, ESTADO_OC_PROPIA } from '../lib/estados'
 import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
+import { sumarDiasHabiles, fechaLocalDeTexto } from '../lib/fechas'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import Pastilla from '../components/ui/Pastilla'
 import BloqueAccion from '../components/ui/BloqueAccion'
@@ -96,12 +97,11 @@ function formatoFecha(fechaStr) {
   }
 }
 
-// 23/10/2026 — feedback Ivana: fecha estimada de llegada = fecha de la OC + dias_entrega
-// (días corridos). Se arma con año/mes/día locales (sin pasar por UTC) para no correr un día.
+// 23/10/2026 — feedback Ivana: fecha estimada de llegada = fecha de la OC + dias_entrega.
+// 26/10/2026 — Ivana: son días HÁBILES (lunes a viernes; feriados no se descuentan).
 function sumarDias(fechaStr, dias) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(fechaStr ?? ''))
-  if (!m) return null
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + dias)
+  const base = fechaLocalDeTexto(fechaStr)
+  return base ? sumarDiasHabiles(base, dias) : null
 }
 
 function formatoDiaMes(d) {
