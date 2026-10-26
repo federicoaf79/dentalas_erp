@@ -321,13 +321,14 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
      - Fórmula: promedio de 3 meses cerrados, fraccionados/combos sumados con `composicion_articulos`, redondeo al bulto, ⚠ en los picos. Solo lectura.
      - Verificación: 2.868 SKU con máximo y 832 con pico [prod 2026-10-26]. El 1999-0.25 no tuvo ventas jul–sep, así que no tiene máximo calculado.
      - Validado en Alertas y en Nueva OC (MEGADENTAL), con el tooltip mes a mes [en vivo 2026-10-26, Federico (admin) en /?page=alertas y /?page=nueva-oc].
-   - **Faltan respuestas de Ivana:**
-     - ¿El máximo cubre 1 mes o más? Hay casos con Mín. 30 > Máx. 20.
-     - ¿Los picos se excluyen solos?
-     - Completar los factores de 160 "-F" sin conversión (planilla `Fraccionados_para_completar_Ivana_26-10-2026.xlsx`; 130 con sugerencia deducida del nombre).
-     - La OC 2700 de YiQi.
-     - Los 4 Nro Movimiento.
-     - Feriados.
+   - **Respuestas de Ivana (26/10, segunda tanda):**
+     - El máximo cubre **1 mes** (2 como mucho); lo confirma Aris para los productos que se compran en cantidad (Compresas K-tex, Totalcaína), que pasan 2 meses sin reponerse.
+     - Picos: los define Aris (le pueden servir para saber en qué época conviene pedir).
+     - La planilla de fraccionados todavía no le llegó: Federico tiene que mandársela.
+     - La OC 2700 de YiQi la borró ella (iba a pedir, pero Aris ya había armado el pedido).
+     - Los 4 movimientos de stock: el encargado de stock no está por ahora.
+     - Feriados: está bien no descontarlos.
+     - Evidencia: [stated por Ivana, 26/10, vía Federico]
    - **Para revisar:** el criterio de pico (más del doble de la mediana con ≥ 3 u) marca el 29 % de los SKU. Probablemente sea demasiado sensible con volúmenes bajos.
 1. Avisarles a Ivana y a Aris del cambio del 23/10:
    - las OC vaciadas o borradas en YiQi aparecen "Cerradas en YiQi" y ya no son Demoradas;
@@ -354,7 +355,8 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 | Qué | De quién | Desde |
 |---|---|---|
 | ~~¿La #21 fue prueba o compra real?~~ Mal planteado (Federico, 23/10): la app no está aprobada para uso real, así que todo lo que está en ella es dato de prueba, lo haya cargado quien lo haya cargado. La #21 nunca llegó a YiQi. La limpieza etapa 2 no depende de Aris | — | cerrado 23/10/2026 |
-| Máximos y fraccionados: fórmula actual ("3 meses"), dónde debe vivir el mín/máx calculado (app o YiQi) y qué artículos entran | Ivana / Aris | 23/10/2026 |
+| Máximos: ¿qué artículos llevan 2 meses de máximo en vez de 1 (K-tex, Totalcaína…)? ¿Qué hacer con los picos (dejarlos en el promedio, sacarlos o usarlos para ver la temporada)? | Aris | 26/10/2026 |
+| Planilla de fraccionados completada (160 "-F"; la tiene que recibir de Federico) | Ivana (con Aris) | 26/10/2026 |
 | ~~¿Qué "máximo" de YiQi espera ver?~~ Respondido el 26/10: ninguno de los que calcula YiQi. Lo cargan a mano en "Uso mensual" y quieren que la app lo calcule (ver PENDIENTE) | Ivana | cerrado 26/10/2026 |
 | ¿Vacía la OC en YiQi también cuando se cancela un pedido? ¿Qué pasó con la 2700 (DROVER, vacía, sin asunto)? | Ivana | 23/10/2026 |
 | Qué ve mal en "Detalle de una sola orden" (checklist, "A corregir") | Ivana | 23/10/2026 |
