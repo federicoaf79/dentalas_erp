@@ -1,5 +1,9 @@
 # CLAUDE.md — Dentalab-Compras
 
+<!-- TULKASOS:ESTADO:INICIO -->
+> **Estado TulkasOS (automático, 2026-11-05):** 69% · 39 ítems · 16 validados · 39 en producción · 0 evidencia rota · cambios: +0 ~20 −0. Detalle por ítem en `INVENTARIO.md`. No editar este bloque: lo reescribe el sistema. Lo tuyo va en `## Cierre AAAA-MM-DD` al final de este archivo.
+<!-- TULKASOS:ESTADO:FIN -->
+
 > **Creado 2026-10-09** por reconciliación entre `PROMPT_CONTINUIDAD_Dentalab-Compras.md` (historial de sesiones hasta el 21/8/2026), `DEFINICIONES_PENDIENTES_Dentalab.md`, `git log` (111 commits, último `f86b582` 2026-10-07) y `supabase/migrations/` (55 archivos).
 > **Actualizado 2026-10-18** con la reconciliación de producción (en vivo), repo (HEAD `8c9a98e` = `origin/main`) y Tulkas — ver la sección "Reconciliación 2026-10-18".
 > **Actualizado 2026-10-23** (HEAD `8076d6c` = `origin/main`): feedback de Ivana, modo prueba (no se escribe en YiQi), limpieza etapa 1, la #21 no existe en YiQi, OC "Cerradas en YiQi" (fin de las falsas "Demoradas") y fechas de Seguimiento — ver la sección "Actualización 2026-10-23".
