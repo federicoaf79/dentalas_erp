@@ -379,7 +379,13 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 
 ## Cierre 2026-11-09
 - HECHO: composicion-articulos — migración `supabase/migrations/20261109120000_composicion_fraccionados_ivana.sql` con 144 factores de fraccionados ("-F" → caja cerrada) sacados de la planilla que devolvió Ivana el 9/11 (130 "sí" sobre la sugerencia del sistema + 14 completados por ella: blisters, láminas, gramos, hilos, sobres). Solo inserta si la caja existe en `material_yiqi` y el par no estaba (idempotente; probada en Postgres local). Aplicación en prod: pendiente.
-- PENDIENTE: composicion-articulos — aplicar la migración en el SQL Editor y validar en vivo el máximo de 750 / 32791 / 66679 en Alertas · Federico · 0,25 h
+- HECHO: composicion-articulos — migración aplicada en prod: `cargadas_9_11 = 144`, `composicion_articulos` pasa de 44 a 188 filas [prod 2026-11-09].
+- VALIDADO EN VIVO: maximos-calculados — [en vivo 2026-11-09, federico@tulkasmedia.com (Chrome Tulkas) en /?page=monitor, "Ver todos"]:
+  - 750: stock 100, Mín. 78,4, **Máx. 31** (ago 27,15 · sep 34,25 · oct 30,65);
+  - 32791: stock 27, Mín. 253,6, **Máx. 129** (Prom./mes 129,2, que también ya suma los fraccionados);
+  - 6505: **Máx. 72** (redondeado al bulto de 24);
+  - 66679: **Máx. 3**.
+- NUEVO: maximos-calculados — en cajas de mucha rotación el Mín. de YiQi queda bastante más alto que el Máx. calculado a 1 mes (750: 78,4 vs 31; 32791: 253,6 vs 129). Refuerza la pregunta a Aris sobre 1 o 2 meses de máximo.
 - PENDIENTE: composicion-articulos — preguntar a Ivana por 9150-F ("surtidas", códigos "9150-N°") y 31822-F (menciona 33066-500 → 33066-100 → -F x100, posible error de código) · Ivana · —
 - PENDIENTE: composicion-articulos — confirmar con Ivana 6067-F → 6067-50 (50 pares) y 61322-F = 24 láminas (dijo "entre 23 y 25") · Ivana · —
 - HECHO: maximos-calculados — el máximo pasa a sumar lo vendido en fraccionado para esas 144 cajas en cuanto se aplique la migración. **Radio de explosión:** `sugerencias_compra()` y el Predictor usan la misma tabla desde el 10/8, así que la cantidad sugerida de esas cajas en Nueva OC también sube y el "-F" deja de tener promedio propio.
