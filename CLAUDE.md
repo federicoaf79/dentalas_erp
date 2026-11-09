@@ -8,6 +8,7 @@
 > **Actualizado 2026-10-18** con la reconciliación de producción (en vivo), repo (HEAD `8c9a98e` = `origin/main`) y Tulkas — ver la sección "Reconciliación 2026-10-18".
 > **Actualizado 2026-10-23** (HEAD `8076d6c` = `origin/main`): feedback de Ivana, modo prueba (no se escribe en YiQi), limpieza etapa 1, la #21 no existe en YiQi, OC "Cerradas en YiQi" (fin de las falsas "Demoradas") y fechas de Seguimiento — ver la sección "Actualización 2026-10-23".
 > **Este archivo es el estado operativo vigente.** `PROMPT_CONTINUIDAD` queda como historial (append-only, no se reescribe). Ante contradicción gana lo verificado; lo marcado **[sin verificar]** no fue probado en vivo.
+> Al cerrar una sesión, seguí el protocolo "Cierre de cada sesión" (commits descriptivos + bloque ## Cierre AAAA-MM-DD con claves de INVENTARIO.md). No edites INVENTARIO.md ni la sección Estado TulkasOS.
 > Reglas compartidas del ecosistema: `.claude/skills/tulkas-stack.md`, `karpathy-guidelines.md`, `anthropic-best-practices.md`.
 
 ## Qué es
@@ -375,3 +376,12 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 | ~~Aprobar o rechazar #18 y #12~~ — #18 rechazada y archivada por Aris (20/10); #12 a la papelera a pedido de Ivana (23/10) | Aris | cerrado 23/10/2026 |
 | ~~Costo de 51006/51007 o rechazar la #2~~ — #2 a la papelera (limpieza etapa 1) | Aris / Ivana | cerrado 23/10/2026 |
 | ~~Decisión sobre OC duplicadas en YiQi (orden #2)~~ — cerrado: no existen en YiQi (28/9) | Aris | 20/8/2026 → cerrado 18/10/2026 |
+
+## Cierre 2026-11-09
+- HECHO: composicion-articulos — migración `supabase/migrations/20261109120000_composicion_fraccionados_ivana.sql` con 144 factores de fraccionados ("-F" → caja cerrada) sacados de la planilla que devolvió Ivana el 9/11 (130 "sí" sobre la sugerencia del sistema + 14 completados por ella: blisters, láminas, gramos, hilos, sobres). Solo inserta si la caja existe en `material_yiqi` y el par no estaba (idempotente; probada en Postgres local). Aplicación en prod: pendiente.
+- PENDIENTE: composicion-articulos — aplicar la migración en el SQL Editor y validar en vivo el máximo de 750 / 32791 / 66679 en Alertas · Federico · 0,25 h
+- PENDIENTE: composicion-articulos — preguntar a Ivana por 9150-F ("surtidas", códigos "9150-N°") y 31822-F (menciona 33066-500 → 33066-100 → -F x100, posible error de código) · Ivana · —
+- PENDIENTE: composicion-articulos — confirmar con Ivana 6067-F → 6067-50 (50 pares) y 61322-F = 24 láminas (dijo "entre 23 y 25") · Ivana · —
+- HECHO: maximos-calculados — el máximo pasa a sumar lo vendido en fraccionado para esas 144 cajas en cuanto se aplique la migración. **Radio de explosión:** `sugerencias_compra()` y el Predictor usan la misma tabla desde el 10/8, así que la cantidad sugerida de esas cajas en Nueva OC también sube y el "-F" deja de tener promedio propio.
+- DESMENTIDO: (sin clave: escrituras de stock de prueba en YiQi) — Ivana buscó los 4 movimientos por número y no los encontró. Lo que le pasamos el 23/10 eran ids de la API. Los "Nro Movimiento" visibles en YiQi son 1430138, 1430139, 1431820 y 1433061 [en vivo 2026-10-26, Ventas Online en /view/MOVIMIENTO_STOCK]. Se crearon por la API (`POST /MOVIMIENTO_STOCK` desde `mover-stock-yiqi` / `mover-stock-reposicion`, usuario `ventas@dentalab.com.ar`), no desde una pantalla de YiQi.
+- NO SE CARGAN (Ivana: el "-F" no es fraccionado): 6530-F, 66696-F (Flameador), 21931/21934/21937-F (se venden sueltos, sin caja), 5942-F (color), 5946-F1/F2/F3 y 33296-F1/F3, 33281-F1 (modelos F1–F3), 623-F (Fino), 6610-F (Frutilla).
