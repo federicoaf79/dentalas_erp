@@ -313,8 +313,8 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
   - Investigación: `claude/INVESTIGACION_escrituras_YiQi_23-10-2026.md` (proyecto). La #21 (Aris, 20/10, $10,5 M) se intentó crear y YiQi respondió 400 ("El pre…"); el cron la reintentó cada 10 min hasta el 23/10 16:20 UTC.
   - *Texto anterior:* [CONTRADICCIÓN SIN RESOLVER] Federico (28/9) dice que el envío a YiQi era "construido pero sin activar". El código lo dispara al aprobar (`OrdenesPropias.jsx:683`, `NuevaOC.jsx`) y el cron `reintentar-oc-pendientes-yiqi` (id 6) está activo cada 10 min [prod 2026-10-23]: la #2 se reintenta con error de costo.
 - **[ACEPTADO]** Colisión de renovación de token entre los 3 crons a las 06:00 UTC, sin locking.
-- **[ABIERTO — MEDIUM]** Carpetas `_to_delete`, `_to_delete_git_locks` y `_to_delete_old` en la raíz. [repo 2026-10-18]
-- **[ABIERTO — MEDIUM]** `package-lock.json` vacío en la raíz, trackeado y sin relación con `frontend/`. [repo 2026-10-18]
+- **[CERRADO 2026-11-09]** Carpetas `_to_delete`, `_to_delete_git_locks` y `_to_delete_old` en la raíz. [repo 2026-10-18] → borradas por Federico desde PowerShell [repo 2026-11-09].
+- **[CERRADO 2026-11-09]** `package-lock.json` vacío en la raíz, trackeado y sin relación con `frontend/`. [repo 2026-10-18] → quitado con `git rm`, commit `1c1aedc` [repo 2026-11-09].
 - **[POR DISEÑO]** `alertas_pausadas_write_authenticated` (FOR ALL, `using (true)`) en el baseline, línea 1230: coincide con la regla "pausa de 15 días por cualquier usuario".
 - **[ABIERTO — BAJO]** `xlsx` sin arreglo en npm. La app solo escribe Excel.
 
@@ -349,7 +349,7 @@ Entregado de más: predictor de demanda (Módulo D, USD 360), semáforo de aprob
    - Decidir si se purgan con `git filter-repo`.
    - Pedirles a Aris e Ivana que cambien su clave.
    - La rotación de la clave de YiQi no está autorizada por ahora.
-6. Mover `dentalabs_Sup_KW.txt` fuera del repo; borrar `_to_delete*` y el `package-lock.json` de la raíz.
+6. ~~Mover `dentalabs_Sup_KW.txt` fuera del repo; borrar `_to_delete*` y el `package-lock.json` de la raíz.~~ Hecho el 9/11 (ver Cierre 2026-11-09).
 7. Capacitación de Ivana (criterio 7 del MVP).
 8. Automatizar la regla "3 años sin movimiento" sobre `ultimo_movimiento_stock_yiqi`.
 
@@ -397,5 +397,6 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 - DESMENTIDO: ordenes-compra — el pendiente "Aprobar o rechazar OC #18, #14 y #12" no aplica: la #18 la rechazó y archivó Aris (20/10), la #12 fue a la papelera (etapa 1, `f5e92e8`, 23/10) y la #14 es dato de prueba (criterio de Federico del 23/10: la app no está aprobada para uso real). Ver tabla ESPERA, filas cerradas el 23/10.
 - DESMENTIDO: ayuda — el pendiente "Respuestas al documento 'Revisión para Ivana'" está cerrado: Ivana respondió el 23/10 y el 26/10 (`claude/FEEDBACK_IVANA_23-10-2026.md` en el proyecto).
 - DESMENTIDO: escritura-yiqi — la "contradicción del envío automático a YiQi al aprobar" está resuelta: con el modo prueba (`20261023160000`, `reglas_compra.escritura_yiqi_habilitada = false`, fail-closed) aprobar no escribe en YiQi, y el cron 6 está pausado (`20261023150000`). Queda solo "pasar a Live con autorización explícita de Federico".
-- PENDIENTE: (sin clave: limpieza etapa 2) — correr la migración `20261109130000` en el SQL Editor de Supabase y verificar · Federico · 0,1 h
-- PENDIENTE: (sin clave: housekeeping del repo) — sacar `dentalabs_Sup_KW.txt` del repo, borrar `_to_delete*` y el `package-lock.json` de la raíz · Federico (PowerShell) · 0,1 h
+- HECHO: (sin clave: limpieza etapa 2) — migración `20261109130000` aplicada en prod: `respaldadas = 13`, `items_respaldados = 80`, `causas_respaldadas = 1`, `ordenes_que_quedan = 14,22,23` [prod 2026-11-09]. Commit `7b78c5a`.
+- HECHO: (sin clave: housekeeping del repo) — `dentalabs_Sup_KW.txt` movido a `Documentos\credenciales-dentalab` (fuera del repo); `_to_delete`, `_to_delete_git_locks` y `_to_delete_old` borradas; `package-lock.json` de la raíz quitado con `git rm` (quedó dentro del commit `1c1aedc`) [repo 2026-11-09]. Cierra los riesgos MEDIUM de carpetas `_to_delete*` y `package-lock.json` vacío.
+- VALIDADO EN VIVO: ordenes-compra — [en vivo 2026-11-09, federico@tulkasmedia.com (Chrome Tulkas) en /?page=ocs] deploy `e05e217`: las 3 tarjetas (#14, #23, #22) son clickeables (cursor de mano, título "Clic para abrir la orden…") y el clic llama a la apertura en pestaña nueva; Papelera (0) y Órdenes (3) confirman la limpieza etapa 2.
