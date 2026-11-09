@@ -208,6 +208,15 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
   // aunque cambie la URL) y, apenas la orden pedida aparece en `ordenes`
   // (se carga async), se abre sola con `abrir()` -- mismo código que usa
   // el click manual, ver más abajo.
+  // Pestaña nueva de verdad (28/9/2026), no el panel en esta misma
+  // pantalla. `?page=ocs` hace que App.jsx arranque directo en esta
+  // sección y `?orden=<id>` hace que OrdenesPropias se abra sola en el
+  // detalle de esta orden (ver el efecto de ordenIdDesdeURL). La usan el
+  // botón "Editar ↗"/"Ver ↗" y el clic en la tarjeta (9/11/2026).
+  const abrirEnPestana = (id) => {
+    const url = `${window.location.origin}${window.location.pathname}?page=ocs&orden=${id}`
+    window.open(url, '_blank', 'noopener')
+  }
   const [ordenIdDesdeURL] = useState(() => {
     try {
       const idParam = new URLSearchParams(window.location.search).get('orden')
@@ -1072,7 +1081,16 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               const editable = puedeEditarItems(o)
               return (
                 <div key={o.id} className="card">
-                  <div className="px-5 py-4 flex items-center gap-3.5">
+                  {/* 9/11/2026 — feedback Ivana 26/10 (pregunta 1): clic en la
+                      tarjeta abre el detalle, igual que "Editar ↗" / "Ver ↗". */}
+                  <div
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => abrirEnPestana(o.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') abrirEnPestana(o.id) }}
+                    title={editable ? 'Clic para abrir la orden y editarla (pestaña nueva)' : 'Clic para ver la orden (pestaña nueva)'}
+                    className="px-5 py-4 flex items-center gap-3.5 cursor-pointer rounded-t-[10px] hover:bg-[#f9fafb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blu)]"
+                  >
                     <span className={`sem ${SEM_DE_TONO[vista.tono]}`} />
                     <div className="flex-1 min-w-0">
                       <div className="text-[15px] font-bold text-[var(--text)] truncate">{o.proveedor_nombre}</div>
@@ -1123,16 +1141,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                       </div>
                       <div className="inline-flex items-center justify-end gap-2 flex-wrap">
                         <button
-                          onClick={() => {
-                            // Pestaña nueva de verdad (28/9/2026), no el panel
-                            // en esta misma pantalla. `?page=ocs` hace que
-                            // App.jsx arranque directo en esta sección y
-                            // `?orden=<id>` hace que OrdenesPropias se abra
-                            // sola en el detalle de esta orden (ver el efecto
-                            // de ordenIdDesdeURL más arriba).
-                            const url = `${window.location.origin}${window.location.pathname}?page=ocs&orden=${o.id}`
-                            window.open(url, '_blank', 'noopener')
-                          }}
+                          onClick={() => abrirEnPestana(o.id)}
                           title={editable ? 'Abrir la orden para editarla (pestaña nueva)' : 'Ver la orden (pestaña nueva)'}
                           className={BTN_SEC}
                         >

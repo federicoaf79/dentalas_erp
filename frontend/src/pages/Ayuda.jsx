@@ -361,7 +361,7 @@ const MODULOS = [
         comoSeUsa: [
           '**Tarjetas de órdenes propias**: proveedor, número de orden, "Generada por" (quién la armó), fecha, cantidad de ítems, total y una pastilla con el estado. Si ya se decidió, dice "Aprobada por …" / "Rechazada por …" con la fecha, u "Orden directa (sin aprobación)". El color dice qué hay que hacer: **azul** = esperando que Aris la apruebe; **amarillo** = falta algo que hacés vos (completar o enviar); **rojo** = problema (rechazada o error al cargar en YiQi); **verde** = listo. Arriba hay una leyenda "Acción requerida" con el significado de cada color.',
           'Chips "Órdenes" (activas) y "Papelera" (solo visible para Aris).',
-          'Botones al pie de cada tarjeta según su estado y tu rol: **Editar ↗** o **Ver ↗** (abre la orden sola en una pestaña nueva), PDF, Causa, WhatsApp / Reenviar (aprobadas), Aprobar / Rechazar (solo Aris, si está esperando aprobación), Enviar / Eliminar (tu borrador), Reintentar envío (solo Aris, si falló YiQi), y archivar.',
+          'Hacé clic en la tarjeta (o en **Editar ↗** / **Ver ↗**) para abrir la orden sola en una pestaña nueva. Botones al pie de cada tarjeta según su estado y tu rol: **Editar ↗** o **Ver ↗**, PDF, Causa, WhatsApp / Reenviar (aprobadas), Aprobar / Rechazar (solo Aris, si está esperando aprobación), Enviar / Eliminar (tu borrador), Reintentar envío (solo Aris, si falló YiQi), y archivar.',
           {
             ol: [
               'Crear una orden se hace desde "Nueva OC" — acá se gestiona lo que ya existe.',
