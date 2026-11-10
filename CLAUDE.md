@@ -413,3 +413,22 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 - PENDIENTE: seguimiento-oc — preguntar a Ivana qué significa el asunto "Revisión - enviado" (¿ya se pidió?), porque define si esas OC pueden figurar Demoradas (D3) · Ivana · —
 - PENDIENTE: alertas — preguntar a Ivana si cargan a mano algo que alimente el punto de pedido de YiQi; la ayuda dice "cuando Dentalab lo cargó manualmente" (D4) · Ivana · —
 - PENDIENTE: (sin clave: arreglos de la radiografía UX) — elegir cuáles de la radiografía se hacen · Federico · según lo que se elija (en el documento, de 0,25 h a 5 h por ítem)
+- HECHO: (sin clave: arreglos de la radiografía UX, ítems 1–20) — 4 agentes en paralelo con archivos separados + ítem 4 al final. `vite build` OK sobre una copia Linux del frontend [repo 2026-11-10]:
+  - alertas / monitor-stock: barra con stock negativo vacía y en rojo, sin superponer zonas si máx < mín (`BarraMinStockMax.jsx`); encabezados fijos con scroll propio de la tabla; explicación por columna (`AYUDA_COLUMNA`); notas sin saltos crudos.
+  - (menú): `title` en los badges (`Sidebar.jsx`); "Usuarios y accesos" oculto si no es admin (falla cerrado).
+  - ordenes-compra / nueva-oc: el bloque de órdenes de la app no desaparece vacío; aviso "Vista filtrada" en Nueva OC; "Sin historial" unificado; aviso de orden abierta de otra persona vía RPC `ordenes_abiertas_proveedor` (con fallback si la migración no está aplicada; link solo a órdenes propias o como admin).
+  - seguimiento-oc / historial-oc: carpeta "Cerradas en YiQi (recibidas o canceladas)"; "Ingreso con exceso" en el aviso y en el detalle; KPI "Total de OC del mes".
+  - (configuración): `AvisoSoloLectura` en Empresa, Reglas, Causas, Templates, Condiciones y Conector para no admin; botón Actualizar con ícono Tabler; "Completar"/"Editar" según `estaCompleto`; columna "Días de entrega" en Condiciones.
+  - usuarios-accesos: columna Rol y texto por rol en "Proveedores asignados" (`UsuariosAccesos.jsx`); `admin-usuarios` devuelve `rol` desde `usuarios_config` (`supabase/functions/admin-usuarios/index.ts`, `listarUsuarios`).
+  - app-deposito / ayuda-deposito: el aviso de "no hay" dice lo que hace (suspende la alerta; no crea OC — DESMENTIDO del texto anterior y de `AyudaDeposito.jsx`); aviso de Confirmar recepción según modo prueba; menú con íconos Tabler y botones navegables con teclado.
+  - ayuda: tarjeta "Glosario"; Ayuda de depósito con modo prueba y reposición automática pausada.
+  - reposicion-central-local: aviso "reposición automática pausada" vía RPC `estado_automatismos` (hook `useEstadoAutomatismos`, falla silenciosa).
+  - revisar-equivalencias: candidatos sin discontinuados ni producción propia (`es_comprable` en `recalcular_candidatos_equivalencia_precios`) + limpieza de la caché.
+  - predictor-demanda: excluye 889/890/99999 y Acritone/NewcryL en el front (`esExcluidoDelPredictor`).
+  - (formato): `lib/formato.js` único es-AR (`formatoNumero`, `formatoMoneda`); 10 helpers locales duplicados reemplazados; Excel, PDF e inputs editables sin tocar.
+- HECHO: (sin clave) — migraciones `20261110120000_ordenes_abiertas_por_proveedor`, `20261110121000_estado_automatismos` y `20261110122000_candidatos_equivalencia_sin_ruido` aplicadas en prod: `abiertas_dis_den = 1` (la #22), `automatismos = {reposicion_central_activa: false, reposicion_interna_activa: false}`, `ruido_en_cache = 0` [prod 2026-11-10].
+- PENDIENTE: usuarios-accesos — deployar la edge function `admin-usuarios` (columna Rol) · Federico · 0,1 h
+- PENDIENTE: (sin clave) — validar en vivo después del deploy: como admin (Monitor, Alertas, Usuarios, Condiciones, Equivalencias, Predictor) y como operadora (Nueva OC DIS DEN debe avisar la #22 de Aris; menú sin Usuarios; avisos de solo lectura) · Claude con Federico · 1,5 h
+- PENDIENTE: (sin clave) — SKU 887 y 888 (nombre vacío, aparecen en el Predictor): ¿son administrativos? Si sí, sumarlos a `es_administrativo()` y a los espejos JS · Federico / Aris · —
+- NUEVO: conector-yiqi — "Verificar ahora" (`yiqi-connector?accion=estado`) lo puede usar una operadora y dispara un intento de renovación del token. Decidir si se restringe a admin · Federico · —
+- NUEVO: ayuda — `Ayuda.jsx` todavía dice que la app "no muestra la fecha estimada de llegada", pero "Llega el" existe desde el 23/10 (`c9f76a0`) [repo 2026-11-10].
