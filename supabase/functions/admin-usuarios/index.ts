@@ -67,6 +67,12 @@ async function listarUsuarios(supabaseAdmin: ReturnType<typeof createClient>) {
     throw new Error(`Error leyendo usuario_proveedor: ${asigError.message}`);
   }
 
+  // 10/11/2026 — radiografía UX (ítem 14): el rol de cada cuenta, para la
+  // columna "Rol" de Usuarios y accesos. Si falla, se sigue sin rol (null).
+  const { data: configs } = await supabaseAdmin
+    .from('usuarios_config')
+    .select('user_id, rol');
+
   const usuarios = authData.users.map((u) => {
     const proveedoresDeEsteUsuario = (asignaciones ?? [])
       .filter((a) => a.user_id === u.id)
@@ -77,6 +83,7 @@ async function listarUsuarios(supabaseAdmin: ReturnType<typeof createClient>) {
       email: u.email,
       creadoEl: u.created_at,
       ultimoLogin: u.last_sign_in_at,
+      rol: (configs ?? []).find((c) => c.user_id === u.id)?.rol ?? null,
       proveedores: proveedoresDeEsteUsuario,
     };
   });

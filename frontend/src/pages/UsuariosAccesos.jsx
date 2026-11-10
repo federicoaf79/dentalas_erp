@@ -228,6 +228,9 @@ function ModalPassword({ usuario, onCerrar, onConfirmar, guardando }) {
   )
 }
 
+// 10/11/2026 — radiografía UX (ítem 14): rótulo del rol que devuelve admin-usuarios (accion=listar).
+const ROTULO_ROL = { admin: 'Administrador', operador: 'Operador', deposito: 'Depósito' }
+
 export default function UsuariosAccesos() {
   const permisos = usePermisos()
   const esAdmin = permisos.esAdmin
@@ -334,7 +337,9 @@ export default function UsuariosAccesos() {
           disabled={loading}
           className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
         >
-          {loading ? 'Actualizando…' : '↻ Actualizar'}
+          {/* 10/11/2026 — radiografía UX (ítem 5): botón Actualizar unificado con ícono Tabler */}
+          <i className="ti ti-refresh" aria-hidden="true" />
+          {loading ? 'Actualizando…' : 'Actualizar'}
         </button>
         )}
       </div>
@@ -384,7 +389,8 @@ export default function UsuariosAccesos() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['Email', 'Creado', 'Último login', 'Proveedores asignados', ''].map((h) => (
+                {/* 10/11/2026 — radiografía UX (ítem 14): columna Rol */}
+                {['Email', 'Rol', 'Creado', 'Último login', 'Proveedores asignados', ''].map((h) => (
                   <th
                     key={h}
                     className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"
@@ -399,11 +405,14 @@ export default function UsuariosAccesos() {
                 <Fragment key={u.id}>
                   <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                     <td className="px-3.5 py-1.5 font-semibold">{u.email}</td>
+                    <td className="px-3.5 py-1.5 text-xs text-gray-600">{ROTULO_ROL[u.rol] ?? '—'}</td>
                     <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(u.creadoEl)}</td>
                     <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(u.ultimoLogin)}</td>
                     <td className="px-3.5 py-1.5">
                       {u.proveedores.length === 0 ? (
-                        <span className="text-gray-300 text-xs">Ninguno (ve el catálogo completo)</span>
+                        <span className="text-gray-300 text-xs">
+                          {u.rol === 'deposito' ? '— (cuenta de depósito)' : u.rol === 'admin' ? 'Todos (administrador)' : 'Ninguno (ve el catálogo completo)'}
+                        </span>
                       ) : (
                         <span className="text-xs text-gray-600">{u.proveedores.length} asignado(s)</span>
                       )}
@@ -428,7 +437,7 @@ export default function UsuariosAccesos() {
                   </tr>
                   {usuarioExpandido === u.id && (
                     <tr>
-                      <td colSpan={5} className="p-0">
+                      <td colSpan={6} className="p-0">
                         <PanelAsignacion usuario={u} proveedores={proveedores} onCambioOptimista={actualizarUsuarioLocal} />
                       </td>
                     </tr>
