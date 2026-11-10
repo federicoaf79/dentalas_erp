@@ -829,8 +829,9 @@ export default function Alertas({ onArmarOC }) {
                         title={columna ? `${AYUDA_COLUMNA[columna] ? AYUDA_COLUMNA[columna] + '\n' : ''}Clic para ordenar por esta columna` : undefined}
                         style={{ position: 'sticky', top: 0, zIndex: 10 }}
                       >
-                        {label}
-                        {AYUDA_COLUMNA[columna] && <i className="ti ti-info-circle ml-1 text-[12px] text-gray-400 align-[-1px]" aria-hidden="true" />}
+                        {/* 10/11/2026 — validación en vivo: el ícono ⓘ ensanchaba la tabla y ocultaba la columna Causa a 1536 px;
+                            la columna con ayuda se marca con subrayado punteado (mismo title, cero ancho extra). */}
+                        {AYUDA_COLUMNA[columna] ? <span className="underline decoration-dotted decoration-gray-400 underline-offset-2">{label}</span> : label}
                         {columna && <FlechaOrden activa={sort.columna === columna} dir={sort.dir} />}
                       </th>
                     ))}
@@ -840,7 +841,7 @@ export default function Alertas({ onArmarOC }) {
                   {filasPaginadas.map((a) => (
                     <tr key={a.yiqi_id} className={a._alerta.nivel === 'critica' ? 'bg-[#fdf2f2]' : undefined}>
                       <td className="sku whitespace-nowrap">{a.mate_codigo}</td>
-                      <td className="font-semibold"><div className="min-w-[180px]">{a.mate_nombre}</div></td>
+                      <td className="font-semibold"><div className="min-w-[145px]">{a.mate_nombre}</div></td>{/* 10/11/2026 — 180→145 px: con el scroll propio de la tabla, a 1536 px la columna Causa quedaba tapada por la de acciones */}
                       <td className="text-[var(--sub)] text-[12px]">{a.clie_nombre ?? '—'}</td>
                       {/* Punto 3 (28/9/2026): gráfico en vez de 3 columnas numéricas
                           sueltas (Stock/Mín./Máx.) -- ver components/BarraMinStockMax.jsx.

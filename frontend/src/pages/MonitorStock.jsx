@@ -627,8 +627,9 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                       title={columna ? `${AYUDA_COLUMNA[columna] ? AYUDA_COLUMNA[columna] + '\n' : ''}Clic para ordenar por esta columna` : undefined}
                       style={{ position: 'sticky', top: 0, zIndex: 10 }}
                     >
-                      {label}
-                      {AYUDA_COLUMNA[columna] && <i className="ti ti-info-circle ml-1 text-[12px] text-gray-400 align-[-1px]" aria-hidden="true" />}
+                      {/* 10/11/2026 — validación en vivo: el ícono ⓘ ensanchaba la tabla y ocultaba la columna Causa a 1536 px;
+                          la columna con ayuda se marca con subrayado punteado (mismo title, cero ancho extra). */}
+                      {AYUDA_COLUMNA[columna] ? <span className="underline decoration-dotted decoration-gray-400 underline-offset-2">{label}</span> : label}
                       {columna && <FlechaOrden activa={sort.columna === columna} dir={sort.dir} />}
                     </th>
                   ))}
