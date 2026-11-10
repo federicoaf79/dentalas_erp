@@ -432,3 +432,18 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 - PENDIENTE: (sin clave) — SKU 887 y 888 (nombre vacío, aparecen en el Predictor): ¿son administrativos? Si sí, sumarlos a `es_administrativo()` y a los espejos JS · Federico / Aris · —
 - NUEVO: conector-yiqi — "Verificar ahora" (`yiqi-connector?accion=estado`) lo puede usar una operadora y dispara un intento de renovación del token. Decidir si se restringe a admin · Federico · —
 - NUEVO: ayuda — `Ayuda.jsx` todavía dice que la app "no muestra la fecha estimada de llegada", pero "Llega el" existe desde el 23/10 (`c9f76a0`) [repo 2026-11-10].
+- VALIDADO EN VIVO: (radiografía UX, deploy `b862402`) — [en vivo 2026-11-10, central@dentalab-compras.demo en la app de depósito]: menú con íconos Tabler y `button`; aviso de "no hay" fiel ("suspende la alerta… no genera por sí solo una orden de compra"); aviso "reposición automática Central→Local pausada"; texto de Confirmar recepción en modo prueba sin contradicción.
+- VALIDADO EN VIVO: (radiografía UX, deploy `b862402`) — [en vivo 2026-11-10, federico@ (admin)]:
+  - /?page=alertas: stock −10 y −1 con barra al 0 % y número en rojo; encabezados `sticky`; ayuda por columna; `title` en los badges.
+  - /?page=usuarios: columna Rol (Depósito / Administrador / Operador) y "— (cuenta de depósito)" / "Todos (administrador)".
+  - /?page=condiciones: columna "Días de entrega"; 31 "Editar" / 73 "Completar".
+  - /?page=equivalencias: 0 pares de discontinuados (seguían 6 con proveedor DENTALAB, ver abajo).
+  - /?page=predictor: sin Acritone/NewcryL; números es-AR ("376.564,1").
+  - /?page=seguimiento: "Ingreso con exceso — OC #1705"; carpeta "Cerradas en YiQi (recibidas o canceladas)".
+  - /?page=historial: "Total de OC del mes".
+  - /?page=nueva-oc: "1.147,1 u/mes", "5.268,2".
+  - /?page=reposicion-central-local: aviso de reposición pausada.
+  - Como admin no aparecen los avisos "Solo lectura" ni "Vista filtrada" y "Usuarios y accesos" sigue en el menú.
+- HECHO: alertas — a 1536 px la tabla de Alertas medía 1.315 px contra 1.236 px de contenedor y la columna de acciones (fija a la derecha) tapaba la de Causa. Se cambió el ícono ⓘ de los encabezados por subrayado punteado (Monitor y Alertas) y `min-w` de Producto en Alertas de 180 a 145 px. Medido en vivo: 1.236 / 1.236 [en vivo 2026-11-10]. `vite build` OK.
+- HECHO: revisar-equivalencias — `es_comprable()` compara con 'Dentalab', y en `precios_proveedor_yiqi` el proveedor viene 'DENTALAB'. Nueva migración `20261110123000_candidatos_equivalencia_sin_dentalab.sql` con `upper(proveedor) <> 'DENTALAB'` en los dos lados y limpieza de la caché. No toca `es_comprable()`. La verificación de `20261110122000` daba 0 porque comparaba 'Dentalab' (falso negativo).
+- PENDIENTE: predictor-demanda — el SKU 888 (nombre vacío, 1.453 u/mes) sigue primero en el Predictor; falta saber si es administrativo · Federico / Aris · —
