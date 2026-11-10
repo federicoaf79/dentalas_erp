@@ -1,3 +1,4 @@
+import { formatoNumero } from '../lib/formato'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
@@ -188,7 +189,7 @@ function DetalleProveedor({ articulosDelProveedor }) {
                 <tr key={a.yiqi_id}>
                   <td className="sku">{a.mate_codigo}</td>
                   <td className="font-medium">{a.mate_nombre}</td>
-                  <td className="font-semibold">{a.mate_stock_disponible ?? 0}</td>
+                  <td className="font-semibold">{formatoNumero(a.mate_stock_disponible ?? 0)}</td>
                   <td>
                     <span className={`pill ${PILL_POR_COLOR[alerta.color]}`}>{alerta.label}</span>
                   </td>
@@ -298,8 +299,8 @@ export default function Proveedores({ onIrACondiciones }) {
           cargandoAlgo
             ? 'Cargando…'
             : vistaFiltrada
-            ? `${proveedores.length} de tus proveedores asignados · con artículos en el catálogo`
-            : `${proveedores.length} proveedores reales · derivados de artículos activos`
+            ? `${formatoNumero(proveedores.length)} de tus proveedores asignados · con artículos en el catálogo`
+            : `${formatoNumero(proveedores.length)} proveedores reales · derivados de artículos activos`
         }
         info={
           <>
@@ -402,17 +403,17 @@ export default function Proveedores({ onIrACondiciones }) {
                       <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap">{p.cuit ?? '—'}</td>
                       <td className="text-[var(--sub)] text-[12px]!">{p.condicionIva ?? '—'}</td>
                       <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap">{p.telefono ?? '—'}</td>
-                      <td className="font-bold">{p.totalArticulos}</td>
+                      <td className="font-bold">{formatoNumero(p.totalArticulos)}</td>
                       <td>
                         {p.criticas === 0 && p.preventivas === 0 ? (
                           <span className="text-gray-300 text-xs">—</span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5">
                             {p.criticas > 0 && (
-                              <span className="pill pill-rojo">{p.criticas} crít.</span>
+                              <span className="pill pill-rojo">{formatoNumero(p.criticas)} crít.</span>
                             )}
                             {p.preventivas > 0 && (
-                              <span className="pill pill-amarillo">{p.preventivas} prev.</span>
+                              <span className="pill pill-amarillo">{formatoNumero(p.preventivas)} prev.</span>
                             )}
                           </span>
                         )}
@@ -471,7 +472,7 @@ export default function Proveedores({ onIrACondiciones }) {
         {proveedoresFiltrados.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-[12px] text-[var(--sub)] px-1">
             <span>
-              Mostrando {inicioSlice + 1}–{Math.min(inicioSlice + filasPorPagina, totalFilas)} de {totalFilas}
+              Mostrando {formatoNumero(inicioSlice + 1)}–{formatoNumero(Math.min(inicioSlice + filasPorPagina, totalFilas))} de {formatoNumero(totalFilas)}
             </span>
             <div className="flex items-center gap-2">
               <button

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import BloqueAccion from '../components/ui/BloqueAccion'
+import AvisoSoloLectura from '../components/ui/AvisoSoloLectura'
+import { usePermisos } from '../hooks/usePermisos'
 
 // ============================================================
 // ConectorYiQi.jsx — pantalla nueva (15 julio 2026)
@@ -45,6 +47,7 @@ async function traerDiagnostico() {
 }
 
 export default function ConectorYiQi() {
+  const permisos = usePermisos()
   const [estado, setEstado] = useState(null)
   const [diagnostico, setDiagnostico] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -82,6 +85,9 @@ export default function ConectorYiQi() {
           {loading ? 'Verificando…' : 'Verificar ahora'}
         </button>
       </EncabezadoPagina>
+
+      {/* 10/11/2026 — radiografía UX (ítem 6): aviso fijo de solo lectura */}
+      {!permisos.cargando && !permisos.esAdmin && <AvisoSoloLectura className="mx-4 mt-4" />}
 
       <div className="pagina flex flex-col gap-4">
         {error && (

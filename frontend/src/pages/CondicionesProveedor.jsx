@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import AvisoSoloLectura from '../components/ui/AvisoSoloLectura'
 
 // ============================================================
 // CondicionesProveedor.jsx
@@ -186,9 +187,7 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
       </Aviso>
 
       {!esAdmin && !permisos.cargando && (
-        <Aviso tipo="filtro" autoCerrarEn={15} className="mx-4 mt-2">
-          Estas condiciones las carga Aris. Podés consultarlas, pero no editarlas.
-        </Aviso>
+        <AvisoSoloLectura className="mx-4 mt-2" />
       )}
 
       <div className="grid grid-cols-3 gap-2.5 p-4">
@@ -237,7 +236,7 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-[var(--border)]">
-                {['Proveedor', 'Mínimo de compra', 'Plazo de pago', 'Contacto de pedidos', 'Límite propio', ''].map((h) => (
+                {['Proveedor', 'Mínimo de compra', 'Plazo de pago', 'Días de entrega', 'Contacto de pedidos', 'Límite propio', ''].map((h) => (
                   <th key={h} className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                     {h}
                   </th>
@@ -269,6 +268,10 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-3.5 py-1.5 text-[13px] text-[var(--sub)]">{p.plazo_pago ?? <span className="text-gray-300">—</span>}</td>
+                      {/* 10/11/2026 — radiografía UX (ítem 15): columna Días de entrega (proveedores.dias_entrega) */}
+                      <td className="px-3.5 py-1.5 text-[13px] text-[var(--sub)]">
+                        {p.dias_entrega != null ? p.dias_entrega : <span className="text-gray-300">—</span>}
+                      </td>
                       <td className="px-3.5 py-1.5 text-[12px] text-[var(--sub)]">
                         {p.whatsapp_pedidos || p.mail_pedidos || <span className="text-gray-300">—</span>}
                       </td>
@@ -283,7 +286,8 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
                             onClick={() => (abierto ? setEditando(null) : abrir(p))}
                             className="text-sm text-[var(--ind,#4338ca)] hover:underline"
                           >
-                            {abierto ? 'Cerrar' : 'Completar'}
+                            {/* 10/11/2026 — radiografía UX (ítem 5): "Completar" solo si no tiene nada cargado */}
+                            {abierto ? 'Cerrar' : (estaCompleto(p) ? 'Editar' : 'Completar')}
                           </button>
                         )}
                       </td>
@@ -291,7 +295,7 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
 
                     {abierto && (
                       <tr className="border-b border-gray-100 bg-indigo-50/20">
-                        <td colSpan={6} className="px-3.5 py-4">
+                        <td colSpan={7} className="px-3.5 py-4">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <label>
                               <div className="text-[11px] text-gray-400 uppercase mb-1">Mínimo de compra</div>

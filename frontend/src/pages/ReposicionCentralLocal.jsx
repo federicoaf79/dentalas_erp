@@ -1,3 +1,4 @@
+import { formatoNumero } from '../lib/formato'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -5,6 +6,7 @@ import Aviso from '../components/Aviso'
 import { nombreDeposito } from '../lib/depositos'
 // 23/10/2026 — feedback Ivana: barra de pasos (como el detalle de una OC) y encabezado v7.
 import BarraPasos from '../components/ui/BarraPasos'
+import { useEstadoAutomatismos } from '../hooks/useEstadoAutomatismos'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 
 // ============================================================
@@ -40,11 +42,9 @@ function formatoFechaHora(fechaStr) {
   }
 }
 
+// 10/11/2026 — radiografía UX (ítem 4): formato de números es-AR único (lib/formato.js).
 function num(v, decimales = 2) {
-  if (v == null) return '—'
-  const n = Number(v)
-  if (Number.isNaN(n)) return '—'
-  return n.toLocaleString('es-AR', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+  return formatoNumero(v, { decimales, minDecimales: decimales })
 }
 
 // Estado derivado: solicitudes_reposicion no tiene una columna
@@ -238,6 +238,8 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
 
 export default function ReposicionCentralLocal() {
   const permisos = usePermisos()
+  // 10/11/2026 — radiografía UX (ítem 18): null = no se sabe (no se muestra nada).
+  const automatismos = useEstadoAutomatismos()
   const [solicitudes, setSolicitudes] = useState([])
   const [lineasPorSolicitud, setLineasPorSolicitud] = useState({})
   const [loading, setLoading] = useState(true)
@@ -364,6 +366,11 @@ export default function ReposicionCentralLocal() {
           ) : filtradas.length === 0 ? (
             <div className="p-8 text-center text-[var(--sub)] text-sm">
               No hay solicitudes {filtro === 'todas' ? '' : filtro} para mostrar.
+              {automatismos?.reposicion_central_activa === false && (
+                <div className="mt-2 text-[12px] text-[#92400e]">
+                  La reposición automática Central→Local está pausada: solo aparecen pedidos manuales.
+                </div>
+              )}
             </div>
           ) : (
             <table className="w-full border-collapse">

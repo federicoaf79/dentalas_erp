@@ -1,3 +1,4 @@
+import { formatoMoneda, formatoNumero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarPrecios } from '../hooks/usePermisos'
@@ -49,14 +50,6 @@ const MAX_ARTICULOS_MOSTRADOS = 25
 const MAX_EQUIVALENTES_POR_ARTICULO = 5
 const UMBRAL_SIMILITUD = 0.28 // Jaccard sobre trigramas — ver normalizar()/trigramas() abajo
 
-function formatoMoneda(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    maximumFractionDigits: 0,
-  }).format(n)
-}
 
 function formatoFechaHora(fechaStr) {
   if (!fechaStr) return '—'
@@ -317,7 +310,9 @@ export default function ComparacionPrecios({ onIrARevisar }) {
             disabled={cargandoAlgo}
             className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
           >
-            {cargandoAlgo ? 'Actualizando…' : '↻ Actualizar'}
+            {/* 10/11/2026 — radiografía UX (ítem 5): botón Actualizar unificado con ícono Tabler */}
+            <i className="ti ti-refresh" aria-hidden="true" />
+            {cargandoAlgo ? 'Actualizando…' : 'Actualizar'}
           </button>
         </div>
       </div>
@@ -533,7 +528,7 @@ export default function ComparacionPrecios({ onIrARevisar }) {
 
             {hayMasArticulos && (
               <div className="text-center text-xs text-gray-400 py-2">
-                Se encontraron {totalDirectos} artículos que coinciden — mostrando los primeros{' '}
+                Se encontraron {formatoNumero(totalDirectos)} artículos que coinciden — mostrando los primeros{' '}
                 {MAX_ARTICULOS_MOSTRADOS}. Afiná la búsqueda para acotar.
               </div>
             )}

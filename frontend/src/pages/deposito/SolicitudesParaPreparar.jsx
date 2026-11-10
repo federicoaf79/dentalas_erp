@@ -1,7 +1,9 @@
+import { formatoNumero } from '../../lib/formato'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
+import { useEstadoAutomatismos } from '../../hooks/useEstadoAutomatismos'
 import { nombreDeposito, DEPOSITO_CENTRAL } from '../../lib/depositos'
 import { generarRemitoImprimible } from '../../lib/pdfRemito'
 
@@ -62,11 +64,9 @@ function BadgeClaseAbc({ clase }) {
   )
 }
 
+// 10/11/2026 — radiografía UX (ítem 4): formato de números es-AR único (lib/formato.js).
 function num(v, decimales = 2) {
-  if (v == null) return '—'
-  const n = Number(v)
-  if (Number.isNaN(n)) return '—'
-  return n.toLocaleString('es-AR', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+  return formatoNumero(v, { decimales, minDecimales: decimales })
 }
 
 function numInput(v) {
@@ -129,7 +129,8 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
           disabled={guardando || (necesitaMotivo && motivo.trim() === '')}
           title={
             necesitaMotivo
-              ? 'Lo que falta se registra como "no hay" con este motivo — dispara la OC al proveedor y suspende la alerta de este artículo'
+              // 10/11/2026 — radiografía UX (ítem 12): el "no hay" solo suspende la alerta; no crea ninguna OC.
+              ? 'Lo que falta se registra como "no hay" con este motivo y suspende la alerta de este artículo hasta que vuelva a haber stock. No genera una orden de compra'
               : 'Declara que se envía todo lo pedido'
           }
           className="px-2.5 py-1 rounded text-[11px] font-semibold text-white bg-[var(--ind,#4338ca)] disabled:opacity-50"
@@ -143,6 +144,8 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
 
 export default function SolicitudesParaPreparar() {
   const permisos = usePermisos()
+  // 10/11/2026 — radiografía UX (ítem 18): null = no se sabe (no se muestra nada).
+  const automatismos = useEstadoAutomatismos()
   const [solicitudes, setSolicitudes] = useState([])
   const [lineasPorSolicitud, setLineasPorSolicitud] = useState({})
   const [loading, setLoading] = useState(true)
@@ -294,8 +297,9 @@ export default function SolicitudesParaPreparar() {
       <Aviso tipo="info" id="deposito-preparar-criterio" className="mx-4 mt-4">
         "Generar remito de mercadería" trae la necesidad actualizada al momento exacto del clic — si lo hacés dos
         veces, la segunda ya descuenta lo que quedó reservado en la primera. Por cada artículo declarás cuánto
-        enviás: lo que falte queda como "no hay" automático con el motivo que escribas — eso dispara la orden de
-        compra al proveedor y suspende la alerta de ese artículo hasta que vuelva a haber stock.
+        enviás: lo que falte queda como "no hay" automático con el motivo que escribas — eso suspende la alerta de
+        ese artículo hasta que vuelva a haber stock. No genera por sí solo una orden de compra: Compras la arma
+        aparte.
       </Aviso>
 
       {permisos.error && (
@@ -326,6 +330,11 @@ export default function SolicitudesParaPreparar() {
         ) : solicitudes.length === 0 ? (
           <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center text-[var(--sub)] text-sm">
             No tenés solicitudes pendientes de preparar. 🎉
+            {automatismos?.reposicion_central_activa === false && (
+              <div className="mt-2 text-[12px] text-[#92400e]">
+                La reposición automática Central→Local está pausada: solo aparecen pedidos manuales.
+              </div>
+            )}
           </div>
         ) : (
           solicitudes.map((s) => (

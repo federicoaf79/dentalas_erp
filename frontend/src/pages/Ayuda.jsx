@@ -790,6 +790,28 @@ export default function Ayuda() {
           </div>
         ))}
 
+        {/* 10/11/2026 — radiografía UX (ítem 16): glosario de los términos de Alertas, Monitor y Seguimiento.
+            "Punto de pedido": a propósito no se dice quién lo carga (pregunta pendiente con Ivana). */}
+        <div id="ayuda-glosario" className="bg-white rounded-xl border border-[var(--border)] p-4 scroll-mt-4">
+          <div className="text-[13px] font-bold mb-2">Glosario</div>
+          <Bloques
+            items={[
+              {
+                ul: [
+                  '**Mín. / Punto de pedido**: el umbral que decide la alerta. Viene de YiQi. Si el artículo no lo tiene cargado, se usa el Stock Seguridad como respaldo.',
+                  '**Stock Seguridad y ●**: valor de respaldo cuando no hay Punto de pedido. El ● al lado del número indica que ese es el valor que está decidiendo la alerta de ese artículo.',
+                  '**Máx. calculado**: lo calcula la app, no YiQi. Es el promedio de ventas de los últimos 3 meses cerrados (sin el mes en curso), con fraccionados y combos sumados a la caja, redondeado al bulto de compra. El ⚠ junto al máximo marca un pico de ventas para revisar. Es solo para mostrar: no cambia la cantidad sugerida ni las alertas.',
+                  '**Prom./mes (12 meses)**: unidades vendidas por mes en promedio durante los últimos 12 meses.',
+                  '**Cobertura**: meses que dura el stock actual al ritmo del Prom./mes.',
+                  '**Demorada**: orden enviada cuya fecha estimada de llegada (fecha de envío + "Días de entrega" del proveedor, en días hábiles) ya pasó y no figura recibida. Sin días de entrega cargados no se calcula.',
+                  '**Cerrada en YiQi**: la orden dejó de venir en el reporte de pendientes de YiQi (se vació o se eliminó, que es como se da por recibida). Ya no cuenta como en curso ni como Demorada; si vuelve a tener pendientes, se reabre sola.',
+                  '**Modo prueba**: mientras esté activo, la app no escribe nada en YiQi (ni órdenes ni movimientos de stock). Todo lo que se registra queda solo en la app.',
+                ],
+              },
+            ]}
+          />
+        </div>
+
         <div className="bg-white rounded-xl border border-[var(--border)] p-4 mb-2">
           <div className="text-[13px] font-bold mb-2">Cosas que el sistema, hoy, todavía no hace</div>
           <Bloques

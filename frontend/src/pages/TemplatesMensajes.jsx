@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
+import AvisoSoloLectura from '../components/ui/AvisoSoloLectura'
 
 // ============================================================
 // TemplatesMensajes.jsx
@@ -172,6 +173,9 @@ export default function TemplatesMensajes() {
           </button>
         )}
       </EncabezadoPagina>
+
+      {/* 10/11/2026 — radiografía UX (ítem 6): aviso fijo de solo lectura */}
+      {!permisos.cargando && !esAdmin && <AvisoSoloLectura className="mx-4 mt-4" />}
 
       {(error || aviso) && (
         <div className="px-7 pt-5 flex flex-col gap-2.5">

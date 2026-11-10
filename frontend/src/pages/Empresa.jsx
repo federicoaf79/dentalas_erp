@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import AvisoSoloLectura from '../components/ui/AvisoSoloLectura'
 
 // ============================================================
 // Empresa.jsx
@@ -129,9 +130,8 @@ export default function Empresa() {
       )}
 
       {!esAdmin && !permisos.cargando && (
-        <Aviso tipo="info" id="empresa-solo-lectura" className="mx-4 mt-4">
-          Estos datos los configura Aris.
-        </Aviso>
+        // 10/11/2026 — radiografía UX (ítem 6): aviso fijo de solo lectura (reemplaza el aviso cerrable)
+        <AvisoSoloLectura className="mx-4 mt-4" />
       )}
 
       {/* Los campos de abajo son solo el placeholder gris del input (ejemplos

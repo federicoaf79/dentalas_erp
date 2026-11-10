@@ -1,3 +1,4 @@
+import { formatoNumero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -84,11 +85,9 @@ function esDeOtroDia(fechaStr) {
 // decimal) para cualquier cantidad — incluye stock, porque Aris confirmó
 // que los decimales en stock son datos legítimos (fraccionados/producción),
 // no hay que truncarlos a entero.
+// 10/11/2026 — radiografía UX (ítem 4): formato de números es-AR único (lib/formato.js).
 function num(v, decimales = 2) {
-  if (v == null) return '—'
-  const n = Number(v)
-  if (Number.isNaN(n)) return '—'
-  return n.toLocaleString('es-AR', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+  return formatoNumero(v, { decimales, minDecimales: decimales })
 }
 
 // Para inputs numéricos nativos (type="number"): SIN separador de miles

@@ -1,3 +1,4 @@
+import { formatoNumero } from '../../lib/formato'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
@@ -28,11 +29,9 @@ import { useModoPruebaYiqi } from '../../hooks/useModoPruebaYiqi'
 // para confirmar contra ese documento físico, no solo contra pantalla.
 // ============================================================
 
+// 10/11/2026 — radiografía UX (ítem 4): formato de números es-AR único (lib/formato.js).
 function num(v, decimales = 2) {
-  if (v == null) return '—'
-  const n = Number(v)
-  if (Number.isNaN(n)) return '—'
-  return n.toLocaleString('es-AR', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+  return formatoNumero(v, { decimales, minDecimales: decimales })
 }
 
 function numInput(v) {
@@ -224,8 +223,11 @@ export default function ConfirmarRecepcion() {
       </div>
 
       <Aviso tipo="info" id="deposito-recepcion-criterio" className="mx-4 mt-4">
-        Confirmá contra lo que realmente llegó. Si la cantidad no coincide, corregila acá antes de confirmar — el
-        movimiento de stock real se registra recién con esta confirmación, no antes.
+        Confirmá contra lo que realmente llegó. Si la cantidad no coincide, corregila acá antes de confirmar —{' '}
+        {/* 10/11/2026 — radiografía UX (ítem 12): en modo prueba no se mueve stock en YiQi. */}
+        {modoPrueba
+          ? 'el movimiento se registra en la app recién con esta confirmación (no en YiQi), no antes.'
+          : 'el movimiento de stock real se registra recién con esta confirmación, no antes.'}
       </Aviso>
 
       {/* 23/10/2026 — modo prueba YiQi (no autorizado Live) */}

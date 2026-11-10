@@ -1,3 +1,4 @@
+import { formatoMoneda, formatoNumero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
@@ -75,14 +76,6 @@ async function traerOrdenesLocal(permisos) {
   return acumulado
 }
 
-function formatoMoneda(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    maximumFractionDigits: 0,
-  }).format(n)
-}
 
 function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -187,7 +180,7 @@ function etiquetaEstado(e) {
   if (e.key === 'parcial') {
     // YiQi puede registrar más de lo pedido (pendiente negativo): no mostrar "-3 u pendientes".
     if (e.totalPendiente < 0) return `Ingreso con exceso · +${-e.totalPendiente} u`
-    return `Ingreso parcial · ${e.totalPendiente} u pendientes`
+    return `Ingreso parcial · ${formatoNumero(e.totalPendiente)} u pendientes`
   }
   return e.label
 }
@@ -221,12 +214,12 @@ function pasosDeOrden(orden) {
     return {
       pasos: [
         { rotulo: 'Enviada al proveedor', fecha, estado: 'hecho' },
-        { rotulo: `Ingreso parcial (${e.totalEntregado} de ${e.totalCantidad} u)`, estado: 'actual' },
+        { rotulo: `${e.totalPendiente < 0 ? 'Ingreso con exceso' : 'Ingreso parcial'} (${formatoNumero(e.totalEntregado)} de ${formatoNumero(e.totalCantidad)} u)`, estado: 'actual' },
         { rotulo: 'Recibida completa', fecha: estLlegada, estado: 'pend' },
       ],
       sigue: e.totalPendiente < 0
-        ? `Se recibieron ${-e.totalPendiente} u más de lo pedido.`
-        : `Faltan ${e.totalPendiente} u por recibir.`,
+        ? `Se recibieron ${formatoNumero(-e.totalPendiente)} u más de lo pedido.`
+        : `Faltan ${formatoNumero(e.totalPendiente)} u por recibir.`,
     }
   }
   return {
@@ -278,12 +271,12 @@ function DetalleOrden({ orden }) {
                 <tr key={i}>
                   <td className="sku">{l.sku ?? '—'}</td>
                   <td className="font-semibold text-gray-800">{l.nombreArticulo ?? '—'}</td>
-                  <td className="text-right tabular-nums">{l.cantidad} u</td>
-                  <td className="text-right tabular-nums text-[var(--grn)] font-bold">{l.entregada} u</td>
+                  <td className="text-right tabular-nums">{formatoNumero(l.cantidad)} u</td>
+                  <td className="text-right tabular-nums text-[var(--grn)] font-bold">{formatoNumero(l.entregada)} u</td>
                   <td className="text-right tabular-nums">
                     {pend > 0 && orden._estado.key !== 'cerrada'
-                      ? <Pastilla tono="amarillo">{pend} u</Pastilla>
-                      : <span className="text-[#9ca3af]">{pend > 0 ? `${pend} u` : '—'}</span>}
+                      ? <Pastilla tono="amarillo">{formatoNumero(pend)} u</Pastilla>
+                      : <span className="text-[#9ca3af]">{pend > 0 ? `${formatoNumero(pend)} u` : '—'}</span>}
                   </td>
                 </tr>
               )
@@ -646,7 +639,7 @@ export default function SeguimientoOC() {
     <div className="flex-1 overflow-y-auto">
       <EncabezadoPagina
         titulo="Seguimiento de OC"
-        bajada={`OC enviadas a proveedores, según YiQi · ${contadores.enviada + contadores.parcial} en curso${contadores.app > 0 ? ` · ${contadores.app} ${contadores.app === 1 ? 'orden' : 'órdenes'} de la app todavía sin YiQi` : ''}`}
+        bajada={`OC enviadas a proveedores, según YiQi · ${formatoNumero(contadores.enviada + contadores.parcial)} en curso${contadores.app > 0 ? ` · ${contadores.app} ${contadores.app === 1 ? 'orden' : 'órdenes'} de la app todavía sin YiQi` : ''}`}
       >
         <button onClick={cargar} className="btn btn-sm"><i className="ti ti-refresh" /> Actualizar</button>
       </EncabezadoPagina>
@@ -667,18 +660,21 @@ export default function SeguimientoOC() {
             className="mb-4"
             titulo={
               parciales.length === 1
-                ? `Ingreso parcial — OC #${parciales[0].nroOC} · ${parciales[0].proveedor}`
-                : `Ingreso parcial en ${parciales.length} OC`
+                // 10/11/2026 — radiografía UX (ítem 10b): si lo ingresado supera lo pedido es "exceso", no "parcial".
+                ? `${parciales[0]._estado.totalPendiente < 0 ? 'Ingreso con exceso' : 'Ingreso parcial'} — OC #${parciales[0].nroOC} · ${parciales[0].proveedor}`
+                : parciales.some((o) => o._estado.totalPendiente < 0)
+                  ? `Ingreso parcial o con exceso en ${parciales.length} OC`
+                  : `Ingreso parcial en ${parciales.length} OC`
             }
             acciones={
               <button className="btn btn-sm" onClick={() => setFiltroEstado('parcial')}><i className="ti ti-eye" /> Ver</button>
             }
           >
             {parciales.length === 1
-              ? `Ingresaron ${parciales[0]._estado.totalEntregado} de ${parciales[0]._estado.totalCantidad} u. ${
+              ? `Ingresaron ${formatoNumero(parciales[0]._estado.totalEntregado)} de ${formatoNumero(parciales[0]._estado.totalCantidad)} u. ${
                   parciales[0]._estado.totalPendiente < 0
-                    ? `Se recibieron ${-parciales[0]._estado.totalPendiente} u más de lo pedido.`
-                    : `Quedan ${parciales[0]._estado.totalPendiente} u pendientes de entrega.`
+                    ? `Se recibieron ${formatoNumero(-parciales[0]._estado.totalPendiente)} u más de lo pedido.`
+                    : `Quedan ${formatoNumero(parciales[0]._estado.totalPendiente)} u pendientes de entrega.`
                 }`
               : 'Llegó parte de la mercadería y todavía faltan unidades por recibir.'}
           </BloqueAccion>
@@ -687,13 +683,13 @@ export default function SeguimientoOC() {
         {/* Filtros por estado + fechas */}
         <div className="flex flex-wrap items-center gap-2 mb-5">
           {[
-            { key: 'todas', label: `Todas (${contadores.todas + contadores.app})` },
+            { key: 'todas', label: `Todas (${formatoNumero(contadores.todas + contadores.app)})` },
             { key: 'app', label: `De la app (${contadores.app})` }, // 23/10/2026 — pedido de Ivana
-            { key: 'enviada', label: `Enviadas (${contadores.enviada})` },
+            { key: 'enviada', label: `Enviadas (${formatoNumero(contadores.enviada)})` },
             { key: 'parcial', label: `Ingreso parcial (${contadores.parcial})` },
-            { key: 'completada', label: `Completadas (${contadores.completada})` },
-            { key: 'cerrada', label: `Cerradas en YiQi (${contadores.cerrada})` }, // 23/10/2026 — punto 3
-            { key: 'demorada', label: `Demoradas (${contadores.demorada})` }, // 23/10/2026 — feedback Ivana
+            { key: 'completada', label: `Completadas (${formatoNumero(contadores.completada)})` },
+            { key: 'cerrada', label: `Cerradas en YiQi (${formatoNumero(contadores.cerrada)})` }, // 23/10/2026 — punto 3
+            { key: 'demorada', label: `Demoradas (${formatoNumero(contadores.demorada)})` }, // 23/10/2026 — feedback Ivana
           ].map((f) => (
             <button
               key={f.key}
@@ -766,7 +762,7 @@ export default function SeguimientoOC() {
         {/* OC completadas: agrupadas por mes > día (colapsables) */}
         {Object.keys(completadasAgrupadas).length > 0 && (
           <div>
-            <div className="text-[12px] font-bold text-[var(--sub)] uppercase tracking-wide mb-2">Recibidas completas y cerradas en YiQi</div>
+            <div className="text-[12px] font-bold text-[var(--sub)] uppercase tracking-wide mb-2">{/* 10/11/2026 — radiografía UX (ítem 10a): Ivana también vacía la OC al cancelar */}Cerradas en YiQi (recibidas o canceladas)</div>
             {Object.entries(completadasAgrupadas).map(([mes, dias]) => (
               <div key={mes} className="mb-2">
                 <button

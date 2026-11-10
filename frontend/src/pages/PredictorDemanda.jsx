@@ -1,3 +1,4 @@
+import { formatoNumero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -37,12 +38,6 @@ function construirMeses() {
   return cols
 }
 
-function formatoNumero(n) {
-  if (n == null) return '—'
-  const num = Number(n)
-  if (!Number.isFinite(num)) return '—'
-  return num % 1 === 0 ? String(num) : num.toFixed(1)
-}
 
 // Meses de cobertura = stock actual / consumo mensual promedio.
 // Es una division simple sobre datos historicos, no un pronostico.
@@ -63,7 +58,7 @@ function ColorCobertura({ meses }) {
     return <span className="text-gray-300 text-xs">—</span>
   }
   let clase = 'pill-verde'
-  const texto = meses <= 0 ? 'Sin stock' : `${meses.toFixed(1)} meses`
+  const texto = meses <= 0 ? 'Sin stock' : `${formatoNumero(meses)} meses`
   const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
 
   if (meses < 1) {
@@ -77,6 +72,16 @@ function ColorCobertura({ meses }) {
       {texto}
     </span>
   )
+}
+
+// 10/11/2026 — radiografía UX (ítem 20): espejo mínimo de es_administrativo() + exclusión Acritone/NewcryL
+// de es_comprable() (ver Alertas.jsx / MonitorStock.jsx). No excluye discontinuados ni producción propia:
+// en el Predictor el historial de ventas de esos artículos sigue siendo información válida.
+function esExcluidoDelPredictor(fila) {
+  const sku = String(fila.mate_codigo ?? '')
+  const nombreMin = String(fila.mate_nombre ?? '').toLowerCase()
+  if (['889', '890', '99999'].includes(sku)) return true
+  return nombreMin.includes('acritone') || nombreMin.includes('newcryl')
 }
 
 export default function PredictorDemanda() {
@@ -105,7 +110,11 @@ export default function PredictorDemanda() {
         p_meses: CANT_MESES,
       })
       if (error) throw new Error(error.message)
-      setFilas(data ?? [])
+      // 10/11/2026 — radiografía UX (ítem 20): misma exclusión que Alertas/Monitor
+      // (esExcluidoDeAlertas): SKU administrativos (889/890/99999, es_administrativo) y la línea
+      // Acritone/NewcryL (pedido de Aris, 26/8). Se filtra acá y no en historial_ventas_json(),
+      // que usan otras pantallas.
+      setFilas((data ?? []).filter((f) => !esExcluidoDelPredictor(f)))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -206,7 +215,7 @@ export default function PredictorDemanda() {
         <div className="metricas mb-5">
           <div className="metrica">
             <div className="metrica-rot">Artículos con movimiento</div>
-            <div className="metrica-val">{totales.skus}</div>
+            <div className="metrica-val">{formatoNumero(totales.skus)}</div>
             <div className="metrica-sub">últimos {CANT_MESES} meses</div>
           </div>
           <div className="metrica">
@@ -216,7 +225,7 @@ export default function PredictorDemanda() {
           </div>
           <div className="metrica">
             <div className="metrica-rot">Cobertura menor a 1 mes</div>
-            <div className="metrica-val text-[var(--red)]">{totales.criticos}</div>
+            <div className="metrica-val text-[var(--red)]">{formatoNumero(totales.criticos)}</div>
             <div className="metrica-sub">según consumo histórico</div>
           </div>
         </div>

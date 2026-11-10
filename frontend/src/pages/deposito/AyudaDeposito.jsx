@@ -71,6 +71,12 @@ export default function AyudaDeposito() {
               automático, y lo pedís vos a mano.
             </li>
           </ul>
+          {/* 10/11/2026 — radiografía UX (ítem 16): estado actual del circuito. */}
+          <Aviso tipo="filtro" className="mt-1">
+            Por ahora la reposición automática Central→Local está pausada: solo llegan pedidos manuales ("Pedir al
+            otro depósito"). Además, mientras dure el modo prueba, confirmar una recepción no mueve stock en YiQi:
+            queda registrada solo en la app.
+          </Aviso>
           <Aviso tipo="info" id="deposito-ayuda-sin-aprobacion" className="mt-1">
             Este circuito no tiene un paso de "aprobación" como sí tienen las órdenes de compra — no hay nadie que
             tenga que autorizar un remito. El único control real es el que hacés vos al confirmar la recepción
@@ -101,7 +107,8 @@ export default function AyudaDeposito() {
                   Cuando el remito está "En preparación", ves una tabla con cada artículo, su clase (A/B/C, solo de
                   referencia), la cantidad pedida, y un campo para declarar cuánto mandás vos. Un solo campo por
                   línea: lo que no llegues a mandar queda automáticamente como "no hay", con un motivo obligatorio —
-                  eso dispara una compra al proveedor del lado de Aris, no hace falta que hagas nada más.
+                  eso suspende la alerta de ese artículo hasta que vuelva a haber stock. No genera por sí solo una
+                  orden de compra: Compras la arma aparte.
                 </li>
                 <li>
                   Botón "🖨️ Imprimir remito" para llevarte el papel al picking físico — es el mismo documento que
@@ -136,7 +143,8 @@ export default function AyudaDeposito() {
                   que llegó no coincide con lo físico antes de confirmar.
                 </li>
                 <li>
-                  "✓ Confirmar recibido" es lo que efectivamente mueve el stock real en YiQi. Si esa parte le falla
+                  "✓ Confirmar recibido" es lo que efectivamente mueve el stock real en YiQi (mientras dure el modo
+                  prueba, queda registrado solo en la app y no mueve stock en YiQi). Si esa parte le falla
                   al sistema por algún motivo, tu confirmación acá ya quedó guardada igual — no se pierde ni se
                   deshace.
                 </li>

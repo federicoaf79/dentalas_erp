@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
+import AvisoSoloLectura from '../components/ui/AvisoSoloLectura'
 
 // ============================================================
 // CatalogoCausas.jsx
@@ -165,9 +166,7 @@ export default function CatalogoCausas() {
       </Aviso>
 
       {!esAdmin && !permisos.cargando && (
-        <Aviso tipo="filtro" autoCerrarEn={15} className="mx-4 mt-2">
-          Este catálogo lo administra Aris. Podés consultarlo, pero no editarlo.
-        </Aviso>
+        <AvisoSoloLectura className="mx-4 mt-2" />
       )}
 
       {/* Ámbitos */}

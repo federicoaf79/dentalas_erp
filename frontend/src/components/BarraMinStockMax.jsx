@@ -14,6 +14,7 @@
 // ============================================================
 // 26/10/2026 — máximo calculado por la app (lib/maximos.js): `detalleMax` va al
 // tooltip y `pico` agrega un aviso para revisar el número.
+import { formatoNumero } from '../lib/formato'
 export default function BarraMinStockMax({ stock, min, max, detalleMax = null, pico = false }) {
   const s = Number(stock) || 0
   const mn = min != null && Number(min) > 0 ? Number(min) : null
@@ -22,14 +23,16 @@ export default function BarraMinStockMax({ stock, min, max, detalleMax = null, p
   // Sin ningún umbral cargado, no hay contra qué graficar -- se cae al
   // número solo, igual que antes.
   if (mn == null && mx == null) {
-    return <span className="text-gray-700 font-bold text-sm">{s}</span>
+    return <span className={`font-bold text-sm ${s < 0 ? 'text-[var(--red)]' : 'text-gray-700'}`}>{s < 0 ? `−${formatoNumero(Math.abs(s))}` : formatoNumero(s)}</span>
   }
 
   // Escala: el techo visual es el mayor entre stock/mín/máx (piso de 1
   // para que la barra no quede vacía si todo es chico), así un stock
   // que se pasó del máximo también se alcanza a ver.
   const techo = Math.max(s, mn ?? 0, mx ?? 0, 1)
-  const pctStock = Math.min(100, (s / techo) * 100)
+  // 10/11/2026 — radiografía UX (ítem 1): con stock negativo el ancho daba negativo y la
+  // barra se dibujaba llena. Se acota a [0, 100]: stock <= 0 → barra vacía.
+  const pctStock = Math.max(0, Math.min(100, (s / techo) * 100))
   const pctMin = mn != null ? Math.min(100, (mn / techo) * 100) : null
   const pctMax = mx != null ? Math.min(100, (mx / techo) * 100) : null
 
@@ -40,13 +43,13 @@ export default function BarraMinStockMax({ stock, min, max, detalleMax = null, p
   return (
     <div
       className="w-28"
-      title={`Stock ${s}${mn != null ? ` · Mín. ${mn}` : ''}${mx != null ? ` · Máx. ${mx}` : ''}${detalleMax ? `\n${detalleMax}` : ''}\nRojo: hasta el mínimo · Verde: entre mínimo y máximo · Índigo: por encima del máximo`}
+      title={`Stock ${formatoNumero(s)}${mn != null ? ` · Mín. ${formatoNumero(mn)}` : ''}${mx != null ? ` · Máx. ${formatoNumero(mx)}` : ''}${detalleMax ? `\n${detalleMax}` : ''}\nRojo: hasta el mínimo · Verde: entre mínimo y máximo · Índigo: por encima del máximo`}
     >
       <div className="flex items-baseline justify-between text-[11px] mb-0.5">
-        <span className="font-bold text-gray-700">{s}</span>
+        <span className={`font-bold ${s < 0 ? 'text-[var(--red)]' : 'text-gray-700'}`}>{s < 0 ? `−${formatoNumero(Math.abs(s))}` : formatoNumero(s)}</span>
         {mx != null && (
           <span className={pico ? 'text-[#92400e]' : 'text-gray-400'}>
-            máx {mx}{pico && <i className="ti ti-alert-triangle ml-0.5 align-[-1px]" />}
+            máx {formatoNumero(mx)}{pico && <i className="ti ti-alert-triangle ml-0.5 align-[-1px]" />}
           </span>
         )}
       </div>
@@ -63,7 +66,8 @@ export default function BarraMinStockMax({ stock, min, max, detalleMax = null, p
           style={{ left: `${pctMin ?? 0}%`, width: `${Math.max(0, (pctMax ?? 100) - (pctMin ?? 0))}%` }}
         />
         {pctMax != null && pctMax < 100 && (
-          <div className="absolute inset-y-0 right-0 rounded-r-full bg-[#e3e1fb]" style={{ left: `${pctMax}%` }} />
+          // 10/11/2026 — si max < min la zona índigo no debe pisar la roja: arranca en el mayor de los dos.
+          <div className="absolute inset-y-0 right-0 rounded-r-full bg-[#e3e1fb]" style={{ left: `${Math.max(pctMax, pctMin ?? 0)}%` }} />
         )}
         <div className={`relative h-1.5 rounded-full ${colorBarra}`} style={{ width: `${pctStock}%` }} />
         {pctMin != null && (

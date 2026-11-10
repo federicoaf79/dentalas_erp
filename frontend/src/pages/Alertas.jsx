@@ -1,3 +1,4 @@
+import { formatoNumero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
@@ -199,12 +200,6 @@ function formatoFechaHora(fechaStr) {
   }
 }
 
-function formatoNumero(n) {
-  if (n == null) return '—'
-  const num = Number(n)
-  if (!Number.isFinite(num)) return '—'
-  return num % 1 === 0 ? String(num) : num.toFixed(1)
-}
 
 // Mismo componente que en MonitorStock.jsx / PredictorDemanda.jsx (H-9,
 // auditoría UX 6/9/2026): todo en meses, equivalente en días como
@@ -212,7 +207,7 @@ function formatoNumero(n) {
 function Cobertura({ meses }) {
   if (meses == null) return <span className="text-gray-300 text-xs">—</span>
   let clase = 'bg-[var(--grn-bg)] text-[var(--grn)]'
-  const texto = meses <= 0 ? 'Sin stock' : `${meses.toFixed(1)} m.`
+  const texto = meses <= 0 ? 'Sin stock' : `${formatoNumero(meses)} m.`
   const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
   if (meses < 1) clase = 'bg-[var(--red-bg)] text-[var(--red)]'
   else if (meses < 2) clase = 'bg-[var(--yel-bg)] text-[#92400e]'
@@ -221,6 +216,22 @@ function Cobertura({ meses }) {
       {texto}
     </span>
   )
+}
+
+// 10/11/2026 — radiografía UX (ítem 3): qué significa cada columna. Va como title del
+// encabezado (un popover CSS quedaría recortado por el scroll de la tabla); sigue siendo ordenable.
+const AYUDA_COLUMNA = {
+  stock: 'Barra: rojo hasta el mínimo, verde entre mínimo y máximo, índigo por encima del máximo. Máx. = calculado por la app (promedio de 3 meses cerrados).',
+  stockSeguridad: 'Umbral de respaldo cuando el artículo no tiene Punto de pedido. El ● indica que se está usando como respaldo.',
+  rotacion: 'Promedio de unidades vendidas por mes en los últimos 12 meses (el Máx. de la barra usa los últimos 3 meses).',
+  cobertura: 'Meses que dura el stock actual al ritmo de venta promedio de los últimos 12 meses.',
+  estadoOC: 'Si ya hay un pedido en curso (orden de la app o OC de YiQi) que incluye este artículo. El (+n) son las unidades ya pedidas, descontadas de la alerta.',
+}
+
+// 10/11/2026 — radiografía UX (ítem 5): las notas de YiQi traen saltos de línea crudos (\r\n).
+function textoNota(n) {
+  const t = String(n ?? '').replace(/\s*[\r\n]+\s*/g, ' ').trim()
+  return t || null
 }
 
 // v6 (10/9/2026) — orden por columna. Sin columna elegida, queda el
@@ -623,12 +634,12 @@ export default function Alertas({ onArmarOC }) {
         <div className="metricas mb-5">
           <div className="metrica">
             <div className="metrica-rot">Preventivas</div>
-            <div className="metrica-val text-[#b8860b]">{cargandoAlgo ? '—' : preventivasFiltradas}</div>
+            <div className="metrica-val text-[#b8860b]">{cargandoAlgo ? '—' : formatoNumero(preventivasFiltradas)}</div>
             <div className="metrica-sub">tiempo para actuar</div>
           </div>
           <div className="metrica">
             <div className="metrica-rot">Críticas</div>
-            <div className="metrica-val text-[var(--red)]">{cargandoAlgo ? '—' : criticasFiltradas}</div>
+            <div className="metrica-val text-[var(--red)]">{cargandoAlgo ? '—' : formatoNumero(criticasFiltradas)}</div>
             <div className="metrica-sub">acción inmediata</div>
           </div>
           <div className="metrica">
@@ -791,7 +802,9 @@ export default function Alertas({ onArmarOC }) {
                 No hay artículos en alerta que coincidan con los filtros. 🎉
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              /* 10/11/2026 — radiografía UX (ítem 2): el wrapper pasa a scroll en ambos ejes con alto
+                 acotado; con solo overflow-x un th sticky no se pega al scroll vertical de la página. */
+              <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 140px)' }}>
               <table className="tabla tabla-acciones">
                 <thead>
                   <tr>
@@ -813,9 +826,11 @@ export default function Alertas({ onArmarOC }) {
                         key={label || 'acciones'}
                         onClick={columna ? () => alHacerClickColumna(columna) : undefined}
                         className={columna ? 'cursor-pointer select-none hover:text-gray-700' : undefined}
-                        title={columna ? 'Ordenar por esta columna' : undefined}
+                        title={columna ? `${AYUDA_COLUMNA[columna] ? AYUDA_COLUMNA[columna] + '\n' : ''}Clic para ordenar por esta columna` : undefined}
+                        style={{ position: 'sticky', top: 0, zIndex: 10 }}
                       >
                         {label}
+                        {AYUDA_COLUMNA[columna] && <i className="ti ti-info-circle ml-1 text-[12px] text-gray-400 align-[-1px]" aria-hidden="true" />}
                         {columna && <FlechaOrden activa={sort.columna === columna} dir={sort.dir} />}
                       </th>
                     ))}
@@ -883,9 +898,9 @@ export default function Alertas({ onArmarOC }) {
                       </td>
                       <td
                         className="text-gray-400 text-[12px] max-w-[110px] truncate"
-                        title={a.mate_notas_sobre_punto_de ?? ''}
+                        title={textoNota(a.mate_notas_sobre_punto_de) ?? ''}
                       >
-                        {a.mate_notas_sobre_punto_de ?? '—'}
+                        {textoNota(a.mate_notas_sobre_punto_de) ?? '—'}
                       </td>
                       <td>
                         <span

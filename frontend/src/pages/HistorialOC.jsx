@@ -1,3 +1,4 @@
+import { formatoMoneda, formatoNumero } from '../lib/formato'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
@@ -58,14 +59,6 @@ async function traerOrdenesLocal(permisos) {
   return acumulado
 }
 
-function formatoMoneda(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    maximumFractionDigits: 0,
-  }).format(n)
-}
 
 function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -181,10 +174,10 @@ function DetalleOrden({ orden }) {
                 <tr key={i} className={pend > 0 ? 'bg-[#fffbeb]' : ''}>
                   <td className="sku">{l.sku ?? '—'}</td>
                   <td className="font-semibold">{l.nombreArticulo ?? '—'}</td>
-                  <td className="tabular-nums">{l.cantidad}</td>
-                  <td className="tabular-nums text-[var(--grn)] font-bold">{l.entregada}</td>
+                  <td className="tabular-nums">{formatoNumero(l.cantidad)}</td>
+                  <td className="tabular-nums text-[var(--grn)] font-bold">{formatoNumero(l.entregada)}</td>
                   <td className={`tabular-nums font-bold ${pend > 0 ? 'text-[var(--red)]' : 'text-[#9ca3af] font-normal'}`}>
-                    {pend > 0 ? pend : '—'}
+                    {pend > 0 ? formatoNumero(pend) : '—'}
                   </td>
                 </tr>
               )
@@ -315,8 +308,8 @@ export default function HistorialOC() {
           cargandoAlgo
             ? 'Cargando…'
             : vistaFiltrada
-            ? `${ordenes.length} órdenes de tus proveedores asignados · buscable`
-            : `${ordenes.length} órdenes en total · archivo completo, buscable`
+            ? `${formatoNumero(ordenes.length)} órdenes de tus proveedores asignados · buscable`
+            : `${formatoNumero(ordenes.length)} órdenes en total · archivo completo, buscable`
         }
       >
         <button onClick={cargarDatos} disabled={cargandoAlgo} className="btn btn-sm">
@@ -360,24 +353,24 @@ export default function HistorialOC() {
           <div className="metricas mb-4">
             <div className="metrica">
               <div className="metrica-rot">Completadas este mes</div>
-              <div className="metrica-val text-[var(--grn)]">{metricasMes.completadas}</div>
+              <div className="metrica-val text-[var(--grn)]">{formatoNumero(metricasMes.completadas)}</div>
               <div className="metrica-sub">recibidas completas o cerradas en YiQi</div>
             </div>
             <div className="metrica">
               <div className="metrica-rot">Enviadas este mes</div>
-              <div className="metrica-val text-[var(--text)]">{metricasMes.enviadas}</div>
+              <div className="metrica-val text-[var(--text)]">{formatoNumero(metricasMes.enviadas)}</div>
               <div className="metrica-sub">OC con fecha de este mes</div>
             </div>
             <div className="metrica">
-              <div className="metrica-rot">Gasto del mes</div>
+              <div className="metrica-rot">Total de OC del mes</div>
               <div className="metrica-val text-[var(--text)] text-[20px]!" title={formatoMoneda(metricasMes.gasto)}>
                 {formatoMonedaCorto(metricasMes.gasto)}
               </div>
-              <div className="metrica-sub">suma de totales de las OC del mes</div>
+              <div className="metrica-sub">suma de los totales de las OC con fecha de este mes</div>
             </div>
             <div className="metrica">
               <div className="metrica-rot">Ingresos parciales</div>
-              <div className="metrica-val text-[#b8860b]">{metricasMes.parciales}</div>
+              <div className="metrica-val text-[#b8860b]">{formatoNumero(metricasMes.parciales)}</div>
               <div className="metrica-sub">este mes</div>
             </div>
           </div>
@@ -530,7 +523,7 @@ export default function HistorialOC() {
         {ordenesFiltradas.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-[12px] text-[var(--sub)] px-1">
             <span>
-              Mostrando {inicioSlice + 1}–{Math.min(inicioSlice + filasPorPagina, totalFilas)} de {totalFilas}
+              Mostrando {formatoNumero(inicioSlice + 1)}–{formatoNumero(Math.min(inicioSlice + filasPorPagina, totalFilas))} de {formatoNumero(totalFilas)}
             </span>
             <div className="flex items-center gap-2">
               <button

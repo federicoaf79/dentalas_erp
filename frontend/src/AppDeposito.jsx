@@ -33,10 +33,10 @@ import CambiarMiPassword from './components/CambiarMiPassword'
 // ============================================================
 
 const NAV = [
-  { key: 'preparar', label: 'Solicitudes para preparar', icon: '📋' },
-  { key: 'recepcion', label: 'Confirmar recepción', icon: '✓' },
-  { key: 'pedir', label: 'Pedir al otro depósito', icon: '📤' },
-  { key: 'ayuda', label: 'Ayuda', icon: '❓' },
+  { key: 'preparar', label: 'Solicitudes para preparar', icon: 'ti-clipboard-list' },
+  { key: 'recepcion', label: 'Confirmar recepción', icon: 'ti-circle-check' },
+  { key: 'pedir', label: 'Pedir al otro depósito', icon: 'ti-send' },
+  { key: 'ayuda', label: 'Ayuda', icon: 'ti-help-circle' },
 ]
 
 export default function AppDeposito({ nombreUsuario, onLogout }) {
@@ -52,19 +52,22 @@ export default function AppDeposito({ nombreUsuario, onLogout }) {
 
         <nav className="px-1.5 py-1.5 flex-1 overflow-y-auto">
           {NAV.map((item) => (
-            <div
+            // 10/11/2026 — radiografía UX (ítem 13): button navegable con teclado (antes div).
+            <button
+              type="button"
               key={item.key}
+              aria-current={pagina === item.key ? 'page' : undefined}
               onClick={() => setPagina(item.key)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-[13px] mb-0.5 select-none transition-colors
+              className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-[13px] mb-0.5 select-none transition-colors
                 ${
                   pagina === item.key
                     ? 'bg-[var(--ind-bg)] text-[var(--ind)] font-bold'
                     : 'text-gray-700 hover:bg-[var(--ind-bg)]'
                 }`}
             >
-              <span className="text-[15px] flex-shrink-0">{item.icon}</span>
+              <i className={`ti ${item.icon} text-[16px] flex-shrink-0`} aria-hidden="true" />
               <span className="flex-1">{item.label}</span>
-            </div>
+            </button>
           ))}
         </nav>
 

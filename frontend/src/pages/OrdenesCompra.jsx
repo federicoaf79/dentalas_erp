@@ -1,3 +1,4 @@
+import { formatoMoneda, formatoNumero } from '../lib/formato'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
@@ -52,14 +53,6 @@ async function traerOrdenesLocal(permisos) {
     }
   }
   return acumulado
-}
-function formatoMoneda(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    maximumFractionDigits: 0,
-  }).format(n)
 }
 function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -135,10 +128,10 @@ function DetalleOrden({ orden }) {
                 <tr key={i} className={pend > 0 ? 'bg-yellow-50' : ''}>
                   <td className="sku">{l.sku ?? '—'}</td>
                   <td className="font-semibold">{l.nombreArticulo ?? '—'}</td>
-                  <td className="tabular-nums">{l.cantidad}</td>
-                  <td className="text-[var(--grn)] font-semibold tabular-nums">{l.entregada}</td>
+                  <td className="tabular-nums">{formatoNumero(l.cantidad)}</td>
+                  <td className="text-[var(--grn)] font-semibold tabular-nums">{formatoNumero(l.entregada)}</td>
                   <td className={`font-semibold tabular-nums ${pend > 0 ? 'text-[var(--red)]' : 'text-gray-300'}`}>
-                    {pend > 0 ? pend : '—'}
+                    {pend > 0 ? formatoNumero(pend) : '—'}
                   </td>
                 </tr>
               )
@@ -239,7 +232,7 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
         bajada={
           cargandoAlgo
             ? 'Cargando…'
-            : `${ordenes.length} OC activas (no completadas) · ${totalPendienteGeneral} unidades pendientes en total`
+            : `${formatoNumero(ordenes.length)} OC activas (no completadas) · ${formatoNumero(totalPendienteGeneral)} unidades pendientes en total`
         }
       >
         <button onClick={cargarDatos} disabled={cargandoAlgo} className="btn btn-sm">
@@ -289,8 +282,8 @@ export default function OrdenesCompra({ onCambioOrdenes }) {
       <div className="px-7 pt-5 pb-1">
         <div className="text-[15px] font-bold text-[var(--text)]">Todas las OC sincronizadas desde YiQi</div>
         <div className="text-[12px] text-[var(--sub)] mt-[3px]">
-          Es la tabla a la que corresponde el resumen de arriba. Distinto de "Órdenes propias" (sección de arriba),
-          que son las que se generan y aprueban desde este sistema.
+          Es la tabla a la que corresponde el resumen de arriba. Distinto de "Órdenes generadas desde el sistema"
+          (bloque anterior), que son las que se arman y aprueban desde esta app.
         </div>
       </div>
 

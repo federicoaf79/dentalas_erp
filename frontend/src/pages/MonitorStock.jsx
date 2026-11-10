@@ -1,3 +1,4 @@
+import { formatoNumero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
@@ -167,12 +168,6 @@ function formatoFechaHora(fechaStr) {
   }
 }
 
-function formatoNumero(n) {
-  if (n == null) return '—'
-  const num = Number(n)
-  if (!Number.isFinite(num)) return '—'
-  return num % 1 === 0 ? String(num) : num.toFixed(1)
-}
 
 // Mismo componente que ColorCobertura en PredictorDemanda.jsx (H-9,
 // auditoría UX 6/9/2026): todo en meses, con el equivalente en días
@@ -181,7 +176,7 @@ function formatoNumero(n) {
 function Cobertura({ meses }) {
   if (meses == null) return <span className="text-gray-300 text-xs">—</span>
   let clase = 'bg-[var(--grn-bg)] text-[var(--grn)]'
-  const texto = meses <= 0 ? 'Sin stock' : `${meses.toFixed(1)} m.`
+  const texto = meses <= 0 ? 'Sin stock' : `${formatoNumero(meses)} m.`
   const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
   if (meses < 1) clase = 'bg-[var(--red-bg)] text-[var(--red)]'
   else if (meses < 2) clase = 'bg-[var(--yel-bg)] text-[#92400e]'
@@ -190,6 +185,22 @@ function Cobertura({ meses }) {
       {texto}
     </span>
   )
+}
+
+// 10/11/2026 — radiografía UX (ítem 3): qué significa cada columna. Va como title del
+// encabezado (un popover CSS quedaría recortado por el scroll de la tabla); sigue siendo ordenable.
+const AYUDA_COLUMNA = {
+  stock: 'Barra: rojo hasta el mínimo, verde entre mínimo y máximo, índigo por encima del máximo. Máx. = calculado por la app (promedio de 3 meses cerrados).',
+  stockSeguridad: 'Umbral de respaldo cuando el artículo no tiene Punto de pedido. El ● indica que se está usando como respaldo.',
+  rotacion: 'Promedio de unidades vendidas por mes en los últimos 12 meses (el Máx. de la barra usa los últimos 3 meses).',
+  cobertura: 'Meses que dura el stock actual al ritmo de venta promedio de los últimos 12 meses.',
+  estadoOC: 'Si ya hay un pedido en curso (orden de la app o OC de YiQi) que incluye este artículo. El (+n) son las unidades ya pedidas, descontadas de la alerta.',
+}
+
+// 10/11/2026 — radiografía UX (ítem 5): las notas de YiQi traen saltos de línea crudos (\r\n).
+function textoNota(n) {
+  const t = String(n ?? '').replace(/\s*[\r\n]+\s*/g, ' ').trim()
+  return t || null
 }
 
 // v6 (10/9/2026) — orden por columna. Cada entrada sabe cómo sacarle
@@ -493,9 +504,9 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
           <div className="metrica" title="Punto de pedido manual si existe; si no, Stock Seguridad como respaldo (provisorio).">
             <div className="metrica-rot">Alertas activas</div>
             <div className="flex items-baseline gap-1.5">
-              <span className="metrica-val text-[var(--red)]">{criticas}</span>
+              <span className="metrica-val text-[var(--red)]">{formatoNumero(criticas)}</span>
               <span className="text-[11px] text-gray-400 mr-1.5">crít.</span>
-              <span className="metrica-val text-[#b8860b]">{preventivas}</span>
+              <span className="metrica-val text-[#b8860b]">{formatoNumero(preventivas)}</span>
               <span className="text-[11px] text-gray-400">prev.</span>
             </div>
             <div className="metrica-sub">productos bajo nivel de alerta</div>
@@ -506,12 +517,12 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
             onClick={() => onIrA?.('ocs')}
           >
             <div className="metrica-rot">OC en curso</div>
-            <div className="metrica-val text-[var(--ind)]">{contadores.ocsActivas ?? '—'}</div>
+            <div className="metrica-val text-[var(--ind)]">{formatoNumero(contadores.ocsActivas)}</div>
             <div className="metrica-sub">enviadas, todavía sin recibir completas</div>
           </button>
           <div className="metrica">
             <div className="metrica-rot">{vistaFiltrada ? 'Artículos visibles' : 'Artículos'}</div>
-            <div className="metrica-val text-[var(--text)]">{articulos.length.toLocaleString('es-AR')}</div>
+            <div className="metrica-val text-[var(--text)]">{formatoNumero(articulos.length)}</div>
             <div className="metrica-sub">
               {error ? '⚠ error al sincronizar' : cargandoAlgo ? 'cargando…' : vistaFiltrada ? 'de tus proveedores asignados' : 'sincronizados con YiQi'}
             </div>
@@ -573,13 +584,16 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
               onClick={() => setVerTodos((v) => !v)}
               className="text-[12px] font-semibold text-[var(--ind)] hover:underline whitespace-nowrap ml-1"
             >
-              {verTodos ? 'Ver solo con alerta' : `Ver todos (${articulosConProveedor.length})`}
+              {verTodos ? 'Ver solo con alerta' : `Ver todos (${formatoNumero(articulosConProveedor.length)})`}
             </button>
           </div>
         </div>
 
         {/* Tabla */}
-        <div className="tw">
+        {/* 10/11/2026 — radiografía UX (ítem 2): .tw tiene overflow-y:hidden, así que un th sticky no
+            tenía contra qué pegarse. Se le da scroll vertical propio (alto acotado) para que el
+            encabezado quede fijo; el estilo va inline porque .tw (CSS sin capa) le gana a las utilidades. */}
+        <div className="tw" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 140px)' }}>
           {cargandoAlgo && articulos.length === 0 ? (
             <div className="p-8 text-center text-[var(--sub)] text-sm">Cargando artículos…</div>
           ) : filasAMostrar.length === 0 ? (
@@ -610,9 +624,11 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                       key={label}
                       onClick={columna ? () => alHacerClickColumna(columna) : undefined}
                       className={columna ? 'cursor-pointer select-none hover:text-gray-700' : undefined}
-                      title={columna ? 'Ordenar por esta columna' : undefined}
+                      title={columna ? `${AYUDA_COLUMNA[columna] ? AYUDA_COLUMNA[columna] + '\n' : ''}Clic para ordenar por esta columna` : undefined}
+                      style={{ position: 'sticky', top: 0, zIndex: 10 }}
                     >
                       {label}
+                      {AYUDA_COLUMNA[columna] && <i className="ti ti-info-circle ml-1 text-[12px] text-gray-400 align-[-1px]" aria-hidden="true" />}
                       {columna && <FlechaOrden activa={sort.columna === columna} dir={sort.dir} />}
                     </th>
                   ))}
@@ -715,9 +731,9 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                       </td>
                       <td
                         className="text-gray-400 max-w-[110px] truncate"
-                        title={a.mate_notas_sobre_punto_de ?? ''}
+                        title={textoNota(a.mate_notas_sobre_punto_de) ?? ''}
                       >
-                        {a.mate_notas_sobre_punto_de ?? '—'}
+                        {textoNota(a.mate_notas_sobre_punto_de) ?? '—'}
                       </td>
                       <td>
                         <Pastilla tono={TONO_DE_COLOR[alerta.color] ?? 'gris'}>{alerta.label}</Pastilla>

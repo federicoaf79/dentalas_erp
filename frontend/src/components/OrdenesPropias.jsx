@@ -1,3 +1,4 @@
+import { formatoNumero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -121,12 +122,6 @@ function vistaLlegada(o, diasPorProv, recibida) {
   if (recibida === false) return { tono: 'rojo', texto: `Demorada desde el ${dm}`, dm }
   // Fecha vencida pero no sabemos si ya se recibió: no se pinta de rojo en la lista.
   return { tono: 'gris', texto: `Debía llegar el ${dm}`, dm }
-}
-function formatoNumero(n) {
-  if (n == null) return '—'
-  const num = Number(n)
-  if (!Number.isFinite(num)) return '—'
-  return num % 1 === 0 ? String(num) : num.toFixed(1)
 }
 function formatoFecha(f) {
   if (!f) return '—'
@@ -1008,7 +1003,9 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
     }
   }
 
-  if (!cargando && ordenes.length === 0) return null
+  // 10/11/2026 — radiografía UX (ítem 7): el bloque ya no desaparece cuando
+  // no hay órdenes propias (muestra estado vacío). En modo soloOrdenId se mantiene el null.
+  if (!cargando && ordenes.length === 0 && soloOrdenId) return null
   return (
     <div className="mx-7 mt-4">
       {error && (
@@ -1071,7 +1068,11 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
           <div className="card p-6 text-center text-[var(--sub)] text-sm">Cargando…</div>
         ) : visibles.length === 0 ? (
           <div className="card p-6 text-center text-[var(--sub)] text-sm">
-            {filtro === 'papelera' ? 'La papelera está vacía.' : 'No hay órdenes.'}
+            {filtro === 'papelera'
+              ? 'La papelera está vacía.'
+              : ordenes.length === 0
+                ? 'Todavía no armaste órdenes desde la app. Se arman en Nueva OC.'
+                : 'No hay órdenes.'}
           </div>
         ) : (
           <div className="space-y-3.5">
@@ -1309,7 +1310,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               },
               {
                 rotulo: ing?.encontrada && ing.entregada > 0 && ing.pendiente > 0
-                  ? `Recibida ${ing.entregada} de ${ing.cantidad} u`
+                  ? `Recibida ${formatoNumero(ing.entregada)} de ${formatoNumero(ing.cantidad)} u`
                   : 'Mercadería recibida',
                 estado: ing?.encontrada && ing.cantidad > 0 && ing.pendiente === 0 && ing.entregada > 0
                   ? 'hecho'

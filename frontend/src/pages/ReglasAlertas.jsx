@@ -1,7 +1,9 @@
+import { formatoNumero, formatoMoneda } from '../lib/formato'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
+import AvisoSoloLectura from '../components/ui/AvisoSoloLectura'
 
 // ============================================================
 // ReglasAlertas.jsx
@@ -34,6 +36,10 @@ function Campo({ label, ayuda, valor, onChange, sufijo, disabled, min = 0, step 
             className={`${INPUT} w-44 text-right font-bold`}
           />
           {sufijo && <span className="text-[12px] text-[var(--sub)]">{sufijo}</span>}
+          {/* 10/11/2026 — radiografía UX (ítem 4): el input nativo muestra "1000000"; acá el mismo valor en es-AR (solo lectura). */}
+          {valor !== '' && valor != null && Number.isFinite(Number(valor)) && (
+            <span className="text-[12px] text-[#9ca3af]">= {formatoNumero(valor, { decimales: 2 })}</span>
+          )}
         </div>
         <div className="text-[11px] text-[#9ca3af] mt-1.5 leading-snug">{ayuda}</div>
       </label>
@@ -157,6 +163,9 @@ export default function ReglasAlertas() {
         )}
       </EncabezadoPagina>
 
+      {/* 10/11/2026 — radiografía UX (ítem 6): aviso fijo de solo lectura */}
+      {!permisos.cargando && !esAdmin && <AvisoSoloLectura className="mx-4 mt-4" />}
+
       <div className="pagina flex flex-col gap-3.5">
       {error && (
         <div className="bloque bloque-rojo text-[13px]">
@@ -229,7 +238,7 @@ export default function ReglasAlertas() {
                 La orden se valoriza con el costo de reposición (CRM Neto). Si el total supera{' '}
                 <b>
                   {form.limite
-                    ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Number(form.limite))
+                    ? formatoMoneda(form.limite)
                     : '—'}
                 </b>{' '}
                 —o si algún artículo no tiene costo cargado— pasa a requerir aprobación.

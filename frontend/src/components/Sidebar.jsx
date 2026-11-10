@@ -1,4 +1,5 @@
 import CambiarMiPassword from './CambiarMiPassword'
+import { usePermisos } from '../hooks/usePermisos'
 
 // ------------------------------------------------------------
 // Estructura de navegación — copiada 1:1 del prototipo v8 aprobado
@@ -76,9 +77,10 @@ const NAV_CONFIG = [
 // del item se lee como error; no mostrar nada se lee como "no hay
 // nada pendiente", que es la verdad.
 // ------------------------------------------------------------
-function Badge({ valor, clase }) {
+// 10/11/2026 — radiografía UX (ítem 4): `title` explica qué cuenta cada número.
+function Badge({ valor, clase, title }) {
   if (valor == null || valor === 0) return null
-  return <span className={`nb ${clase}`}>{valor}</span>
+  return <span className={`nb ${clase}`} title={title}>{valor}</span>
 }
 
 function NavItem({ item, active, onClick, badges }) {
@@ -148,6 +150,11 @@ export default function Sidebar({
 
   const syncTexto = formatoSyncCorto(ultimaSync)
 
+  // 10/11/2026 — radiografía UX (ítem 4): "Usuarios y accesos" solo para admin. Falla cerrado:
+  // mientras carga permisos (o si hay error) no se muestra.
+  const permisos = usePermisos()
+  const puedeVerUsuarios = !permisos.cargando && !permisos.error && permisos.esAdmin === true
+
   // Aviso de conexión con YiQi (agregado 20/8/2026). Antes esto solo se
   // veía entrando puntualmente a "Conector YiQi" -- se vio 3 veces en
   // una semana que nadie se enteraba de un corte real hasta que alguien
@@ -164,18 +171,18 @@ export default function Sidebar({
   // a cuál (bug que ya pasó una vez, el 19/8/2026, al insertar
   // "Reposición interna" en el medio del array viejo).
   const badgesPorKey = {
-    stock: <Badge valor={alertasStock} clase="nb-yel" />,
+    stock: <Badge valor={alertasStock} clase="nb-yel" title="Artículos en alerta (críticos + preventivos), sin los excluidos ni los pausados" />,
     alertas: (
       <>
-        <Badge valor={alertasCriticas} clase="nb-red" />
-        <Badge valor={alertasPreventivas} clase="nb-yel" />
+        <Badge valor={alertasCriticas} clase="nb-red" title="Críticas: artículos sin stock" />
+        <Badge valor={alertasPreventivas} clase="nb-yel" title="Preventivas: stock por debajo del Punto de pedido (o del Stock Seguridad si no tiene)" />
         {/* Azul = pedidos que requieren aprobacion de Aris.
             El flujo es Sprint 2, hoy siempre 0 -> no se dibuja. */}
-        <Badge valor={aprobacionPendiente} clase="nb-blu" />
+        <Badge valor={aprobacionPendiente} clase="nb-blu" title="Órdenes de la app esperando aprobación" />
       </>
     ),
-    ocs: <Badge valor={ocsActivas} clase="nb-ind" />,
-    seguimiento: <Badge valor={seguimientoPendiente} clase="nb-yel" />,
+    ocs: <Badge valor={ocsActivas} clase="nb-ind" title="OC en curso: órdenes de YiQi con mercadería pendiente (sin las cerradas en YiQi)" />,
+    seguimiento: <Badge valor={seguimientoPendiente} clase="nb-yel" title="OC con ingreso parcial: ya llegó una parte y falta el resto" />,
   }
 
   function renderGrupo(items) {
@@ -227,7 +234,7 @@ export default function Sidebar({
         {renderGrupo(NAV_INTELIGENCIA)}
 
         <NavSection title="Configuración" />
-        {renderGrupo(NAV_CONFIG)}
+        {renderGrupo(NAV_CONFIG.filter((i) => i.key !== 'usuarios' || puedeVerUsuarios))}
       </nav>
 
       {/* Ayuda: fuera del <nav> que scrollea, para que quede siempre a la

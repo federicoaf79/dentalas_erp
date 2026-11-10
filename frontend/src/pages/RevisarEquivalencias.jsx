@@ -1,3 +1,4 @@
+import { formatoMoneda } from '../lib/formato'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -23,14 +24,6 @@ import Aviso from '../components/Aviso'
 
 const TAMANIO_TANDA = 30
 
-function formatoMoneda(n) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    maximumFractionDigits: 0,
-  }).format(n)
-}
 
 export default function RevisarEquivalencias() {
   const permisos = usePermisos()

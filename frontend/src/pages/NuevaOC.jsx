@@ -1,3 +1,4 @@
+import { formatoNumero } from '../lib/formato'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -46,14 +47,6 @@ const ESTADOS = {
   rechazada: { label: 'Rechazada',           clase: 'bg-[var(--red-bg)] text-[var(--red)]' },
 }
 
-const MESES_COBERTURA = 2
-
-function formatoNumero(n) {
-  if (n == null) return '—'
-  const num = Number(n)
-  if (!Number.isFinite(num)) return '—'
-  return num % 1 === 0 ? String(num) : num.toFixed(1)
-}
 
 // 23/10/2026 (feedback Ivana 23/10): true solo si el umbral es un número
 // igual a 0. null/undefined/'' (sin mínimo cargado) NO cuentan como 0.
@@ -148,12 +141,12 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
       <div className="metricas mb-5">
         <div className="metrica">
           <div className="metrica-rot">Sin stock</div>
-          <div className="metrica-val text-[var(--red)]">{resumen.criticas}</div>
+          <div className="metrica-val text-[var(--red)]">{formatoNumero(resumen.criticas)}</div>
           <div className="metrica-sub">artículos en cero</div>
         </div>
         <div className="metrica">
           <div className="metrica-rot">Bajo mínimo</div>
-          <div className="metrica-val text-[#b8860b]">{resumen.preventivas}</div>
+          <div className="metrica-val text-[#b8860b]">{formatoNumero(resumen.preventivas)}</div>
           <div className="metrica-sub">todavía con stock</div>
         </div>
         <div className="metrica">
@@ -229,7 +222,7 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
                   <td className="text-right">
                     {Number(p.criticas) > 0 ? (
                       <span className="badge bg-[var(--red-bg)] text-[var(--red)]">
-                        {p.criticas}
+                        {formatoNumero(p.criticas)}
                       </span>
                     ) : (
                       <span className="text-gray-300 text-xs">—</span>
@@ -238,14 +231,14 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
                   <td className="text-right">
                     {Number(p.preventivas) > 0 ? (
                       <span className="badge bg-[#fef3e8] text-[#92400e]">
-                        {p.preventivas}
+                        {formatoNumero(p.preventivas)}
                       </span>
                     ) : (
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
                   <td className="text-right text-gray-400 tabular-nums">
-                    <span className="text-[12px]">{Number(p.sin_historial) > 0 ? p.sin_historial : '—'}</span>
+                    <span className="text-[12px]">{Number(p.sin_historial) > 0 ? formatoNumero(p.sin_historial) : '—'}</span>
                   </td>
                   <td className="text-right">
                     <button onClick={() => onElegir(p.proveedor)} className="btn btn-sm">
@@ -618,7 +611,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
             </InfoAyuda>
           </div>
           <div className="text-[12px] text-[var(--sub)] mt-[3px]">
-            {sugerencias.length} artículos por debajo del punto de pedido · {items.length} seleccionados
+            {formatoNumero(sugerencias.length)} artículos por debajo del punto de pedido · {items.length} seleccionados
           </div>
           {semaforo && (
             <div className={`bloque mt-2.5 py-2! px-3.5! inline-flex items-center gap-2 text-[12px] font-semibold ${semaforo.clase}`}>
@@ -954,8 +947,13 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         sigue en texto normal más abajo). Mismo peso visual que Costo. */}
                     <td>{formatoNumero(s.umbral)}</td>
                     <td>
-                      {sinBase ? (
-                        <span className="text-[11px] text-gray-400 italic whitespace-nowrap">Sin historial</span>
+                      {/* 10/11/2026 — radiografía UX (ítem 9): un solo criterio. Sin base de
+                          cantidad o sin promedio calculable = "Sin historial" (antes algunas filas mostraban "—"). */}
+                      {sinBase || s.promedio == null || !Number.isFinite(Number(s.promedio)) ? (
+                        <span
+                          title="No hay ventas suficientes para calcular el promedio mensual de este artículo"
+                          className="text-[11px] text-gray-400 italic whitespace-nowrap"
+                        >Sin historial</span>
                       ) : (
                         <span className="text-[var(--ind)] font-semibold">{formatoNumero(s.promedio)}</span>
                       )}
@@ -1202,15 +1200,24 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
     setVista('armar')
     setCargandoSub(true)
     setAbiertasDelProveedor([])
-    supabase
-      .from('ordenes_propias')
-      .select('id, estado, creada_en, total_estimado')
-      .eq('proveedor_nombre', nombre)
-      .in('estado', ['borrador', 'pendiente'])
-      .is('archivada_en', null)
-      .order('creada_en', { ascending: false })
-      .limit(5)
-      .then(({ data }) => setAbiertasDelProveedor(data ?? []))
+    // 10/11/2026 — radiografía UX (ítem 17): RPC SECURITY DEFINER para ver también
+    // las órdenes abiertas por otras personas (la RLS solo deja ver las propias).
+    // Si la RPC falla o aún no existe, vuelve a la consulta directa de antes.
+    const consultaDirecta = () =>
+      supabase
+        .from('ordenes_propias')
+        .select('id, estado, creada_en, total_estimado')
+        .eq('proveedor_nombre', nombre)
+        .in('estado', ['borrador', 'pendiente'])
+        .is('archivada_en', null)
+        .order('creada_en', { ascending: false })
+        .limit(5)
+        .then(({ data }) => (data ?? []).map((o) => ({ ...o, es_mia: true, creador_nombre: null })))
+    Promise.resolve(supabase.rpc('ordenes_abiertas_proveedor', { p_proveedor: nombre }))
+      .then(({ data, error }) => (error || !Array.isArray(data) ? consultaDirecta() : data))
+      .catch(() => consultaDirecta())
+      .then((filas) => setAbiertasDelProveedor(filas ?? []))
+      .catch(() => {})
     try {
       // Sugerencias y condiciones comerciales en paralelo: la funcion
       // condiciones_proveedor() ya devuelve el limite resuelto (propio
@@ -1434,14 +1441,14 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
             <BloqueAccion
               tono="amarillo"
               titulo={`Ya hay ${abiertasDelProveedor.length === 1 ? 'una orden abierta' : `${abiertasDelProveedor.length} órdenes abiertas`} de ${proveedorElegido}`}
-              acciones={abiertasDelProveedor.slice(0, 3).map((o) => (
+              acciones={abiertasDelProveedor.slice(0, 3).filter((o) => o.es_mia || permisos.esAdmin).map((o) => (
                 <a key={o.id} href={`?page=ocs&orden=${o.id}`} target="_blank" rel="noopener" className="btn btn-sm">
                   #{o.id} <i className="ti ti-external-link" />
                 </a>
               ))}
             >
               {abiertasDelProveedor
-                .map((o) => `#${o.id} ${o.estado === 'pendiente' ? 'esperando aprobación' : 'borrador'} del ${new Date(o.creada_en).toLocaleDateString('es-AR')}`)
+                .map((o) => `#${o.id} ${o.estado === 'pendiente' ? 'esperando aprobación' : 'borrador'}${o.es_mia ? '' : `, de ${o.creador_nombre ?? 'otra persona'}`} del ${new Date(o.creada_en).toLocaleDateString('es-AR')}`)
                 .join(' · ')}
               . Revisá que no estés armando la misma orden otra vez.
             </BloqueAccion>
@@ -1451,13 +1458,20 @@ export default function NuevaOC({ onCambioOrdenes, preseleccion, onConsumirPrese
 
       {cargando ? (
         <div className="p-10 text-center text-[var(--sub)] text-[13px]">Cargando…</div>
-      ) : vista === 'lista' ? (
+      ) : vista === 'lista' ? (<>
+        {/* 10/11/2026 — radiografía UX (ítem 8): mismo aviso de vista filtrada que en Órdenes de compra */}
+        {!permisos.cargando && !permisos.error && !permisos.esAdmin && (
+          <Aviso tipo="filtro" autoCerrarEn={15} className="mx-7 mt-4">
+            Vista filtrada: estás viendo solo tus {permisos.nombres.length} proveedores asignados. Si falta
+            alguno, pedile a Aris que te lo asigne.
+          </Aviso>
+        )}
         <SelectorProveedor
           proveedores={proveedores}
           cargando={false}
           onElegir={elegirProveedor}
         />
-      ) : vista === 'armar' ? (
+      </>) : vista === 'armar' ? (
         <ArmarOrden
           // key por proveedor: fuerza un montaje limpio al cambiar de
           // proveedor, para que los artículos agregados a mano (estado
