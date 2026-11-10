@@ -447,3 +447,10 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
 - HECHO: alertas — a 1536 px la tabla de Alertas medía 1.315 px contra 1.236 px de contenedor y la columna de acciones (fija a la derecha) tapaba la de Causa. Se cambió el ícono ⓘ de los encabezados por subrayado punteado (Monitor y Alertas) y `min-w` de Producto en Alertas de 180 a 145 px. Medido en vivo: 1.236 / 1.236 [en vivo 2026-11-10]. `vite build` OK.
 - HECHO: revisar-equivalencias — `es_comprable()` compara con 'Dentalab', y en `precios_proveedor_yiqi` el proveedor viene 'DENTALAB'. Nueva migración `20261110123000_candidatos_equivalencia_sin_dentalab.sql` con `upper(proveedor) <> 'DENTALAB'` en los dos lados y limpieza de la caché. No toca `es_comprable()`. La verificación de `20261110122000` daba 0 porque comparaba 'Dentalab' (falso negativo).
 - PENDIENTE: predictor-demanda — el SKU 888 (nombre vacío, 1.453 u/mes) sigue primero en el Predictor; falta saber si es administrativo · Federico / Aris · —
+- VALIDADO EN VIVO: (radiografía UX, como operadora) — [en vivo 2026-11-10, federico@ pasado temporalmente a `operador` con los 62 proveedores de Ivana]:
+  - /?page=nueva-oc → DIS DEN: "Ya hay una orden abierta de DIS DEN — #22 borrador, de Aris del 20/10/2026", sin link a la orden ajena (RPC `ordenes_abiertas_proveedor`). Cierra el riesgo NUEVO del 10/11 de OC duplicadas por RLS.
+  - Nueva OC con "Vista filtrada: estás viendo solo tus 62 proveedores asignados".
+  - "Usuarios y accesos" fuera del menú (por URL sigue el bloqueo "No tenés permiso").
+  - /?page=reglas: "Solo lectura: esta configuración la edita Aris (administrador)".
+  - /?page=ocs: bloque "Órdenes generadas desde el sistema" visible vacío ("Todavía no armaste órdenes desde la app…") y el texto de abajo remite al "bloque anterior".
+  - /?page=equivalencias: 0 tarjetas DENTALAB y 0 discontinuadas (30 pares) después de `20261110123000` [prod 2026-11-10, `dentalab_en_cache = 0`].
