@@ -1,7 +1,7 @@
 # CLAUDE.md — Dentalab-Compras
 
 <!-- TULKASOS:ESTADO:INICIO -->
-> **Estado TulkasOS (automático, 2026-11-10):** 98% · 39 ítems · 39 validados · 39 en producción · 0 evidencia rota · cambios: +0 ~30 −0. Detalle por ítem en `INVENTARIO.md`. No editar este bloque: lo reescribe el sistema. Lo tuyo va en `## Cierre AAAA-MM-DD` al final de este archivo.
+> **Estado TulkasOS (automático, 2026-11-10):** 99% · 39 ítems · 39 validados · 39 en producción · 0 evidencia rota · cambios: +0 ~12 −0. Detalle por ítem en `INVENTARIO.md`. No editar este bloque: lo reescribe el sistema. Lo tuyo va en `## Cierre AAAA-MM-DD` al final de este archivo.
 <!-- TULKASOS:ESTADO:FIN -->
 
 > **Trabajo con TulkasOS:** al abrir una sesión, leé el bloque "Estado TulkasOS" y el último "## Cierre" de este archivo más `INVENTARIO.md`, y proponé el trabajo a partir de los pendientes por ítem. Al cerrar, seguí el protocolo "Trabajo con TulkasOS" (commits descriptivos + bloque `## Cierre AAAA-MM-DD` con claves de `INVENTARIO.md`). No edites `INVENTARIO.md` ni la sección "Estado TulkasOS". Nunca `git push`.
