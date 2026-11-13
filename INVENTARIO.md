@@ -1,9 +1,9 @@
-# Inventario — Dentalab-Compras · 2026-11-12
+# Inventario — Dentalab-Compras · 2026-11-13
 <!-- Generado por TulkasOS cada mañana. NO EDITAR: se sobreescribe. Para corregir algo, escribilo en el bloque "## Cierre AAAA-MM-DD" de CLAUDE.md (DESMENTIDO / VALIDADO EN VIVO / PENDIENTE) o marcalo desde TulkasOS. -->
 
 **Avance: 98%** (ponderado: módulo ×3, sección ×2, resto ×1) · 39 ítems · 39 validados · 0 testeados · 0 construidos · 39 en producción (Vercel 3a66642) · 0 con evidencia rota
-Cambios desde la auditoría anterior: +0 ~2 −0
-Cobertura de lo cambiado desde 3a66642: 0/0 archivos de código caen bajo algún ítem · todo cubierto
+Cambios desde la auditoría anterior: +0 ~6 −0
+Cobertura de lo cambiado desde 795acea: 0/0 archivos de código caen bajo algún ítem · todo cubierto
 
 Leyenda de estado: construido = el código existe · testeado = tests/verificación que corren · validado = probado en uso real o desplegado en producción con fecha · ✓prod = archivos del ítem en el commit desplegado · ⚠ = evidencia rota (cita rutas que no existen)
 
@@ -44,11 +44,11 @@ Leyenda de estado: construido = el código existe · testeado = tests/verificaci
 | clave | ítem | estado | % | prod | cambio | pendientes |
 |---|---|---|---|---|---|---|
 | `admin-usuarios-fn` | Administración de usuarios (Edge Function) | validado | 95 | ✓ | sin cambios | 1 |
-| `composicion-articulos` | Composición de artículos fraccionados/combos | validado (Federico) | 90 | ✓ | sin cambios | 2 |
-| `whatsapp-pedidos` | Envío de pedidos por WhatsApp | validado | 95 | ✓ | sin cambios | 1 |
-| `escritura-yiqi` | Escritura en YiQi (OC y stock) | validado | 95 | ✓ | sin cambios | 1 |
-| `exportar-excel` | Exportar a Excel | validado | 95 | ✓ | sin cambios | 1 |
-| `maximos-calculados` | Máximo calculado por la app | validado (Federico) | 90 | ✓ | sin cambios | 2 |
+| `composicion-articulos` | Composición de artículos fraccionados/combos | validado (Federico) | 90 | ✓ | modificado | 2 |
+| `whatsapp-pedidos` | Envío de pedidos por WhatsApp | validado | 95 | ✓ | modificado | 1 |
+| `escritura-yiqi` | Escritura en YiQi (OC y stock) | validado | 95 | ✓ | modificado | 1 |
+| `exportar-excel` | Exportar a Excel | validado | 95 | ✓ | modificado | 1 |
+| `maximos-calculados` | Máximo calculado por la app | validado (Federico) | 90 | ✓ | modificado | 2 |
 | `modo-prueba-yiqi` | Modo prueba YiQi | validado | 100 | ✓ | sin cambios | — |
 | `pdf-oc-remito` | PDF de OC y remito | validado | 100 | ✓ | sin cambios | — |
 | `reposicion-interna-automatica` | Reposición interna Central-Local automática | validado | 100 | ✓ | sin cambios | — |
@@ -69,12 +69,12 @@ Leyenda de estado: construido = el código existe · testeado = tests/verificaci
 ## Pendientes por ítem
 - `login-permisos` — pendiente heredado sin detalle
 - `admin-usuarios-fn` — deployar la función a producción (0,1h, Federico)
-- `composicion-articulos` — confirmar con Ivana 9150-F/31822-F; confirmar 6067-F/61322-F
-- `whatsapp-pedidos` — WhatsApp de proveedores reales pendiente
-- `escritura-yiqi` — pasar a Live solo con autorización de Federico
-- `exportar-excel` — vulnerabilidad alta en xlsx sin fix disponible
-- `maximos-calculados` — decidir 1 vs 2 meses de cobertura; revisar criterio de pico (29% de SKU)
-- `yiqi-erp` — decidir si 'Verificar ahora' se restringe a admin; comentario desactualizado de smartieIds en yiqi-connector/index.ts:66-68
+- `composicion-articulos` — confirmar con Ivana 9150-F/31822-F; confirmar con Ivana 6067-F/61322-F
+- `whatsapp-pedidos` — WhatsApp de proveedores reales
+- `escritura-yiqi` — pasar a Live solo con autorización explícita de Federico
+- `exportar-excel` — vulnerabilidad alta en xlsx sin fix disponible en npm
+- `maximos-calculados` — decidir 1 vs 2 meses de cobertura (Aris); revisar criterio de pico, marca 29% de SKU
+- `yiqi-erp` — comentario desactualizado de smartieIds en yiqi-connector/index.ts:65-67; decidir si 'Verificar ahora' se restringe a admin
 - `alertas` — 4 conteos distintos de alertas sin unificar
 - `nueva-oc` — cantidad sugerida no respeta el máximo calculado
 - `predictor-demanda` — SKU 887/888 sin resolver si son administrativos
