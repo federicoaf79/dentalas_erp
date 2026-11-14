@@ -5,6 +5,7 @@ import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import Pastilla from '../components/ui/Pastilla'
+import { esAsuntoRevision } from '../lib/estados' // 14/11/2026 — OC en revisión (Aris)
 
 // ============================================================
 // HistorialOC.jsx — v3
@@ -148,6 +149,10 @@ function calcularEstado(orden) {
   }
   if (totalEntregado > 0) {
     return { key: 'parcial', label: 'Ingreso parcial', clase: 'bg-[var(--yel-bg)] text-[#92400e]' }
+  }
+  // 14/11/2026 — Ivana: asunto "Revisión - enviado" = se la mandó a Aris y espera que confirme la OC; todavía no se pidió al proveedor.
+  if (esAsuntoRevision(orden.asunto)) {
+    return { key: 'revision', label: 'En revisión (Aris)', clase: 'bg-blue-50 text-[#1d4ed8]' }
   }
   return { key: 'enviada', label: 'Enviada', clase: 'bg-gray-100 text-gray-600' }
 }
@@ -414,6 +419,7 @@ export default function HistorialOC() {
               className="border border-[var(--border)] rounded-lg px-2 py-1.5 text-[13px] bg-white"
             >
               <option value="todas">Todas</option>
+              <option value="revision">En revisión (Aris)</option>
               <option value="enviada">Enviada</option>
               <option value="parcial">Ingreso parcial</option>
               <option value="completada">Completada</option>

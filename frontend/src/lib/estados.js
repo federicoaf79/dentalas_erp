@@ -15,6 +15,8 @@ export const TONOS = ['verde', 'amarillo', 'azul', 'rojo', 'gris']
 
 // OC sincronizadas desde YiQi (Seguimiento / Historial)
 export const ESTADO_OC_YIQI = {
+  // 14/11/2026 — Ivana: asunto "Revisión - enviado" = se la mandó a Aris y espera que confirme la OC; todavía no se pidió al proveedor.
+  revision:   { tono: 'azul',     label: 'En revisión (Aris)' },
   enviada:    { tono: 'gris',     label: 'Enviada al proveedor' },
   parcial:    { tono: 'amarillo', label: 'Ingreso parcial' },
   completada: { tono: 'verde',    label: 'Recibida completa' },
@@ -28,6 +30,12 @@ export const ESTADO_OC_PROPIA = {
   pendiente: { tono: 'azul',  label: 'Esperando aprobación' },
   aprobada:  { tono: 'verde', label: 'Aprobada' },
   rechazada: { tono: 'rojo',  label: 'Rechazada' },
+}
+
+// 14/11/2026 — Ivana: asunto "Revisión - enviado" = se la mandó a Aris y espera que confirme la OC; todavía no se pidió al proveedor.
+// Se detecta por el asunto que escribe Ivana en YiQi ("Revisión - enviado", "REVISION"…).
+export function esAsuntoRevision(asunto) {
+  return /revisi[oó]n/i.test(asunto ?? '')
 }
 
 export function tonoSeguro(tono) {

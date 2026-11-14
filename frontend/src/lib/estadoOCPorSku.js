@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { filtrarOrdenes } from '../hooks/usePermisos'
+import { esAsuntoRevision } from './estados'
 
 // ============================================================
 // estadoOCPorSku.js — 10/9/2026
@@ -47,10 +48,12 @@ import { filtrarOrdenes } from '../hooks/usePermisos'
 
 const TAMANIO_LOTE = 1000
 
-const ORDEN_NIVEL = { preparada: 1, solicitada: 2, entrega_parcial: 3 }
+// 14/11/2026 — en_revision: OC de YiQi con asunto "Revisión" (Ivana se la mandó a Aris y espera que confirme).
+const ORDEN_NIVEL = { preparada: 1, en_revision: 1.5, solicitada: 2, entrega_parcial: 3 }
 
 export const NIVEL_OC = {
   preparada: { label: 'Preparada', clase: 'bg-gray-100 text-gray-600' },
+  en_revision: { label: 'En revisión (Aris)', clase: 'bg-blue-50 text-[#1d4ed8]' },
   solicitada: { label: 'Solicitada', clase: 'bg-blue-50 text-[#1d4ed8]' },
   entrega_parcial: { label: 'Entrega parcial', clase: 'bg-[var(--yel-bg)] text-[#92400e]' },
 }
@@ -65,7 +68,7 @@ async function traerOrdenesYiqiActivas(permisos) {
   while (true) {
     let consulta = supabase
       .from('ordenes_yiqi')
-      .select('sku, cantidad_entregada, cantidad_pendiente')
+      .select('sku, asunto, cantidad_entregada, cantidad_pendiente')
       .gt('cantidad_pendiente', 0)
       // 23/10/2026 — punto 3: una OC que ya no figura en YiQi (cerrada) no está "en camino".
       // Antes sumaba ~9.700 u de 125 OC congeladas y escondía críticos en Alertas/Monitor.
@@ -118,7 +121,8 @@ export async function traerEstadoOCPorSku(permisos) {
     }
   }
   for (const linea of filasYiqi) {
-    const nivel = (linea.cantidad_entregada ?? 0) > 0 ? 'entrega_parcial' : 'solicitada'
+    // 14/11/2026 — la cantidad de una OC en revisión se sigue sumando "en camino" (para no pedirla dos veces); solo cambia el rótulo.
+    const nivel = (linea.cantidad_entregada ?? 0) > 0 ? 'entrega_parcial' : esAsuntoRevision(linea.asunto) ? 'en_revision' : 'solicitada'
     marcar(linea.sku, nivel)
     sumarCantidad(linea.sku, linea.cantidad_pendiente)
   }

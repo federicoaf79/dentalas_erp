@@ -9,6 +9,7 @@ import Pastilla from '../components/ui/Pastilla'
 // 23/10/2026 — modo prueba YiQi (no autorizado Live)
 import AvisoModoPrueba from '../components/ui/AvisoModoPrueba'
 import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
+import { esAsuntoRevision } from '../lib/estados' // 14/11/2026 — OC en revisión (Aris)
 // ============================================================
 // OrdenesCompra.jsx — v3
 // v2: leia de la tabla propia ordenes_yiqi en vez de YiQi en vivo.
@@ -104,6 +105,10 @@ function calcularEstado(orden) {
   }
   if (totalEntregado > 0) {
     return { key: 'parcial', label: 'Ingreso parcial', clase: 'bg-[var(--yel-bg)] text-[#92400e]' }
+  }
+  // 14/11/2026 — Ivana: asunto "Revisión - enviado" = se la mandó a Aris y espera que confirme la OC; todavía no se pidió al proveedor.
+  if (esAsuntoRevision(orden.asunto)) {
+    return { key: 'revision', label: 'En revisión (Aris)', clase: 'bg-blue-50 text-[#1d4ed8]' }
   }
   return { key: 'enviada', label: 'Enviada', clase: 'bg-gray-100 text-gray-600' }
 }

@@ -5,7 +5,7 @@ import { usePermisos, filtrarOrdenes } from '../hooks/usePermisos'
 import Aviso from '../components/Aviso'
 import DeclararCausaModal from '../components/DeclararCausaModal'
 import { ultimasCausasPorReferencia } from '../lib/causas'
-import { ESTADO_OC_YIQI, ESTADO_OC_PROPIA } from '../lib/estados'
+import { ESTADO_OC_YIQI, ESTADO_OC_PROPIA, esAsuntoRevision } from '../lib/estados'
 import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
 import { sumarDiasHabiles, fechaLocalDeTexto } from '../lib/fechas'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
@@ -107,7 +107,8 @@ function formatoDiaMes(d) {
 const TERMINALES = new Set(['completada', 'cerrada'])
 
 function calcularLlegada(orden, estado, plazos) {
-  if (TERMINALES.has(estado.key) || plazos == null) return null
+  // 14/11/2026 — una OC "En revisión (Aris)" todavía no se pidió: no tiene fecha de llegada ni puede estar demorada.
+  if (TERMINALES.has(estado.key) || estado.key === 'revision' || plazos == null) return null
   const dias = plazos[orden.proveedor]
   if (dias == null) return { sinPlazo: true, demorada: false }
   const est = sumarDias(orden.fecha, dias)
@@ -172,6 +173,10 @@ function calcularEstado(orden) {
   }
   if (totalEntregado > 0) {
     return { key: 'parcial', ...ESTADO_OC_YIQI.parcial, ...base }
+  }
+  // 14/11/2026 — Ivana: asunto "Revisión - enviado" = se la mandó a Aris y espera que confirme la OC; todavía no se pidió al proveedor.
+  if (esAsuntoRevision(orden.asunto)) {
+    return { key: 'revision', ...ESTADO_OC_YIQI.revision, ...base }
   }
   return { key: 'enviada', ...ESTADO_OC_YIQI.enviada, ...base }
 }
@@ -543,6 +548,7 @@ export default function SeguimientoOC() {
 
   const contadores = useMemo(() => ({
     todas: ordenesConEstado.length,
+    revision: ordenesConEstado.filter((o) => o._estado.key === 'revision').length, // 14/11/2026 — asunto "Revisión"
     enviada: ordenesConEstado.filter((o) => o._estado.key === 'enviada').length,
     parcial: ordenesConEstado.filter((o) => o._estado.key === 'parcial').length,
     completada: ordenesConEstado.filter((o) => o._estado.key === 'completada').length,
@@ -685,6 +691,7 @@ export default function SeguimientoOC() {
           {[
             { key: 'todas', label: `Todas (${formatoNumero(contadores.todas + contadores.app)})` },
             { key: 'app', label: `De la app (${contadores.app})` }, // 23/10/2026 — pedido de Ivana
+            { key: 'revision', label: `En revisión (${formatoNumero(contadores.revision)})` }, // 14/11/2026 — esperan que Aris confirme
             { key: 'enviada', label: `Enviadas (${formatoNumero(contadores.enviada)})` },
             { key: 'parcial', label: `Ingreso parcial (${contadores.parcial})` },
             { key: 'completada', label: `Completadas (${formatoNumero(contadores.completada)})` },
