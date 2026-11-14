@@ -454,3 +454,24 @@ Fuera de la lista, sin cambios desde el 9/10: envío de OC por email (Resend). N
   - /?page=reglas: "Solo lectura: esta configuración la edita Aris (administrador)".
   - /?page=ocs: bloque "Órdenes generadas desde el sistema" visible vacío ("Todavía no armaste órdenes desde la app…") y el texto de abajo remite al "bloque anterior".
   - /?page=equivalencias: 0 tarjetas DENTALAB y 0 discontinuadas (30 pares) después de `20261110123000` [prod 2026-11-10, `dentalab_en_cache = 0`].
+
+## Cierre 2026-11-14
+- HECHO: (sin clave: respuestas de Ivana del 14/11, vía Federico) — [stated por Ivana, 14/11]:
+  1. 9150-F (hojas de bisturí surtidas x unidad) sale de varias cajas (9150-10 … 9150-24) y tiene su propio ranking: no se carga en `composicion_articulos`.
+  2. 31822-F: los códigos son 31822-100 y 31822-500 (había escrito 33066 por error).
+  3. 6067-F: no entendió la pregunta ("¿o sea que se fraccionan 50 pares?"); se le repregunta.
+  4. 61322-F = 24 láminas: confirmado.
+  5. "Revisión - enviado" = se la mandó a Aris y espera que confirme la OC; todavía no se pidió al proveedor.
+  6. A mano cargan solo Stock de seguridad y consumo mensual; el Punto de pedido lo calcula YiQi. YiQi se actualizó hace poco y "Punto pedido" tiene campos nuevos: verlo con Aris y Vanig.
+  7. Los 4 movimientos de stock de prueba (Nro 1430138, 1430139, 1431820, 1433061) los vio en YiQi y todavía no se dieron de baja.
+  - Días de entrega: hay proveedores sin día fijo; ella lo revisa.
+- HECHO: seguimiento-oc / historial-oc / ordenes-compra / monitor-stock — estado nuevo "En revisión (Aris)" para OC de YiQi con asunto que contiene "Revisión" (`esAsuntoRevision` en `lib/estados.js`): chip propio en Seguimiento, sin "Llega el" ni "Demorada" (`SeguimientoOC.jsx`, `calcularLlegada`), opción en el filtro de Historial, rótulo en Órdenes de compra, y nivel `en_revision` en la columna Estado OC de Monitor/Alertas (`lib/estadoOCPorSku.js`; la cantidad se sigue sumando "en camino" para no pedirla dos veces). Cierra D3 de la radiografía [repo 2026-11-14]. `vite build` OK.
+- DESMENTIDO: alertas — el texto "se respeta el Punto de pedido cuando Dentalab lo cargó manualmente" (`Alertas.jsx` ~616, `MonitorStock.jsx` ~504) era falso: lo calcula YiQi a partir del Stock de seguridad y el consumo mensual que carga Dentalab (Ivana, 14/11). Corregido junto con el glosario de `Ayuda.jsx`. Cierra D4 / A6 de la radiografía [repo 2026-11-14].
+- HECHO: ayuda — se quitó de "Cosas que el sistema todavía no hace" la línea "No muestra la fecha estimada de llegada" ("Llega el" existe desde `c9f76a0`); el glosario suma "En revisión (Aris)".
+- HECHO: composicion-articulos — migración `supabase/migrations/20261114120000_composicion_31822.sql`: 31822-F → 1/500 y 31822-100 → 1/5 de la caja 31822-500 (la que se compra), cargados directo contra la -500 porque la composición se aplica a un solo nivel. Las cantidades por caja salen del código [confirmar]. Aplicación en prod: pendiente.
+- PENDIENTE: composicion-articulos — repreguntar 6067-F a Ivana: "¿el 6067-F es 1 par suelto que sale de abrir la caja 6067-50, que trae 50 pares?" · Ivana · —
+- PENDIENTE: alertas / sync-yiqi — YiQi se actualizó y "Punto pedido" tiene campos nuevos (Ivana, 14/11). Verificar que `mate_punto_de_pedido`, `mate_punto_pedido_max` y `mate_stock_seguridad` sigan llegando por la smartie 2344 (SQL de solo lectura) y ver con Aris y Vanig qué cambió · Federico · 0,2 h
+- PENDIENTE: (sin clave: movimientos de stock de prueba en YiQi) — siguen vigentes en YiQi. Decidir si se revierten a mano (movimiento inverso) o se ajustan con un conteo físico · Aris / encargado de stock · —
+- HECHO: composicion-articulos — `20261114120000` aplicada en prod: 2 filas (31822-F → 0,002 y 31822-100 → 0,2 de 31822-500); máximo de 31822-500 = 1 (prom. 0,21) [prod 2026-11-14]. Unidades confirmadas por el catálogo: "x Unid.", "x 100" y "x 500" (`mate_nombre`), así que se quita el [confirmar].
+- DESMENTIDO: composicion-articulos — el PENDIENTE "repreguntar 6067-F a Ivana" no hace falta. El catálogo lo confirma: 6067-F = "Cubre Calzado Descartable x Par", 6067-50 = "x 100 und. (50 pares)", 6067-100 = "x 200 und. (100 pares)". El factor 1/50 contra 6067-50 (la caja más usada, según Ivana el 9/11) es correcto [prod 2026-11-14].
+- HECHO: sync-yiqi — después de la actualización de "Punto pedido" en YiQi, los campos siguen llegando por la smartie 2344: de 7.348 artículos, 3.010 con punto de pedido, 3.010 con máximo y 2.960 con stock de seguridad; último sync 14/11 20:15 UTC [prod 2026-11-14]. No hay un conteo anterior para comparar, así que no se descarta un cambio en los valores [sin verificar]. Queda verlo con Aris y Vanig.
