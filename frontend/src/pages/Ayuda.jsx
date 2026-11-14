@@ -791,18 +791,19 @@ export default function Ayuda() {
         ))}
 
         {/* 10/11/2026 — radiografía UX (ítem 16): glosario de los términos de Alertas, Monitor y Seguimiento.
-            "Punto de pedido": a propósito no se dice quién lo carga (pregunta pendiente con Ivana). */}
+            14/11/2026 — Ivana: Dentalab carga a mano solo Stock de seguridad y consumo mensual; el Punto de pedido lo calcula YiQi. */}
         <div id="ayuda-glosario" className="bg-white rounded-xl border border-[var(--border)] p-4 scroll-mt-4">
           <div className="text-[13px] font-bold mb-2">Glosario</div>
           <Bloques
             items={[
               {
                 ul: [
-                  '**Mín. / Punto de pedido**: el umbral que decide la alerta. Viene de YiQi. Si el artículo no lo tiene cargado, se usa el Stock Seguridad como respaldo.',
+                  '**Mín. / Punto de pedido**: el umbral que decide la alerta. Lo calcula YiQi a partir del Stock de seguridad y el consumo mensual que carga Dentalab. Si el artículo no lo tiene, se usa el Stock Seguridad como respaldo.',
                   '**Stock Seguridad y ●**: valor de respaldo cuando no hay Punto de pedido. El ● al lado del número indica que ese es el valor que está decidiendo la alerta de ese artículo.',
                   '**Máx. calculado**: lo calcula la app, no YiQi. Es el promedio de ventas de los últimos 3 meses cerrados (sin el mes en curso), con fraccionados y combos sumados a la caja, redondeado al bulto de compra. El ⚠ junto al máximo marca un pico de ventas para revisar. Es solo para mostrar: no cambia la cantidad sugerida ni las alertas.',
                   '**Prom./mes (12 meses)**: unidades vendidas por mes en promedio durante los últimos 12 meses.',
                   '**Cobertura**: meses que dura el stock actual al ritmo del Prom./mes.',
+                  '**En revisión (Aris)**: orden de YiQi con asunto "Revisión": Ivana se la mandó a Aris y espera que la confirme. Todavía no se pidió al proveedor, así que no tiene fecha de llegada ni puede estar demorada.',
                   '**Demorada**: orden enviada cuya fecha estimada de llegada (fecha de envío + "Días de entrega" del proveedor, en días hábiles) ya pasó y no figura recibida. Sin días de entrega cargados no se calcula.',
                   '**Cerrada en YiQi**: la orden dejó de venir en el reporte de pendientes de YiQi (se vació o se eliminó, que es como se da por recibida). Ya no cuenta como en curso ni como Demorada; si vuelve a tener pendientes, se reabre sola.',
                   '**Modo prueba**: mientras esté activo, la app no escribe nada en YiQi (ni órdenes ni movimientos de stock). Todo lo que se registra queda solo en la app.',
@@ -820,7 +821,6 @@ export default function Ayuda() {
                 ul: [
                   'No manda mensajes (mail o WhatsApp) en forma automática — siempre arma el texto/PDF y sos vos quien lo envía.',
                   'Una orden ya aprobada no se puede editar — solo se le puede sumar mercadería nueva si ya está vinculada a YiQi (desde el detalle en "Órdenes de compra"). Las que todavía no están aprobadas sí se editan, con "Editar orden".',
-                  'No muestra la fecha estimada de llegada de una orden: el plazo de entrega de cada proveedor todavía no está cargado.',
                   'No hay estadísticas ni reportes (aparte de Predictor de demanda, que es historial, no proyección).',
                   'Ninguna pantalla exporta a Excel. Los remitos del circuito de depósito se imprimen/guardan como PDF (botón "Imprimir remito"), no se exportan a Excel.',
                 ],

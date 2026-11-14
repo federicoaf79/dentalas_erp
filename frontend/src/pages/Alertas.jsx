@@ -613,8 +613,9 @@ export default function Alertas({ onArmarOC }) {
         }
         info={
           <>
-            Criterio de alerta: se respeta el Punto de pedido cuando Dentalab lo cargó manualmente; si no, se usa
-            Stock Seguridad como umbral temporal. Datos sincronizados desde YiQi cada 15 minutos. No se muestran
+            {/* 14/11/2026 — Ivana: el Punto de pedido lo calcula YiQi; Dentalab carga Stock de seguridad y consumo mensual. */}
+            Criterio de alerta: se usa el Punto de pedido que calcula YiQi (a partir del Stock de seguridad y el consumo
+            mensual que carga Dentalab); si no hay, se usa el Stock Seguridad como umbral. Datos sincronizados desde YiQi cada 15 minutos. No se muestran
             alertas de SKU administrativos, publicaciones de Mercado Libre, artículos discontinuados ni producción
             propia. Los artículos excluidos o pausados manualmente tampoco se cuentan acá.
           </>

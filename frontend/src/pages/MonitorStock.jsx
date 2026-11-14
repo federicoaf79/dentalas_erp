@@ -501,7 +501,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
 
         {/* Métricas (prototipo v7): lo que pide acción, no texto de contexto */}
         <div className="metricas mb-5">
-          <div className="metrica" title="Punto de pedido manual si existe; si no, Stock Seguridad como respaldo (provisorio).">
+          <div className="metrica" title="Punto de pedido que calcula YiQi (a partir del Stock de seguridad y el consumo mensual que carga Dentalab); si no hay, se usa el Stock Seguridad como respaldo.">
             <div className="metrica-rot">Alertas activas</div>
             <div className="flex items-baseline gap-1.5">
               <span className="metrica-val text-[var(--red)]">{formatoNumero(criticas)}</span>
