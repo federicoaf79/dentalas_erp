@@ -65,15 +65,17 @@ function BadgeClaseAbc({ clase }) {
 }
 
 // 10/11/2026 — radiografía UX (ítem 4): formato de números es-AR único (lib/formato.js).
+// 17/11/2026 — sin ",00" en cantidades enteras (500, no 500,00); hasta 2 decimales solo si los tiene.
 function num(v, decimales = 2) {
-  return formatoNumero(v, { decimales, minDecimales: decimales })
+  return formatoNumero(v, { decimales, minDecimales: 0 })
 }
 
 function numInput(v) {
   if (v == null) return ''
   const n = Number(v)
   if (Number.isNaN(n)) return ''
-  return n.toFixed(2)
+  // 17/11/2026 — entero sin decimales ("500"); si tiene decimales, hasta 2 ("0.08").
+  return String(Math.round(n * 100) / 100)
 }
 
 function formatoFechaHora(fechaStr) {
