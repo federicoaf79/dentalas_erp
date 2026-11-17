@@ -29,6 +29,9 @@ export default function PedirAlOtroDeposito() {
   const [busqueda, setBusqueda] = useState('')
   const [buscando, setBuscando] = useState(false)
   const [resultados, setResultados] = useState([])
+  // 17/11/2026 — buscador por palabras: total de coincidencias (null = fallback sin RPC) y texto buscado
+  const [total, setTotal] = useState(null)
+  const [buscado, setBuscado] = useState('')
   const [carrito, setCarrito] = useState([]) // [{sku, mate_nombre, cantidad}]
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState(null)
@@ -37,19 +40,35 @@ export default function PedirAlOtroDeposito() {
   async function buscar() {
     if (busqueda.trim().length < 2) {
       setResultados([])
+      setTotal(null)
+      setBuscado('')
       return
     }
     setBuscando(true)
     setError(null)
     try {
       const texto = busqueda.trim().replace(/,/g, ' ')
-      const { data, error: errBusq } = await supabase
-        .from('material_yiqi')
-        .select('mate_codigo, mate_nombre')
-        .or(`mate_codigo.ilike.%${texto}%,mate_nombre.ilike.%${texto}%`)
-        .limit(20)
-      if (errBusq) throw errBusq
-      setResultados(data ?? [])
+      // 17/11/2026 — buscador por palabras: RPC buscar_articulos_deposito (palabras sueltas,
+      // cualquier orden, sin tildes, por relevancia). Si todavía no existe en producción
+      // (o falla), cae al query viejo de la frase entera con .limit(20), sin total.
+      const { data: rpcData, error: errRpc } = await supabase.rpc('buscar_articulos_deposito', {
+        p_texto: texto,
+        p_limite: 50,
+      })
+      if (!errRpc && rpcData && Array.isArray(rpcData.items)) {
+        setResultados(rpcData.items)
+        setTotal(Number(rpcData.total ?? rpcData.items.length))
+      } else {
+        const { data, error: errBusq } = await supabase
+          .from('material_yiqi')
+          .select('mate_codigo, mate_nombre')
+          .or(`mate_codigo.ilike.%${texto}%,mate_nombre.ilike.%${texto}%`)
+          .limit(20)
+        if (errBusq) throw errBusq
+        setResultados(data ?? [])
+        setTotal(null)
+      }
+      setBuscado(texto)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -136,7 +155,7 @@ export default function PedirAlOtroDeposito() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && buscar()}
-          placeholder="Buscar por SKU o nombre…"
+          placeholder="Buscar por código o palabras (ej.: acrilico auto)"
           className="flex-1 border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
         />
         <button
@@ -148,6 +167,27 @@ export default function PedirAlOtroDeposito() {
         </button>
       </div>
 
+      <div className="px-4 mt-1.5 max-w-xl text-[11px] text-[var(--sub)] flex gap-1.5 items-start">
+        <i className="ti ti-bulb mt-px" />
+        <span>
+          Buscá por palabras sueltas: «acrilico auto» encuentra todo lo que tenga las dos palabras, en cualquier
+          orden y con o sin tilde. También podés poner el código. Si salen demasiados, sumá otra palabra (marca,
+          color o tamaño).
+        </span>
+      </div>
+
+      {buscado && !buscando && resultados.length === 0 && !error && (
+        <div className="mx-4 mt-2 max-w-xl text-[13px] text-[var(--sub)]">
+          No encontramos artículos con «{buscado}». Probá con menos palabras, otra forma de escribirla o el código.
+        </div>
+      )}
+
+      {total !== null && total > resultados.length && (
+        <div className="px-4 mt-2 max-w-xl text-[12px] text-[var(--sub)]">
+          Mostrando {resultados.length} de {total} — sumá otra palabra (marca, color, tamaño) para afinar
+        </div>
+      )}
+
       {resultados.length > 0 && (
         <div className="mx-4 mt-2 max-w-xl bg-white rounded-xl border border-[var(--border)] overflow-hidden max-h-64 overflow-y-auto">
           {resultados.map((r) => (
@@ -158,6 +198,11 @@ export default function PedirAlOtroDeposito() {
               <div className="min-w-0">
                 <div className="font-mono text-xs">{r.mate_codigo}</div>
                 <div className="text-sm truncate">{r.mate_nombre}</div>
+                {r.stock_local !== undefined && (
+                  <div className="text-[11px] text-[var(--sub)]">
+                    Local: {Number(r.stock_local ?? 0)} · Central: {Number(r.stock_central ?? 0)}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => agregarAlCarrito(r)}
