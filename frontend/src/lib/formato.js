@@ -20,6 +20,19 @@ export function formatoNumero(valor, { decimales = 1, minDecimales = 0 } = {}) {
   }).format(num)
 }
 
+// 17/11/2026 — feedback Ivana: enteros en pantalla (promedios, punto de pedido, stock de seguridad,
+// máximos). modo 'redondear' = Math.round, 'arriba' = Math.ceil. Solo presentación.
+export function formatoEntero(valor, { modo = 'redondear' } = {}) {
+  if (valor == null || valor === '') return '—'
+  const num = Number(valor)
+  if (!Number.isFinite(num)) return '—'
+  const entero = modo === 'arriba' ? Math.ceil(num) : Math.round(num)
+  return new Intl.NumberFormat('es-AR', {
+    maximumFractionDigits: 0,
+    useGrouping: 'always',
+  }).format(entero)
+}
+
 // Monto en pesos sin decimales ("$ 3.645"). null → "—".
 export function formatoMoneda(valor) {
   if (valor == null || valor === '') return '—'

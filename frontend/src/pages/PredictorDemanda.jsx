@@ -1,4 +1,4 @@
-import { formatoNumero } from '../lib/formato'
+import { formatoNumero, formatoEntero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -58,7 +58,8 @@ function ColorCobertura({ meses }) {
     return <span className="text-gray-300 text-xs">—</span>
   }
   let clase = 'pill-verde'
-  const texto = meses <= 0 ? 'Sin stock' : `${formatoNumero(meses)} meses`
+  // 17/11/2026 — feedback Ivana: cobertura en meses enteros; entre 0 y 1 se muestra "<1 m.".
+  const texto = meses <= 0 ? 'Sin stock' : meses < 1 ? '<1 m.' : `${formatoEntero(meses)} meses`
   const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
 
   if (meses < 1) {
@@ -293,7 +294,7 @@ export default function PredictorDemanda() {
                       <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap max-w-[120px] truncate" title={f.proveedor ?? ''}>{f.proveedor ?? '—'}</td>
                       <td className="text-right tabular-nums font-semibold">{formatoNumero(f.stock_actual)}</td>
                       <td className="text-right font-semibold tabular-nums text-[var(--ind,#4338ca)]">
-                        {formatoNumero(f.promedio)}
+                        {formatoEntero(f.promedio)}
                       </td>
                       <td><ColorCobertura meses={cobertura} /></td>
                       {meses.map((m) => {

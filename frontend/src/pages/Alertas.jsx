@@ -1,4 +1,4 @@
-import { formatoNumero } from '../lib/formato'
+import { formatoNumero, formatoEntero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
@@ -207,7 +207,8 @@ function formatoFechaHora(fechaStr) {
 function Cobertura({ meses }) {
   if (meses == null) return <span className="text-gray-300 text-xs">—</span>
   let clase = 'bg-[var(--grn-bg)] text-[var(--grn)]'
-  const texto = meses <= 0 ? 'Sin stock' : `${formatoNumero(meses)} m.`
+  // 17/11/2026 — feedback Ivana: cobertura en meses enteros; entre 0 y 1 se muestra "<1 m.".
+  const texto = meses <= 0 ? 'Sin stock' : meses < 1 ? '<1 m.' : `${formatoEntero(meses)} m.`
   const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
   if (meses < 1) clase = 'bg-[var(--red-bg)] text-[var(--red)]'
   else if (meses < 2) clase = 'bg-[var(--yel-bg)] text-[#92400e]'
@@ -306,6 +307,8 @@ export default function Alertas({ onArmarOC }) {
   // 'pausadas' son las pestañas de exclusión manual (ítem #48).
   const [vista, setVista] = useState('alertas')
   const [filtroNivel, setFiltroNivel] = useState('todas')
+  // 17/11/2026 — feedback Ivana: mismo filtro que Monitor: ocultar artículos con Stock Seguridad = 0.
+  const [ocultarSinSeguridad, setOcultarSinSeguridad] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   // Filtro de proveedores estilo YiQi (feedback del cliente, punto 1,
   // 28/9/2026) -- ver lib/filtroProveedor.js para el criterio completo.
@@ -378,7 +381,7 @@ export default function Alertas({ onArmarOC }) {
 
   useEffect(() => {
     setPaginaActual(1)
-  }, [busqueda, filtroNivel, filtroProveedor, filasPorPagina, vista])
+  }, [busqueda, filtroNivel, filtroProveedor, filasPorPagina, vista, ocultarSinSeguridad])
 
   // Lista de proveedores para el selector del filtro (punto 1) --
   // sobre `articulos` (ya pasó el filtro de permisos), no sobre
@@ -429,10 +432,32 @@ export default function Alertas({ onArmarOC }) {
   // acá, una sola vez, para que tarjetas y contadores de chips se
   // calculen sobre el conjunto filtrado (igual que Monitor de stock).
   // La búsqueda de texto NO entra: sigue afectando solo a la tabla.
-  const conProveedor = useMemo(
+  // 17/11/2026 — feedback Ivana: el filtro "Ocultar Stock Seguridad = 0" (mismo criterio que Monitor)
+  // se aplica antes del de proveedor, así tarjetas y chips lo reflejan.
+  const conProveedorBase = useMemo(
     () => aplicarFiltroProveedor(conAlertaTodas, filtroProveedor),
     [conAlertaTodas, filtroProveedor]
   )
+  const conProveedor = useMemo(
+    () => (ocultarSinSeguridad ? conProveedorBase.filter((a) => (a.mate_stock_seguridad ?? null) !== 0) : conProveedorBase),
+    [conProveedorBase, ocultarSinSeguridad]
+  )
+  // Cantidad que se ocultaría (sobre el conjunto filtrado por proveedor, nivel y búsqueda).
+  const sinStockSeguridadTotal = useMemo(() => {
+    const texto = busqueda.toLowerCase()
+    return conProveedorBase.filter((a) => {
+      if ((a.mate_stock_seguridad ?? null) !== 0) return false
+      if (filtroNivel !== 'todas' && a._alerta.nivel !== filtroNivel) return false
+      if (busqueda) {
+        return (
+          a.mate_nombre?.toLowerCase().includes(texto) ||
+          a.mate_codigo?.toLowerCase().includes(texto) ||
+          a.clie_nombre?.toLowerCase().includes(texto)
+        )
+      }
+      return true
+    }).length
+  }, [conProveedorBase, filtroNivel, busqueda])
 
   // 23/10/2026 (feedback Ivana 23/10): contadores filtrados por proveedor
   // para las tarjetas Preventivas/Críticas y los chips Alertas/Todas/
@@ -779,6 +804,16 @@ export default function Alertas({ onArmarOC }) {
                 onChange={setFiltroProveedor}
                 permitirSinProveedor={false}
               />
+              {(sinStockSeguridadTotal > 0 || ocultarSinSeguridad) && (
+                <label className="flex items-center gap-2 text-[12px] text-gray-600 cursor-pointer whitespace-nowrap ml-1">
+                  <input
+                    type="checkbox"
+                    checked={ocultarSinSeguridad}
+                    onChange={(e) => setOcultarSinSeguridad(e.target.checked)}
+                  />
+                  Ocultar Stock Seguridad = 0 ({sinStockSeguridadTotal})
+                </label>
+              )}
             </div>
             <label className="flex items-center gap-2 text-[12px] text-[var(--sub)]">
               Filas por página
@@ -866,7 +901,7 @@ export default function Alertas({ onArmarOC }) {
                       <td
                         className={a.mate_punto_de_pedido > 0 ? 'text-gray-400' : 'text-gray-700 font-semibold'}
                       >
-                        {a.mate_stock_seguridad ?? '—'}
+                        {formatoEntero(a.mate_stock_seguridad, { modo: 'arriba' }) /* 17/11/2026 — feedback Ivana: entero hacia arriba */}
                         {!(a.mate_punto_de_pedido > 0) && a.mate_stock_seguridad != null && (
                           <span
                             className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--ind,#4338ca)] align-middle"
@@ -875,7 +910,7 @@ export default function Alertas({ onArmarOC }) {
                         )}
                       </td>
                       <td className="text-right tabular-nums text-[var(--ind,#4338ca)] font-semibold">
-                        {formatoNumero(rotacionPorSku[a.mate_codigo]?.promedio)}
+                        {formatoEntero(rotacionPorSku[a.mate_codigo]?.promedio)}
                       </td>
                       <td>
                         <Cobertura meses={calcularCobertura(a.mate_stock_disponible, rotacionPorSku[a.mate_codigo]?.promedio)} />

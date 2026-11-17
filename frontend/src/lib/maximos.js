@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { formatoNumero } from './formato'
+import { formatoNumero, formatoEntero } from './formato'
 
 // ============================================================
 // maximos.js — 26/10/2026
@@ -49,14 +49,14 @@ export function useMaximosCalculados(proveedor = null, activo = true) {
 // Texto para el tooltip de la barra: de dónde sale el número.
 export function textoMaximoCalculado(info, maxYiqi) {
   if (!info) {
-    return `Máx. calculado: sin ventas en los últimos 3 meses cerrados.${maxYiqi > 0 ? ` (Máx. de YiQi: ${formatoNumero(maxYiqi)})` : ''}`
+    return `Máx. calculado: sin ventas en los últimos 3 meses cerrados.${maxYiqi > 0 ? ` (Máx. de YiQi: ${formatoEntero(maxYiqi, { modo: 'arriba' })})` : ''}`
   }
   const detalle = Object.entries(info.meses ?? {})
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${MESES_CORTOS[Number(k.slice(5, 7)) - 1]} ${formatoNumero(v, { decimales: 2 })}`)
+    .map(([k, v]) => `${MESES_CORTOS[Number(k.slice(5, 7)) - 1]} ${formatoNumero(v, { decimales: 1 })}`)
     .join(' · ')
   const bulto = info.bulto ? `, redondeado al bulto de ${formatoNumero(info.bulto)}` : ''
   const pico = info.pico ? '\n⚠ Un mes vendió mucho más que los otros (pico): revisar si corresponde.' : ''
-  const yiqi = maxYiqi > 0 ? `\n(Máx. que calcula YiQi: ${formatoNumero(maxYiqi)})` : ''
-  return `Máx. calculado = promedio de los últimos 3 meses cerrados (${detalle}) = ${formatoNumero(info.prom, { decimales: 2 })}${bulto}.${pico}${yiqi}`
+  const yiqi = maxYiqi > 0 ? `\n(Máx. que calcula YiQi: ${formatoEntero(maxYiqi, { modo: 'arriba' })})` : ''
+  return `Máx. calculado = promedio de los últimos 3 meses cerrados (${detalle}) = ${formatoNumero(info.prom, { decimales: 1 })}${bulto}.${pico}${yiqi}`
 }

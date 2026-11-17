@@ -1,4 +1,4 @@
-import { formatoNumero } from '../lib/formato'
+import { formatoNumero, formatoEntero } from '../lib/formato'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -151,7 +151,7 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
         </div>
         <div className="metrica">
           <div className="metrica-rot">Demanda en riesgo</div>
-          <div className="metrica-val text-[var(--text)]">{formatoNumero(resumen.demanda)}</div>
+          <div className="metrica-val text-[var(--text)]">{formatoEntero(resumen.demanda)}</div>
           <div className="metrica-sub">unidades por mes</div>
         </div>
         <div className="metrica">
@@ -212,7 +212,7 @@ function SelectorProveedor({ proveedores, cargando, onElegir, onCancelar }) {
                   <td className="text-right">
                     {Number(p.demanda_riesgo) > 0 ? (
                       <span className="font-bold tabular-nums">
-                        {formatoNumero(p.demanda_riesgo)}
+                        {formatoEntero(p.demanda_riesgo)}
                         <span className="text-[10px] text-gray-400 font-normal"> u/mes</span>
                       </span>
                     ) : (
@@ -816,7 +816,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                   <td className="font-semibold max-w-[280px] truncate" title={s.mate_nombre ?? ''}>
                     {s.mate_nombre ?? '—'}
                   </td>
-                  <td className="text-[var(--sub)] whitespace-nowrap">Mín. {formatoNumero(s.umbral)}</td>
+                  <td className="text-[var(--sub)] whitespace-nowrap">Mín. {formatoEntero(s.umbral, { modo: 'arriba' })}</td>
                   <td className="text-gray-400 whitespace-nowrap">
                     {s.unidades_por_bulto ? `x${formatoNumero(s.unidades_por_bulto)}` : '—'}
                   </td>
@@ -945,7 +945,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                         como "poco relevante", cuando el Mínimo es justo el dato que
                         más mira para decidir reposición (más que Costo unit., que
                         sigue en texto normal más abajo). Mismo peso visual que Costo. */}
-                    <td>{formatoNumero(s.umbral)}</td>
+                    <td>{formatoEntero(s.umbral, { modo: 'arriba' })}</td>
                     <td>
                       {/* 10/11/2026 — radiografía UX (ítem 9): un solo criterio. Sin base de
                           cantidad o sin promedio calculable = "Sin historial" (antes algunas filas mostraban "—"). */}
@@ -955,7 +955,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
                           className="text-[11px] text-gray-400 italic whitespace-nowrap"
                         >Sin historial</span>
                       ) : (
-                        <span className="text-[var(--ind)] font-semibold">{formatoNumero(s.promedio)}</span>
+                        <span className="text-[var(--ind)] font-semibold">{formatoEntero(s.promedio)}</span>
                       )}
                     </td>
                     <td className="text-gray-400">

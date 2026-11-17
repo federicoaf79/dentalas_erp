@@ -14,11 +14,14 @@
 // ============================================================
 // 26/10/2026 — máximo calculado por la app (lib/maximos.js): `detalleMax` va al
 // tooltip y `pico` agrega un aviso para revisar el número.
-import { formatoNumero } from '../lib/formato'
+import { formatoNumero, formatoEntero } from '../lib/formato'
 export default function BarraMinStockMax({ stock, min, max, detalleMax = null, pico = false }) {
   const s = Number(stock) || 0
   const mn = min != null && Number(min) > 0 ? Number(min) : null
-  const mx = max != null && Number(max) > 0 ? Number(max) : null
+  const mxCalc = max != null && Number(max) > 0 ? Number(max) : null
+  // 17/11/2026 — feedback Ivana: provisorio hasta que Aris defina la regla: el Máx. mostrado nunca es menor que el Mín.
+  const mxBajoMin = mn != null && mxCalc != null && mxCalc < mn
+  const mx = mxBajoMin ? mn : mxCalc
 
   // Sin ningún umbral cargado, no hay contra qué graficar -- se cae al
   // número solo, igual que antes.
@@ -43,13 +46,13 @@ export default function BarraMinStockMax({ stock, min, max, detalleMax = null, p
   return (
     <div
       className="w-28"
-      title={`Stock ${formatoNumero(s)}${mn != null ? ` · Mín. ${formatoNumero(mn)}` : ''}${mx != null ? ` · Máx. ${formatoNumero(mx)}` : ''}${detalleMax ? `\n${detalleMax}` : ''}\nRojo: hasta el mínimo · Verde: entre mínimo y máximo · Índigo: por encima del máximo`}
+      title={`Stock ${formatoNumero(s)}${mn != null ? ` · Mín. ${formatoEntero(mn, { modo: 'arriba' })}` : ''}${mx != null ? ` · Máx. ${formatoEntero(mx, { modo: 'arriba' })}` : ''}${mxBajoMin ? `\nEl máximo calculado (${formatoEntero(mxCalc, { modo: 'arriba' })}) es menor que el mínimo de YiQi: se muestra el mínimo hasta que Aris defina la regla.` : ''}${detalleMax ? `\n${detalleMax}` : ''}\nRojo: hasta el mínimo · Verde: entre mínimo y máximo · Índigo: por encima del máximo`}
     >
       <div className="flex items-baseline justify-between text-[11px] mb-0.5">
         <span className={`font-bold ${s < 0 ? 'text-[var(--red)]' : 'text-gray-700'}`}>{s < 0 ? `−${formatoNumero(Math.abs(s))}` : formatoNumero(s)}</span>
         {mx != null && (
           <span className={pico ? 'text-[#92400e]' : 'text-gray-400'}>
-            máx {formatoNumero(mx)}{pico && <i className="ti ti-alert-triangle ml-0.5 align-[-1px]" />}
+            máx {formatoEntero(mx, { modo: 'arriba' })}{pico && <i className="ti ti-alert-triangle ml-0.5 align-[-1px]" />}
           </span>
         )}
       </div>

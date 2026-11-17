@@ -1,4 +1,4 @@
-import { formatoNumero } from '../lib/formato'
+import { formatoNumero, formatoEntero } from '../lib/formato'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos, filtrarMaterial } from '../hooks/usePermisos'
@@ -176,7 +176,8 @@ function formatoFechaHora(fechaStr) {
 function Cobertura({ meses }) {
   if (meses == null) return <span className="text-gray-300 text-xs">—</span>
   let clase = 'bg-[var(--grn-bg)] text-[var(--grn)]'
-  const texto = meses <= 0 ? 'Sin stock' : `${formatoNumero(meses)} m.`
+  // 17/11/2026 — feedback Ivana: cobertura en meses enteros; entre 0 y 1 se muestra "<1 m.".
+  const texto = meses <= 0 ? 'Sin stock' : meses < 1 ? '<1 m.' : `${formatoEntero(meses)} m.`
   const tooltip = meses > 0 && meses < 1 ? `≈ ${Math.round(meses * 30)} días de cobertura` : undefined
   if (meses < 1) clase = 'bg-[var(--red-bg)] text-[var(--red)]'
   else if (meses < 2) clase = 'bg-[var(--yel-bg)] text-[#92400e]'
@@ -676,7 +677,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                       </td>
                       <td className="text-[#9ca3af]">
                         {a.mate_punto_de_pedido > 0 ? (
-                          a.mate_punto_de_pedido
+                          formatoEntero(a.mate_punto_de_pedido, { modo: 'arriba' }) /* 17/11/2026 — feedback Ivana: entero hacia arriba */
                         ) : (
                           <span
                             className="text-gray-300 cursor-help"
@@ -698,7 +699,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                           a.mate_punto_de_pedido > 0 ? 'text-[#9ca3af]' : 'text-gray-700 font-semibold'
                         }`}
                       >
-                        {a.mate_stock_seguridad ?? '—'}
+                        {formatoEntero(a.mate_stock_seguridad, { modo: 'arriba' }) /* 17/11/2026 — feedback Ivana: entero hacia arriba */}
                         {!(a.mate_punto_de_pedido > 0) && a.mate_stock_seguridad != null && (
                           <span
                             className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--ind,#4338ca)] align-middle"
@@ -707,7 +708,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                         )}
                       </td>
                       <td className="text-right tabular-nums text-[var(--ind,#4338ca)] font-bold">
-                        {formatoNumero(rotacionPorSku[a.mate_codigo]?.promedio)}
+                        {formatoEntero(rotacionPorSku[a.mate_codigo]?.promedio)}
                       </td>
                       <td>
                         <Cobertura meses={calcularCobertura(a.mate_stock_disponible, rotacionPorSku[a.mate_codigo]?.promedio)} />
