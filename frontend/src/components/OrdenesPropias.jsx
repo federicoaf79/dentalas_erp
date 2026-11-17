@@ -1432,7 +1432,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               {(() => {
                 const lim = Number(abierta.limite_al_crear)
                 const tot = Number(abierta.total_estimado)
-                if (abierta.limite_al_crear != null && abierta.total_estimado != null && Number.isFinite(lim) && Number.isFinite(tot) && tot > lim) {
+                if (abierta.limite_al_crear != null && abierta.total_estimado != null && Number.isFinite(lim) && lim > 0 && Number.isFinite(tot) && tot > lim) { // 17/11/2026 — órdenes viejas guardaron limite_al_crear = 0: sin dato, no se muestra
                   return <div className="mt-1">Motivo: el total ({formatoMoneda(tot)}) supera el límite de aprobación de {formatoMoneda(lim)}.</div>
                 }
                 if (abierta.items_sin_costo > 0) {
