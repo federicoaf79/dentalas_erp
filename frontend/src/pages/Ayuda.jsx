@@ -185,6 +185,8 @@ const MODULOS = [
           'Chips arriba: Activas / Completas / Todas. Botón "↻ Actualizar".',
           'Tabla con una fila por solicitud (remito): circuito (origen → destino), si se generó por regla automática o a pedido manual del depósito, fecha, estado resumido y cantidad de líneas.',
           'Al expandir una fila aparece una **barra de pasos** (Solicitada → En preparación → En tránsito → Recibida) con la fecha de cada paso, y en la fila cerrada se ve "Paso N de 4".',
+          // 17/11/2026 — diferencias de recepción
+          'Si el destino confirmó una cantidad distinta de la enviada, la fila muestra "Recibido con diferencia" (faltan / sobran N u), el detalle tiene una columna "Diferencia" (−N faltante, +N sobrante) y el chip "Con diferencias" filtra solo esos pedidos. El depósito que envió también lo ve en su app, arriba de "Solicitudes para preparar".',
           'Click en una fila la expande y muestra el detalle línea por línea: SKU, producto, cantidad pedida, estado, cuánto se declaró que se envía, faltante y motivo si no se mandó todo, cuánto se confirmó recibido, y si el movimiento ya quedó registrado en YiQi (o si dio error).',
         ],
         reglas: [

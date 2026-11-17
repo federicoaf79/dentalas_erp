@@ -9,6 +9,7 @@ import BarraPasos from '../components/ui/BarraPasos'
 import { useEstadoAutomatismos } from '../hooks/useEstadoAutomatismos'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import NuevoPedidoEntreDepositos from '../components/NuevoPedidoEntreDepositos'
+import Pastilla from '../components/ui/Pastilla'
 
 // ============================================================
 // pages/ReposicionCentralLocal.jsx — 7/9/2026
@@ -143,14 +144,34 @@ function pasosDeSolicitud(solicitud, lineas) {
   return { pasos, sigue, resumen }
 }
 
+// 17/11/2026 — diferencias de recepción: línea 'recibida' con cantidad_recibida distinta de cantidad_enviada.
+// dif = recibida − enviada (negativa = faltan, positiva = sobran).
+function difLinea(l) {
+  if (l.estado_linea !== 'recibida' || l.cantidad_enviada == null || l.cantidad_recibida == null) return 0
+  return Number(l.cantidad_recibida) - Number(l.cantidad_enviada)
+}
+// Resumen por pedido: { faltan, sobran } en unidades (0 si no hay).
+function resumenDiferencias(lineas) {
+  let faltan = 0
+  let sobran = 0
+  for (const l of lineas) {
+    const d = difLinea(l)
+    if (d < 0) faltan += -d
+    else if (d > 0) sobran += d
+  }
+  return { faltan, sobran, hay: faltan > 0 || sobran > 0 }
+}
+
 const FILTROS = [
   { key: 'activas', label: 'Activas' },
   { key: 'completas', label: 'Completas' },
+  { key: 'diferencias', label: 'Con diferencias' },
   { key: 'todas', label: 'Todas' },
 ]
 
 function FilaLinea({ linea }) {
   const tieneError = !!linea.yiqi_error
+  const dif = difLinea(linea)
   return (
     <tr className="border-b border-gray-50 last:border-0">
       <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
@@ -162,6 +183,12 @@ function FilaLinea({ linea }) {
         {linea.cantidad_faltante > 0 ? `${num(linea.cantidad_faltante)} — ${linea.motivo_sin_stock || 'sin motivo'}` : '—'}
       </td>
       <td className="px-3.5 py-1.5 text-sm">{linea.cantidad_recibida != null ? num(linea.cantidad_recibida) : '—'}</td>
+      {/* 17/11/2026 — diferencias de recepción: −N faltante (rojo), +N sobrante (ámbar). */}
+      <td className="px-3.5 py-1.5 text-sm font-semibold">
+        {dif < 0 ? <span className="text-[var(--red)]">−{num(-dif)}</span>
+          : dif > 0 ? <span className="text-[#b45309]">+{num(dif)}</span>
+          : <span className="text-[var(--sub)] font-normal">—</span>}
+      </td>
       <td className="px-3.5 py-1.5 text-xs">
         {linea.estado_linea === 'recibida' ? (
           tieneError ? (
@@ -182,6 +209,7 @@ function FilaLinea({ linea }) {
 function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
   const estado = estadoDetallado(solicitud, lineas)
   const { pasos, sigue, resumen } = pasosDeSolicitud(solicitud, lineas)
+  const difs = resumenDiferencias(lineas)
   return (
     <>
       <tr
@@ -201,6 +229,16 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
           {estado.texto}
           {/* 23/10/2026 — feedback Ivana: paso actual del circuito, sin tocar las columnas. */}
           {resumen && <div className="text-[10px] font-normal text-[var(--sub)] mt-0.5">{resumen}</div>}
+          {/* 17/11/2026 — diferencias de recepción */}
+          {difs.hay && (
+            <div className="mt-1">
+              <Pastilla tono="rojo" title="El destino confirmó una cantidad distinta de la enviada">
+                Recibido con diferencia · {difs.faltan > 0 ? `faltan ${num(difs.faltan)} u` : ''}
+                {difs.faltan > 0 && difs.sobran > 0 ? ' · ' : ''}
+                {difs.sobran > 0 ? `sobran ${num(difs.sobran)} u` : ''}
+              </Pastilla>
+            </div>
+          )}
         </td>
         <td className="px-3.5 py-2 text-xs text-[var(--sub)]">{lineas.length}</td>
       </tr>
@@ -217,7 +255,7 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
               <table className="w-full border-collapse bg-white rounded-lg overflow-hidden border border-[var(--border)]">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {['SKU', 'Producto', 'Pedido', 'Estado', 'Envía', 'Faltante / motivo', 'Recibido', 'YiQi'].map((h) => (
+                    {['SKU', 'Producto', 'Pedido', 'Estado', 'Envía', 'Faltante / motivo', 'Recibido', 'Diferencia', 'YiQi'].map((h) => (
                       <th key={h} className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                         {h}
                       </th>
@@ -313,10 +351,13 @@ export default function ReposicionCentralLocal() {
     const lineas = lineasPorSolicitud[s.id] ?? []
     const estado = estadoDetallado(s, lineas)
     if (filtro === 'todas') return true
+    if (filtro === 'diferencias') return resumenDiferencias(lineas).hay
     if (filtro === 'completas') return estado.texto === '✓ Completa'
     // activas: todo lo que no es completa ni reemplazada
     return estado.texto !== '✓ Completa' && s.estado !== 'reemplazada' && s.estado !== 'anulada'
   })
+
+  const cantConDiferencias = solicitudes.filter((s) => resumenDiferencias(lineasPorSolicitud[s.id] ?? []).hay).length
 
   function toggle(id) {
     setExpandidas((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -370,7 +411,7 @@ export default function ReposicionCentralLocal() {
                 : 'bg-white text-gray-600 border-[var(--border)] hover:bg-gray-50'
             }`}
           >
-            {f.label}
+            {f.label}{f.key === 'diferencias' ? ` (${cantConDiferencias})` : ''}
           </button>
         ))}
       </div>

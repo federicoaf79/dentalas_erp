@@ -139,6 +139,12 @@ export default function AyudaDeposito() {
                   punto después.
                 </li>
                 <li>
+                  {/* 17/11/2026 — diferencias de recepción */}
+                  Si confirmás menos (o más) de lo que se envió, la diferencia queda registrada y el depósito que envió la ve
+                  en un bloque "Diferencias en recepción" arriba de "Solicitudes para preparar" (últimos 30 días). Aris la ve
+                  en Reposición Central-Local, en el chip "Con diferencias".
+                </li>
+                <li>
                   El campo de cantidad recibida viene precargado con lo declarado, pero es editable — corregilo si lo
                   que llegó no coincide con lo físico antes de confirmar.
                 </li>

@@ -6,6 +6,8 @@ import Aviso from '../../components/Aviso'
 import { useEstadoAutomatismos } from '../../hooks/useEstadoAutomatismos'
 import { nombreDeposito, DEPOSITO_CENTRAL } from '../../lib/depositos'
 import { generarRemitoImprimible } from '../../lib/pdfRemito'
+// 17/11/2026 — diferencias de recepción: bloque para quien envió.
+import DiferenciasRecepcion from '../../components/DiferenciasRecepcion'
 
 // ============================================================
 // pages/deposito/SolicitudesParaPreparar.jsx — 7/9/2026, v3 10/9/2026
@@ -303,6 +305,11 @@ export default function SolicitudesParaPreparar() {
         ese artículo hasta que vuelva a haber stock. No genera por sí solo una orden de compra: Compras la arma
         aparte.
       </Aviso>
+
+      {/* 17/11/2026 — diferencias de recepción: líneas que el destino confirmó con distinta cantidad que la enviada. */}
+      {claveFiltro !== null && (
+        <DiferenciasRecepcion depositosOrigen={misDepositos} esAdmin={!!permisos.esAdmin} />
+      )}
 
       {permisos.error && (
         <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
