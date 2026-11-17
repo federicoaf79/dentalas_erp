@@ -140,9 +140,14 @@ export default function AyudaDeposito() {
                 </li>
                 <li>
                   {/* 17/11/2026 — diferencias de recepción */}
-                  Si confirmás menos (o más) de lo que se envió, la diferencia queda registrada y el depósito que envió la ve
-                  en un bloque "Diferencias en recepción" arriba de "Solicitudes para preparar" (últimos 30 días). Aris la ve
-                  en Reposición Central-Local, en el chip "Con diferencias".
+                  Si lo que llegó coincide con lo enviado, el artículo se cierra OK y se registra el movimiento de stock.
+                  Si no coincide (de menos o de más), elegí el motivo: ese artículo queda <b>frenado</b> — no se mueve su
+                  stock y el pedido sigue abierto — y aparece arriba en "Recibido con diferencia — pendiente de revisar".
+                  Los demás artículos del pedido se cierran igual. Cuando aclares la diferencia (recontaste, hablaste con
+                  el otro depósito), poné la cantidad final y marcá "Revisado": ahí se mueve el stock con esa cantidad y,
+                  si era el último, el pedido se cierra solo. El depósito que envió ve la diferencia en "Diferencias en
+                  recepción" arriba de "Solicitudes para preparar" (últimos 30 días) y Aris en Reposición Central-Local,
+                  chip "Con diferencias".
                 </li>
                 <li>
                   El campo de cantidad recibida viene precargado con lo declarado, pero es editable — corregilo si lo

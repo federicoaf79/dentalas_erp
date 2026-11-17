@@ -62,6 +62,8 @@ function estadoDetallado(solicitud, lineas) {
   // estado === 'en_preparacion'
   if (lineas.length === 0) return { texto: 'En preparación (sin líneas)', clase: 'text-[var(--sub)]' }
   if (lineas.every((l) => l.estado_linea === 'recibida')) return { texto: '✓ Completa', clase: 'text-[var(--grn,#059669)] font-semibold' }
+  // 17/11/2026 — Parte B: un artículo frenado por diferencia tiene el pedido abierto.
+  if (lineas.some((l) => l.estado_linea === 'con_diferencia')) return { texto: 'Frenado por diferencia', clase: 'text-[#b45309] font-semibold' }
   if (lineas.some((l) => l.estado_linea === 'declarada')) return { texto: 'Esperando confirmación', clase: 'text-[var(--blu,#2563eb)]' }
   return { texto: 'En preparación', clase: 'text-[var(--ind)]' }
 }
@@ -75,7 +77,7 @@ function estadoDetallado(solicitud, lineas) {
 // verificadas en las migraciones el 23/10/2026. Si no hay
 // columna, el paso queda sin fecha (no se inventa nada).
 const PASOS_REPOSICION = ['Solicitada', 'En preparación', 'En tránsito', 'Recibida']
-const ESTADOS_LINEA_EN_CAMINO = ['declarada', 'enviada', 'recibida']
+const ESTADOS_LINEA_EN_CAMINO = ['declarada', 'enviada', 'con_diferencia', 'recibida']
 
 function fechaPaso(valor) {
   if (!valor) return null
@@ -144,11 +146,21 @@ function pasosDeSolicitud(solicitud, lineas) {
   return { pasos, sigue, resumen }
 }
 
-// 17/11/2026 — diferencias de recepción: línea 'recibida' con cantidad_recibida distinta de cantidad_enviada.
+// 17/11/2026 — diferencias de recepción: lo recibido al confirmar distinto de lo enviado.
 // dif = recibida − enviada (negativa = faltan, positiva = sobran).
+// Parte B: también las frenadas ('con_diferencia'); en las revisadas se usa la
+// cantidad del primer conteo (cantidad_recibida_inicial).
 function difLinea(l) {
-  if (l.estado_linea !== 'recibida' || l.cantidad_enviada == null || l.cantidad_recibida == null) return 0
-  return Number(l.cantidad_recibida) - Number(l.cantidad_enviada)
+  if (!['recibida', 'con_diferencia'].includes(l.estado_linea)) return 0
+  const recibida = l.cantidad_recibida_inicial ?? l.cantidad_recibida
+  if (l.cantidad_enviada == null || recibida == null) return 0
+  return Number(recibida) - Number(l.cantidad_enviada)
+}
+const ETIQUETA_ESTADO_LINEA = {
+  reservada: 'reservada',
+  declarada: 'en tránsito',
+  con_diferencia: 'frenada por diferencia',
+  recibida: 'recibida',
 }
 // Resumen por pedido: { faltan, sobran } en unidades (0 si no hay).
 function resumenDiferencias(lineas) {
@@ -159,7 +171,8 @@ function resumenDiferencias(lineas) {
     if (d < 0) faltan += -d
     else if (d > 0) sobran += d
   }
-  return { faltan, sobran, hay: faltan > 0 || sobran > 0 }
+  const pendientes = lineas.filter((l) => l.estado_linea === 'con_diferencia').length
+  return { faltan, sobran, pendientes, hay: faltan > 0 || sobran > 0 || pendientes > 0 }
 }
 
 const FILTROS = [
@@ -177,7 +190,9 @@ function FilaLinea({ linea }) {
       <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
       <td className="px-3.5 py-1.5 text-sm">{linea.mate_nombre}</td>
       <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(linea.cantidad_solicitada)}</td>
-      <td className="px-3.5 py-1.5 text-sm">{linea.estado_linea}</td>
+      <td className={`px-3.5 py-1.5 text-sm ${linea.estado_linea === 'con_diferencia' ? 'text-[#b45309] font-semibold' : ''}`}>
+        {ETIQUETA_ESTADO_LINEA[linea.estado_linea] ?? linea.estado_linea}
+      </td>
       <td className="px-3.5 py-1.5 text-sm">{linea.cantidad_enviada != null ? num(linea.cantidad_enviada) : '—'}</td>
       <td className="px-3.5 py-1.5 text-sm text-[var(--red)]">
         {linea.cantidad_faltante > 0 ? `${num(linea.cantidad_faltante)} — ${linea.motivo_sin_stock || 'sin motivo'}` : '—'}
@@ -188,6 +203,16 @@ function FilaLinea({ linea }) {
         {dif < 0 ? <span className="text-[var(--red)]">−{num(-dif)}</span>
           : dif > 0 ? <span className="text-[#b45309]">+{num(dif)}</span>
           : <span className="text-[var(--sub)] font-normal">—</span>}
+        {linea.motivo_diferencia && (
+          <div className="text-[10px] font-normal text-[var(--sub)]">
+            {linea.motivo_diferencia}{linea.nota_diferencia ? ` — ${linea.nota_diferencia}` : ''}
+          </div>
+        )}
+        {linea.diferencia_revisada_en && (
+          <div className="text-[10px] font-normal text-green-700">
+            Revisada · final {num(linea.cantidad_recibida)}{linea.nota_revision ? ` — ${linea.nota_revision}` : ''}
+          </div>
+        )}
       </td>
       <td className="px-3.5 py-1.5 text-xs">
         {linea.estado_linea === 'recibida' ? (
@@ -236,6 +261,7 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
                 Recibido con diferencia · {difs.faltan > 0 ? `faltan ${num(difs.faltan)} u` : ''}
                 {difs.faltan > 0 && difs.sobran > 0 ? ' · ' : ''}
                 {difs.sobran > 0 ? `sobran ${num(difs.sobran)} u` : ''}
+                {difs.pendientes > 0 ? ` · ${difs.pendientes} sin revisar` : ''}
               </Pastilla>
             </div>
           )}

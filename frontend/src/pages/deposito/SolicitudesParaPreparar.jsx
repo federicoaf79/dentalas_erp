@@ -96,7 +96,10 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
   const [motivo, setMotivo] = useState('')
 
   const faltante = Math.max(Number(linea.cantidad_solicitada) - (Number(cantidad) || 0), 0)
-  const necesitaMotivo = faltante > 0
+  // 17/11/2026 — Parte B (regla de Aris): si lo enviado difiere de lo pedido,
+  // de menos o de más, se asienta el motivo.
+  const sobrante = Math.max((Number(cantidad) || 0) - Number(linea.cantidad_solicitada), 0)
+  const necesitaMotivo = faltante > 0 || sobrante > 0
 
   return (
     <tr className="border-b border-gray-100 last:border-0">
@@ -120,7 +123,7 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
             type="text"
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
-            placeholder={`Motivo por qué faltan ${num(faltante)}`}
+            placeholder={faltante > 0 ? `Motivo por qué faltan ${num(faltante)}` : `Motivo por qué se envían ${num(sobrante)} de más`}
             className="w-56 border border-[var(--border)] rounded-lg px-2 py-1 text-sm"
           />
         ) : (
@@ -132,7 +135,9 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
           onClick={() => onDeclarar(linea, Number(cantidad) || 0, motivo.trim() || null)}
           disabled={guardando || (necesitaMotivo && motivo.trim() === '')}
           title={
-            necesitaMotivo
+            sobrante > 0
+              ? 'Se envía más de lo pedido: queda asentado con este motivo'
+              : necesitaMotivo
               // 10/11/2026 — radiografía UX (ítem 12): el "no hay" solo suspende la alerta; no crea ninguna OC.
               ? 'Lo que falta se registra como "no hay" con este motivo y suspende la alerta de este artículo hasta que vuelva a haber stock. No genera una orden de compra'
               : 'Declara que se envía todo lo pedido'
@@ -301,9 +306,9 @@ export default function SolicitudesParaPreparar() {
       <Aviso tipo="info" id="deposito-preparar-criterio" className="mx-4 mt-4">
         "Generar remito de mercadería" trae la necesidad actualizada al momento exacto del clic — si lo hacés dos
         veces, la segunda ya descuenta lo que quedó reservado en la primera. Por cada artículo declarás cuánto
-        enviás: lo que falte queda como "no hay" automático con el motivo que escribas — eso suspende la alerta de
-        ese artículo hasta que vuelva a haber stock. No genera por sí solo una orden de compra: Compras la arma
-        aparte.
+        enviás. Si enviás distinto de lo pedido (de menos o de más), escribí el motivo. Lo que falte queda como "no
+        hay" automático — eso suspende la alerta de ese artículo hasta que vuelva a haber stock. No genera por sí solo
+        una orden de compra: Compras la arma aparte.
       </Aviso>
 
       {/* 17/11/2026 — diferencias de recepción: líneas que el destino confirmó con distinta cantidad que la enviada. */}
@@ -444,8 +449,17 @@ export default function SolicitudesParaPreparar() {
                               )}
                             </td>
                             <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{l.motivo_sin_stock ?? '—'}</td>
-                            <td className="px-3.5 py-1.5 text-[11px] text-green-700 font-semibold">
-                              {l.estado_linea === 'recibida' ? '✓ Recibido' : 'En tránsito — esperando recepción'}
+                            {/* 17/11/2026 — Parte B: 'con_diferencia' = frenado en destino hasta "Revisado". */}
+                            <td
+                              className={`px-3.5 py-1.5 text-[11px] font-semibold ${
+                                l.estado_linea === 'con_diferencia' ? 'text-amber-700' : 'text-green-700'
+                              }`}
+                            >
+                              {l.estado_linea === 'recibida'
+                                ? '✓ Recibido'
+                                : l.estado_linea === 'con_diferencia'
+                                ? `⚠ Recibido con diferencia (${num(l.cantidad_recibida)} de ${num(l.cantidad_enviada)}) — lo revisa quien recibe`
+                                : 'En tránsito — esperando recepción'}
                             </td>
                           </tr>
                         )

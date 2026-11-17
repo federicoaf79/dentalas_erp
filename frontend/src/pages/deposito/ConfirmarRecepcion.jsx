@@ -52,30 +52,142 @@ function formatoFechaHora(fechaStr) {
   }
 }
 
+// 17/11/2026 — diferencias en la recepción (Parte B, regla de Aris):
+// si lo recibido no coincide con lo enviado, ese artículo queda FRENADO
+// (estado 'con_diferencia'): se pide el motivo, no se mueve stock y el
+// pedido no se cierra hasta que quien recibe lo marca "Revisado".
+// Los artículos que coinciden se cierran OK y mueven stock como siempre.
+const MOTIVOS_DIFERENCIA = [
+  'Faltó en la caja o el bulto',
+  'Llegó roto o dañado',
+  'Llegó de más',
+  'Error de conteo al enviar',
+  'Otro',
+]
+
 function FilaLineaDeclarada({ linea, onConfirmar, guardando }) {
   const [cantidad, setCantidad] = useState(numInput(linea.cantidad_enviada))
+  const [motivo, setMotivo] = useState('')
+  const [nota, setNota] = useState('')
+  const cantNum = cantidad === '' ? null : Number(cantidad)
+  const valida = cantNum != null && !Number.isNaN(cantNum) && cantNum >= 0
+  const difiere = valida && Math.abs(cantNum - Number(linea.cantidad_enviada)) > 1e-9
+  const dif = valida ? cantNum - Number(linea.cantidad_enviada) : 0
+  const faltaMotivo = difiere && (!motivo || (motivo === 'Otro' && !nota.trim()))
+  const deshabilitado = guardando || !valida || (!difiere && cantNum <= 0) || faltaMotivo
   return (
-    <tr className="border-b border-gray-100 last:border-0">
+    <tr className={`border-b border-gray-100 last:border-0 align-top ${difiere ? 'bg-amber-50/60' : ''}`}>
       <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
       <td className="px-3.5 py-1.5 text-sm">{linea.mate_nombre}</td>
       <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(linea.cantidad_enviada)} en tránsito</td>
       <td className="px-3.5 py-1.5">
         <input
           type="number"
+          min="0"
           value={cantidad}
           onChange={(e) => setCantidad(e.target.value)}
+          aria-label={`Cantidad recibida de ${linea.sku}`}
           className="w-24 border border-[var(--border)] rounded-lg px-2 py-1 text-sm"
         />
-        <div className="text-[10px] text-gray-400 mt-0.5">Corregí si no coincide contra lo físico</div>
+        {difiere ? (
+          <div className="mt-1.5 space-y-1 max-w-[230px]">
+            <div className="text-[11px] font-semibold text-amber-700">
+              {dif < 0 ? `Faltan ${num(-dif)} u` : `Sobran ${num(dif)} u`} contra lo enviado
+            </div>
+            <select
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              aria-label="Motivo de la diferencia"
+              className="w-full border border-[var(--border)] rounded-lg px-2 py-1 text-[12px] bg-white"
+            >
+              <option value="">Elegí el motivo…</option>
+              {MOTIVOS_DIFERENCIA.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder={motivo === 'Otro' ? 'Contá qué pasó (obligatorio)' : 'Nota (opcional)'}
+              className="w-full border border-[var(--border)] rounded-lg px-2 py-1 text-[12px]"
+            />
+          </div>
+        ) : (
+          <div className="text-[10px] text-gray-400 mt-0.5">Corregí si no coincide contra lo físico</div>
+        )}
       </td>
       <td className="px-3.5 py-1.5">
         <button
-          onClick={() => onConfirmar(linea, Number(cantidad) || 0)}
-          disabled={guardando || Number(cantidad) <= 0}
-          title="Registra el movimiento de stock real — recién acá queda hecho"
+          onClick={() => onConfirmar(linea, cantNum, difiere ? { motivo, nota } : null)}
+          disabled={deshabilitado}
+          title={
+            difiere
+              ? 'Queda frenado: no se mueve stock ni se cierra el pedido hasta que lo marques "Revisado"'
+              : 'Coincide con lo enviado: se cierra OK y se registra el movimiento de stock'
+          }
+          className={`px-2.5 py-1 rounded text-[11px] font-semibold text-white disabled:opacity-50 ${
+            difiere ? 'bg-amber-600' : 'bg-[var(--grn,#059669)]'
+          }`}
+        >
+          {guardando ? 'Guardando…' : difiere ? '⚠ Confirmar con diferencia' : '✓ Confirmar recibido'}
+        </button>
+        {difiere && faltaMotivo && (
+          <div className="text-[10px] text-amber-700 mt-1">Falta el motivo</div>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+// Artículo frenado por diferencia: lo resuelve quien recibe con "Revisado".
+function FilaConDiferencia({ linea, onRevisar, guardando }) {
+  const [cantidad, setCantidad] = useState(numInput(linea.cantidad_recibida))
+  const [nota, setNota] = useState('')
+  const cantNum = cantidad === '' ? null : Number(cantidad)
+  const valida = cantNum != null && !Number.isNaN(cantNum) && cantNum >= 0
+  const dif = Number(linea.cantidad_recibida) - Number(linea.cantidad_enviada)
+  return (
+    <tr className="border-b border-gray-100 last:border-0 align-top">
+      <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
+      <td className="px-3.5 py-1.5 text-sm">{linea.mate_nombre}</td>
+      <td className="px-3.5 py-1.5 text-sm">
+        <div>Enviado {num(linea.cantidad_enviada)} · recibido {num(linea.cantidad_recibida)}</div>
+        <div className="text-[11px] font-semibold text-amber-700">
+          {dif < 0 ? `Faltan ${num(-dif)} u` : `Sobran ${num(dif)} u`}
+        </div>
+        <div className="text-[11px] text-[var(--sub)] mt-0.5">
+          {linea.motivo_diferencia}
+          {linea.nota_diferencia ? ` — ${linea.nota_diferencia}` : ''}
+        </div>
+        <div className="text-[10px] text-gray-400">{formatoFechaHora(linea.recibida_en)}</div>
+      </td>
+      <td className="px-3.5 py-1.5">
+        <input
+          type="number"
+          min="0"
+          value={cantidad}
+          onChange={(e) => setCantidad(e.target.value)}
+          aria-label={`Cantidad final recibida de ${linea.sku}`}
+          className="w-24 border border-[var(--border)] rounded-lg px-2 py-1 text-sm"
+        />
+        <div className="text-[10px] text-gray-400 mt-0.5">Cantidad final (corregí si recontaste)</div>
+        <input
+          type="text"
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          placeholder="Qué se resolvió (opcional)"
+          className="mt-1 w-full max-w-[230px] border border-[var(--border)] rounded-lg px-2 py-1 text-[12px]"
+        />
+      </td>
+      <td className="px-3.5 py-1.5">
+        <button
+          onClick={() => onRevisar(linea, cantNum, nota)}
+          disabled={guardando || !valida}
+          title="Cierra el artículo con esta cantidad y registra el movimiento de stock"
           className="px-2.5 py-1 rounded text-[11px] font-semibold text-white bg-[var(--grn,#059669)] disabled:opacity-50"
         >
-          {guardando ? 'Guardando…' : '✓ Confirmar recibido'}
+          {guardando ? 'Guardando…' : '✓ Revisado'}
         </button>
       </td>
     </tr>
@@ -87,6 +199,8 @@ export default function ConfirmarRecepcion() {
   // 23/10/2026 — modo prueba YiQi (no autorizado Live)
   const { modoPrueba } = useModoPruebaYiqi()
   const [lineas, setLineas] = useState([])
+  // 17/11/2026 — artículos frenados por diferencia (estado 'con_diferencia').
+  const [conDiferencia, setConDiferencia] = useState([])
   const [solicitudesPorId, setSolicitudesPorId] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -114,6 +228,7 @@ export default function ConfirmarRecepcion() {
   const cargar = useCallback(async () => {
     if (!misDepositos.length) {
       setLineas([])
+      setConDiferencia([])
       setLoading(false)
       return
     }
@@ -134,6 +249,7 @@ export default function ConfirmarRecepcion() {
       const idsSolicitud = (solicitudes ?? []).map((s) => s.id)
       if (!idsSolicitud.length) {
         setLineas([])
+        setConDiferencia([])
         return
       }
 
@@ -141,11 +257,12 @@ export default function ConfirmarRecepcion() {
         .from('solicitudes_reposicion_lineas')
         .select('*')
         .in('solicitud_id', idsSolicitud)
-        .eq('estado_linea', 'declarada')
+        .in('estado_linea', ['declarada', 'con_diferencia'])
         .gt('cantidad_enviada', 0)
         .order('sku')
       if (errLin) throw errLin
-      setLineas(filasLineas ?? [])
+      setLineas((filasLineas ?? []).filter((l) => l.estado_linea === 'declarada'))
+      setConDiferencia((filasLineas ?? []).filter((l) => l.estado_linea === 'con_diferencia'))
 
       // Clase ABC congelada en la línea al generarse el remito
       // (migración 20260930100000). El depósito no llama más a
@@ -166,38 +283,89 @@ export default function ConfirmarRecepcion() {
     cargar()
   }, [claveFiltro, cargar])
 
-  async function confirmarRecepcion(linea, cantidadRecibida) {
+  function moverStock(linea) {
+    // Fire-and-forget: dispara el movimiento real en YiQi. Un error
+    // acá nunca deshace el "recibido" ya confirmado (regla de oro,
+    // igual que mover-stock-yiqi).
+    // 23/10/2026 — modo prueba YiQi (no autorizado Live): si la función
+    // responde modo_prueba no es un error; la recepción quedó solo en la app.
+    supabase.functions
+      .invoke('mover-stock-reposicion', { body: { linea_id: linea.id } })
+      .then(({ data }) => {
+        if (data?.modo_prueba) {
+          setAviso(`${linea.sku} confirmado como recibido. Modo prueba: no se movió stock en YiQi.`)
+          setTimeout(() => setAviso(null), 4000)
+        }
+      })
+      .catch((e) => console.error('[mover-stock-reposicion]', e))
+  }
+
+  function avisar(texto) {
+    setAviso(texto)
+    setTimeout(() => setAviso(null), 5000)
+  }
+
+  async function confirmarRecepcion(linea, cantidadRecibida, diferencia) {
     setConfirmando(linea.id)
     setError(null)
     try {
-      const { error: errRpc } = await supabase.rpc('confirmar_recepcion_linea', {
+      const { data: estado, error: errRpc } = await supabase.rpc('confirmar_recepcion_linea', {
         p_linea_id: linea.id,
         p_cantidad_recibida: cantidadRecibida,
+        p_motivo_diferencia: diferencia?.motivo ?? null,
+        p_nota_diferencia: diferencia?.nota ?? null,
       })
       if (errRpc) throw errRpc
 
-      // Fire-and-forget: dispara el movimiento real en YiQi. Un error
-      // acá nunca deshace el "recibido" ya confirmado (regla de oro,
-      // igual que mover-stock-yiqi).
-      // 23/10/2026 — modo prueba YiQi (no autorizado Live): si la función
-      // responde modo_prueba no es un error; la recepción quedó solo en la app.
-      supabase.functions
-        .invoke('mover-stock-reposicion', { body: { linea_id: linea.id } })
-        .then(({ data }) => {
-          if (data?.modo_prueba) {
-            setAviso(`${linea.sku} confirmado como recibido. Modo prueba: no se movió stock en YiQi.`)
-            setTimeout(() => setAviso(null), 4000)
-          }
-        })
-        .catch((e) => console.error('[mover-stock-reposicion]', e))
-
       setLineas((prev) => prev.filter((l) => l.id !== linea.id))
-      setAviso(
+      if (estado === 'con_diferencia') {
+        // 17/11/2026 — frenado: no se mueve stock hasta "Revisado".
+        setConDiferencia((prev) => [
+          ...prev,
+          {
+            ...linea,
+            estado_linea: 'con_diferencia',
+            cantidad_recibida: cantidadRecibida,
+            motivo_diferencia: diferencia?.motivo,
+            nota_diferencia: diferencia?.nota,
+            recibida_en: new Date().toISOString(),
+          },
+        ])
+        avisar(`${linea.sku} quedó frenado por diferencia. No se movió stock: revisalo abajo y marcalo "Revisado".`)
+        return
+      }
+
+      moverStock(linea)
+      avisar(
         modoPrueba
           ? `${linea.sku} confirmado como recibido. Modo prueba: no se movió stock en YiQi.`
           : `${linea.sku} confirmado como recibido.`
       )
-      setTimeout(() => setAviso(null), 4000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setConfirmando(null)
+    }
+  }
+
+  async function revisarDiferencia(linea, cantidadFinal, nota) {
+    setConfirmando(linea.id)
+    setError(null)
+    try {
+      const { error: errRpc } = await supabase.rpc('revisar_diferencia_linea', {
+        p_linea_id: linea.id,
+        p_cantidad_final: cantidadFinal,
+        p_nota: nota || null,
+      })
+      if (errRpc) throw errRpc
+      // Con cantidad final 0 no hay nada que mover (no se manda un movimiento vacío a YiQi).
+      if (Number(cantidadFinal) > 0) moverStock(linea)
+      setConDiferencia((prev) => prev.filter((l) => l.id !== linea.id))
+      avisar(
+        modoPrueba
+          ? `${linea.sku} revisado y cerrado con ${num(cantidadFinal)} u. Modo prueba: no se movió stock en YiQi.`
+          : `${linea.sku} revisado y cerrado con ${num(cantidadFinal)} u.`
+      )
     } catch (err) {
       setError(err.message)
     } finally {
@@ -220,12 +388,17 @@ export default function ConfirmarRecepcion() {
         <div className="text-[12px] text-[var(--sub)] mt-0.5">
           {cargandoAlgo
             ? 'Cargando…'
-            : `${lineas.length} artículo${lineas.length === 1 ? '' : 's'} esperando confirmación`}
+            : `${lineas.length} artículo${lineas.length === 1 ? '' : 's'} esperando confirmación` +
+              (conDiferencia.length
+                ? ` · ${conDiferencia.length} frenado${conDiferencia.length === 1 ? '' : 's'} por diferencia`
+                : '')}
         </div>
       </div>
 
       <Aviso tipo="info" id="deposito-recepcion-criterio" className="mx-4 mt-4">
-        Confirmá contra lo que realmente llegó. Si la cantidad no coincide, corregila acá antes de confirmar —{' '}
+        Confirmá contra lo que realmente llegó. Si coincide con lo enviado, el artículo se cierra OK. Si no coincide,
+        corregí la cantidad y elegí el motivo: ese artículo queda frenado (no se mueve su stock y el pedido sigue
+        abierto) hasta que lo marques &quot;Revisado&quot;. Los demás se cierran igual —{' '}
         {/* 10/11/2026 — radiografía UX (ítem 12): en modo prueba no se mueve stock en YiQi. */}
         {modoPrueba
           ? 'el movimiento se registra en la app recién con esta confirmación (no en YiQi), no antes.'
@@ -253,13 +426,52 @@ export default function ConfirmarRecepcion() {
       )}
 
       <div className="px-4 py-4 space-y-4">
+        {/* 17/11/2026 — Parte B: artículos frenados por diferencia, los resuelve quien recibe. */}
+        {conDiferencia.length > 0 && (
+          <div className="bg-white rounded-xl border border-amber-300 overflow-hidden">
+            <div className="px-3.5 py-2.5 bg-amber-50 border-b border-amber-200">
+              <div className="font-bold text-sm text-amber-800">
+                ⚠ Recibido con diferencia — pendiente de revisar ({conDiferencia.length})
+              </div>
+              <div className="text-[11px] text-amber-800/80 mt-0.5">
+                Estos artículos están frenados: no se movió su stock y el pedido no se cierra. Cuando aclares la
+                diferencia (recontaste, hablaste con el otro depósito), poné la cantidad final y marcá &quot;Revisado&quot;.
+              </div>
+            </div>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  {['SKU', 'Producto', 'Diferencia', 'Cantidad final', ''].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {conDiferencia.map((l) => (
+                  <FilaConDiferencia
+                    key={l.id}
+                    linea={l}
+                    onRevisar={revisarDiferencia}
+                    guardando={confirmando === l.id}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {cargandoAlgo && lineas.length === 0 ? (
           <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center text-[var(--sub)] text-sm">
             Cargando…
           </div>
         ) : Object.keys(grupos).length === 0 ? (
           <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center text-[var(--sub)] text-sm">
-            No tenés nada pendiente de confirmar. 🎉
+            {conDiferencia.length ? 'No hay más envíos para confirmar.' : 'No tenés nada pendiente de confirmar. 🎉'}
           </div>
         ) : (
           Object.entries(grupos).map(([solicitudId, filasLineas]) => {

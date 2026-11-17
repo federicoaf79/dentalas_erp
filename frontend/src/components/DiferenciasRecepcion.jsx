@@ -8,6 +8,10 @@ import Pastilla from './ui/Pastilla'
 // Muestra las líneas que el otro depósito confirmó con distinta cantidad que la enviada
 // (últimos 30 días). Diferencia = cantidad_recibida − cantidad_enviada (negativa = faltante).
 // Solo lectura; si la consulta falla no muestra nada.
+// 17/11/2026 — Parte B: incluye las frenadas ('con_diferencia', pendientes de que
+// las revise quien recibe) y las ya revisadas (diferencia original en
+// cantidad_recibida_inicial). select('*') para no romper si la migración
+// 20261117130000 todavía no está aplicada.
 function num(v) {
   return formatoNumero(v, { decimales: 2, minDecimales: 0 })
 }
@@ -24,16 +28,19 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
         const desde = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
         const { data: lineas, error } = await supabase
           .from('solicitudes_reposicion_lineas')
-          .select('id, solicitud_id, sku, mate_nombre, cantidad_enviada, cantidad_recibida, recibida_en')
-          .eq('estado_linea', 'recibida')
+          .select('*')
+          .in('estado_linea', ['recibida', 'con_diferencia'])
           .gte('recibida_en', desde)
           .order('recibida_en', { ascending: false })
           .limit(500)
         if (error) throw error
-        const conDif = (lineas ?? []).filter(
-          (l) => l.cantidad_enviada != null && l.cantidad_recibida != null &&
-            Number(l.cantidad_recibida) !== Number(l.cantidad_enviada)
-        )
+        const conDif = (lineas ?? []).filter((l) => {
+          const recibidaInicial = l.cantidad_recibida_inicial ?? l.cantidad_recibida
+          return l.estado_linea === 'con_diferencia' || (
+            l.cantidad_enviada != null && recibidaInicial != null &&
+            Number(recibidaInicial) !== Number(l.cantidad_enviada)
+          )
+        })
         if (!conDif.length) { if (vivo) setFilas([]); return }
         const ids = [...new Set(conDif.map((l) => l.solicitud_id))]
         let q = supabase
@@ -64,21 +71,24 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
           <i className="ti ti-alert-triangle" /> Diferencias en recepción ({filas.length})
         </div>
         <div className="text-[12px] text-gray-700 mt-0.5">
-          El otro depósito confirmó menos de lo que enviaste. Revisá si quedó mercadería sin despachar o si se perdió
-          en el camino. (Últimos 30 días.)
+          El otro depósito recibió una cantidad distinta de la que enviaste. Mientras dice &quot;Pendiente de revisar&quot;,
+          ese artículo está frenado: no se movió su stock. Revisá si quedó mercadería sin despachar o si se perdió en el
+          camino y avisale a quien recibió; lo cierra él con &quot;Revisado&quot;. (Últimos 30 días.)
         </div>
       </div>
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-gray-100">
-            {['Remito', 'Recibido el', 'Artículo', 'Enviado', 'Recibido', 'Diferencia'].map((h) => (
+            {['Remito', 'Recibido el', 'Artículo', 'Enviado', 'Recibido', 'Diferencia', 'Estado'].map((h) => (
               <th key={h} className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {filas.map((l) => {
-            const dif = Number(l.cantidad_recibida) - Number(l.cantidad_enviada)
+            const recibidaInicial = l.cantidad_recibida_inicial ?? l.cantidad_recibida
+            const dif = Number(recibidaInicial) - Number(l.cantidad_enviada)
+            const pendiente = l.estado_linea === 'con_diferencia'
             return (
               <tr key={l.id} className="border-b border-gray-50 last:border-0">
                 <td className="px-3.5 py-1.5 text-sm font-semibold">
@@ -88,11 +98,28 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
                 <td className="px-3.5 py-1.5 text-xs text-[var(--sub)]">{new Date(l.recibida_en).toLocaleString('es-AR')}</td>
                 <td className="px-3.5 py-1.5 text-sm"><span className="font-mono text-xs">{l.sku}</span> {l.mate_nombre}</td>
                 <td className="px-3.5 py-1.5 text-sm">{num(l.cantidad_enviada)}</td>
-                <td className="px-3.5 py-1.5 text-sm">{num(l.cantidad_recibida)}</td>
+                <td className="px-3.5 py-1.5 text-sm">{num(recibidaInicial)}</td>
                 <td className="px-3.5 py-1.5 text-sm">
                   {dif < 0
                     ? <Pastilla tono="rojo">faltan {num(-dif)}</Pastilla>
                     : <Pastilla tono="amarillo">sobran {num(dif)}</Pastilla>}
+                  {l.motivo_diferencia && (
+                    <div className="text-[10px] text-[var(--sub)] mt-0.5">
+                      {l.motivo_diferencia}{l.nota_diferencia ? ` — ${l.nota_diferencia}` : ''}
+                    </div>
+                  )}
+                </td>
+                <td className="px-3.5 py-1.5 text-[11px]">
+                  {pendiente ? (
+                    <span className="font-semibold text-amber-700">Pendiente de revisar</span>
+                  ) : l.diferencia_revisada_en ? (
+                    <span className="text-green-700">
+                      Revisada · final {num(l.cantidad_recibida)}
+                      {l.nota_revision ? <span className="block text-[10px] text-[var(--sub)]">{l.nota_revision}</span> : null}
+                    </span>
+                  ) : (
+                    <span className="text-[var(--sub)]">Cerrada</span>
+                  )}
                 </td>
               </tr>
             )

@@ -187,6 +187,8 @@ const MODULOS = [
           'Al expandir una fila aparece una **barra de pasos** (Solicitada → En preparación → En tránsito → Recibida) con la fecha de cada paso, y en la fila cerrada se ve "Paso N de 4".',
           // 17/11/2026 — diferencias de recepción
           'Si el destino confirmó una cantidad distinta de la enviada, la fila muestra "Recibido con diferencia" (faltan / sobran N u), el detalle tiene una columna "Diferencia" (−N faltante, +N sobrante) y el chip "Con diferencias" filtra solo esos pedidos. El depósito que envió también lo ve en su app, arriba de "Solicitudes para preparar".',
+          // 17/11/2026 — Parte B
+          'Un artículo recibido con diferencia queda "frenado por diferencia": no se mueve su stock y el pedido sigue abierto hasta que el depósito que lo recibió lo marca "Revisado" con la cantidad final. Los artículos que coinciden se cierran OK. Si el depósito que prepara envía distinto de lo pedido (de menos o de más), tiene que escribir el motivo.',
           'Click en una fila la expande y muestra el detalle línea por línea: SKU, producto, cantidad pedida, estado, cuánto se declaró que se envía, faltante y motivo si no se mandó todo, cuánto se confirmó recibido, y si el movimiento ya quedó registrado en YiQi (o si dio error).',
         ],
         reglas: [
