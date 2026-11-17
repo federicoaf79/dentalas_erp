@@ -216,9 +216,13 @@ export default function Sidebar({
               : `Renovación de YiQi con fallas (${yiqiFallosRecuperables} en 24h) — ver detalle`}
           </div>
         ) : (
-          <div className="text-[10px] text-[var(--grn)] flex items-center gap-1 font-semibold mt-0.5">
+          // 17/11/2026 — feedback Ivana: "Sincronizado" parecía indicar que la app estaba al día; es la fecha de los datos de YiQi.
+          <div
+            title="Última vez que se actualizaron los datos desde YiQi. No indica la versión de la app."
+            className="text-[10px] text-[var(--grn)] flex items-center gap-1 font-semibold mt-0.5"
+          >
             <span>●</span>
-            {syncTexto ? `Sincronizado ${syncTexto}` : 'Sincronizando…'}
+            {syncTexto ? `Datos de YiQi: ${syncTexto}` : 'Actualizando datos de YiQi…'}
           </div>
         )}
       </div>

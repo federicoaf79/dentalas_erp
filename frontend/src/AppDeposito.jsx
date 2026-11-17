@@ -4,6 +4,7 @@ import ConfirmarRecepcion from './pages/deposito/ConfirmarRecepcion'
 import PedirAlOtroDeposito from './pages/deposito/PedirAlOtroDeposito'
 import AyudaDeposito from './pages/deposito/AyudaDeposito'
 import CambiarMiPassword from './components/CambiarMiPassword'
+import AvisoVersionNueva from './components/ui/AvisoVersionNueva'
 
 // ============================================================
 // AppDeposito.jsx — 7/9/2026, v2 14/9/2026
@@ -44,6 +45,8 @@ export default function AppDeposito({ nombreUsuario, onLogout }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* 17/11/2026 — feedback Ivana: aviso de versión nueva */}
+      <AvisoVersionNueva />
       <aside className="w-[220px] bg-white border-r border-[var(--border)] flex flex-col flex-shrink-0 h-screen">
         <div className="px-3.5 pt-3.5 pb-3 border-b border-[var(--border)]">
           <div className="text-[15px] font-bold">🦷 Dentalab</div>

@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import { usePermisos } from './hooks/usePermisos'
 import Login from './pages/Login'
 import Sidebar from './components/Sidebar'
+import AvisoVersionNueva from './components/ui/AvisoVersionNueva'
 import AppDeposito from './AppDeposito'
 import MonitorStock from './pages/MonitorStock'
 import SeguimientoOC from './pages/SeguimientoOC'
@@ -239,6 +240,8 @@ function AppLogueada({ session, onLogout }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* 17/11/2026 — feedback Ivana: aviso de versión nueva */}
+      <AvisoVersionNueva />
       <Sidebar
         currentPage={currentPage}
         onNavigate={setCurrentPage}
