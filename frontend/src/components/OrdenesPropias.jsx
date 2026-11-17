@@ -1,4 +1,6 @@
-import { formatoNumero } from '../lib/formato'
+import { formatoNumero, formatoEntero } from '../lib/formato'
+import BarraMinStockMax from './BarraMinStockMax'
+import { useMaximosCalculados, textoMaximoCalculado } from '../lib/maximos'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -312,6 +314,54 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
     }, 350)
     return () => clearTimeout(id)
   }, [buscarEdit, editandoItems, abierta])
+  // 17/11/2026 — feedback Ivana: al editar un borrador, mostrar como en Nueva OC los
+  // artículos del proveedor con faltante o preventivo (mismo RPC sugerencias_compra)
+  // para ir agregándolos. Si falla no bloquea la edición.
+  const [sugEdit, setSugEdit] = useState([])
+  const [cargandoSugEdit, setCargandoSugEdit] = useState(false)
+  const [errorSugEdit, setErrorSugEdit] = useState(null)
+  const [ocultarSinHistEdit, setOcultarSinHistEdit] = useState(false)
+  const [limiteSugEdit, setLimiteSugEdit] = useState(30)
+  const proveedorEdit = editandoItems && abierta ? abierta.proveedor_nombre : null
+  const maximosCalcEdit = useMaximosCalculados(proveedorEdit, !!proveedorEdit)
+  useEffect(() => {
+    setLimiteSugEdit(30)
+    if (!proveedorEdit) {
+      setSugEdit([])
+      setErrorSugEdit(null)
+      return
+    }
+    let vivo = true
+    setCargandoSugEdit(true)
+    setErrorSugEdit(null)
+    Promise.resolve(supabase.rpc('sugerencias_compra', { p_proveedor: proveedorEdit }))
+      .then(({ data, error }) => {
+        if (!vivo) return
+        if (error) {
+          setSugEdit([])
+          setErrorSugEdit(error.message)
+        } else setSugEdit(Array.isArray(data) ? data : [])
+      })
+      .catch((e) => {
+        if (vivo) setErrorSugEdit(e?.message ?? 'Error')
+      })
+      .finally(() => {
+        if (vivo) setCargandoSugEdit(false)
+      })
+    return () => {
+      vivo = false
+    }
+  }, [proveedorEdit])
+  // Agrega una sugerencia a la orden con su cantidad sugerida (si no hay, un bulto).
+  function agregarSugerenciaEdit(s) {
+    agregarItemEdit(s)
+    const sug = Number(s.cantidad_sugerida)
+    if (sug > 0) {
+      setItemsEdit((prev) =>
+        prev.map((i) => (i.id === `nuevo-${s.mate_codigo}` ? { ...i, _cantidad: String(sug) } : i))
+      )
+    }
+  }
   function agregarItemEdit(r) {
     setItemsEdit((prev) => {
       if (prev.some((i) => i.mate_codigo === r.mate_codigo)) return prev
@@ -1511,6 +1561,110 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                   </div>
                 )}
               </div>
+              {(() => {
+                const enOrden = new Set(itemsEdit.map((i) => i.mate_codigo))
+                const pendientes = sugEdit.filter(
+                  (s) => !enOrden.has(s.mate_codigo) && !(ocultarSinHistEdit && s.cantidad_sugerida == null)
+                )
+                const sinHist = sugEdit.filter((s) => !enOrden.has(s.mate_codigo) && s.cantidad_sugerida == null).length
+                const visibles = pendientes.slice(0, limiteSugEdit)
+                return (
+                  <div className="border border-[var(--border)] rounded-[10px] p-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                      <span className="text-[12px] font-semibold text-[var(--sub)]">
+                        Faltantes y preventivos de {abierta.proveedor_nombre} que no están en la orden
+                        {!cargandoSugEdit && !errorSugEdit && ` (${pendientes.length})`}
+                      </span>
+                      {sinHist > 0 && (
+                        <label className="flex items-center gap-2 text-[12px] text-gray-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ocultarSinHistEdit}
+                            onChange={(e) => setOcultarSinHistEdit(e.target.checked)}
+                          />
+                          Ocultar sin historial ({sinHist})
+                        </label>
+                      )}
+                    </div>
+                    {cargandoSugEdit ? (
+                      <div className="text-[13px] text-[var(--sub)] py-2">Calculando sugerencias…</div>
+                    ) : errorSugEdit ? (
+                      <div className="text-[12px] text-[var(--sub)] py-1">
+                        No se pudieron cargar las sugerencias ({errorSugEdit}). Podés seguir editando y buscar artículos a mano.
+                      </div>
+                    ) : pendientes.length === 0 ? (
+                      <div className="text-[13px] text-[var(--sub)] py-2">
+                        No hay otros artículos con faltante para este proveedor.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="tw">
+                          <table className="tabla">
+                            <thead>
+                              <tr>
+                                {['SKU', 'Producto', 'Stock', 'Mín.', 'Prom./mes', 'Sugerida', ''].map((h, idx) => (
+                                  <th key={`${h}-${idx}`}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {visibles.map((s) => {
+                                const sinBase = s.cantidad_sugerida == null
+                                return (
+                                  <tr key={s.mate_codigo}>
+                                    <td className="sku">{s.mate_codigo}</td>
+                                    <td className="font-semibold max-w-[280px] truncate" title={s.mate_nombre ?? ''}>
+                                      {s.mate_nombre ?? '—'}
+                                    </td>
+                                    <td>
+                                      <BarraMinStockMax
+                                        stock={s.stock}
+                                        min={s.umbral}
+                                        max={maximosCalcEdit?.[s.mate_codigo]?.max ?? null}
+                                        pico={!!maximosCalcEdit?.[s.mate_codigo]?.pico}
+                                        detalleMax={maximosCalcEdit ? textoMaximoCalculado(maximosCalcEdit[s.mate_codigo], s.maximo) : null}
+                                      />
+                                    </td>
+                                    <td>{formatoEntero(s.umbral, { modo: 'arriba' })}</td>
+                                    <td>
+                                      {sinBase || s.promedio == null || !Number.isFinite(Number(s.promedio)) ? (
+                                        <span className="text-[11px] text-gray-400 italic whitespace-nowrap">Sin historial</span>
+                                      ) : (
+                                        <span className="text-[var(--ind)] font-semibold">{formatoEntero(s.promedio)}</span>
+                                      )}
+                                    </td>
+                                    <td>{sinBase ? '—' : formatoNumero(s.cantidad_sugerida)}</td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        onClick={() => agregarSugerenciaEdit(s)}
+                                        className="btn btn-sm"
+                                      >
+                                        <i className="ti ti-plus" aria-hidden="true" /> Agregar
+                                      </button>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {pendientes.length > visibles.length && (
+                          <div className="flex justify-center mt-2">
+                            <button
+                              type="button"
+                              onClick={() => setLimiteSugEdit((n) => n + 30)}
+                              className="btn btn-sm"
+                            >
+                              Mostrar más ({pendientes.length - visibles.length} restantes)
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )}
           {errorEdicionItems && (
