@@ -659,7 +659,8 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
       })
     }
   }
-  async function imprimir(orden) {
+  // 17/11/2026 — feedback Ivana: { conPrecios: false } = PDF para el proveedor, sin precios ni SKU.
+  async function imprimir(orden, { conPrecios = true } = {}) {
     let lista = items
     if (abierta?.id !== orden.id) {
       const { data, error } = await supabase
@@ -676,7 +677,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
       .eq('clie_nombre', orden.proveedor_nombre)
       .limit(1)
       .maybeSingle()
-    generarPdfOrden({ orden, items: lista, empresa, proveedor: prov ?? null })
+    generarPdfOrden({ orden, items: lista, empresa, proveedor: prov ?? null }, { conPrecios })
   }
   // Envío semi-automático por WhatsApp (19/8/2026): descarga el PDF real
   // de la orden (jsPDF, se guarda solo en Descargas) y abre WhatsApp con
@@ -1203,6 +1204,10 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
                         <button onClick={() => imprimir(o)} title="Ver e imprimir el PDF de la orden" className={BTN_SEC}>
                           <i className="ti ti-file-text" aria-hidden="true" /> PDF
                         </button>
+                        {/* 17/11/2026 — feedback Ivana: versión para el proveedor */}
+                        <button onClick={() => imprimir(o, { conPrecios: false })} title="PDF para el proveedor: sin precios ni códigos internos" className={BTN_SEC}>
+                          <i className="ti ti-file-off" aria-hidden="true" /> PDF sin precios
+                        </button>
                         <button
                           onClick={() =>
                             setModalCausa({ referenciaId: o.id, referenciaTexto: `Orden #${o.id} — ${o.proveedor_nombre}` })
@@ -1423,6 +1428,18 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               )}
             >
               {abierta.enviada_en ? `Enviada a aprobación el ${formatoDia(abierta.enviada_en)}.` : 'Enviada a aprobación.'}
+              {/* 17/11/2026 — feedback Ivana: decir por qué necesita aprobación */}
+              {(() => {
+                const lim = Number(abierta.limite_al_crear)
+                const tot = Number(abierta.total_estimado)
+                if (abierta.limite_al_crear != null && abierta.total_estimado != null && Number.isFinite(lim) && Number.isFinite(tot) && tot > lim) {
+                  return <div className="mt-1">Motivo: el total ({formatoMoneda(tot)}) supera el límite de aprobación de {formatoMoneda(lim)}.</div>
+                }
+                if (abierta.items_sin_costo > 0) {
+                  return <div className="mt-1">Motivo: {abierta.items_sin_costo} {abierta.items_sin_costo === 1 ? 'artículo sin costo cargado' : 'artículos sin costo cargado'}, no se puede confirmar que esté dentro del límite.</div>
+                }
+                return null
+              })()}
             </BloqueAccion>
           )}
           {abierta.estado === 'rechazada' && (
@@ -1467,6 +1484,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
               acciones={
                 <>
                   <button onClick={() => imprimir(abierta)} className="btn btn-sm"><i className="ti ti-file-text" aria-hidden="true" /> PDF</button>
+                  <button onClick={() => imprimir(abierta, { conPrecios: false })} title="PDF para el proveedor: sin precios ni códigos internos" className="btn btn-sm"><i className="ti ti-file-off" aria-hidden="true" /> PDF sin precios</button>
                   <button
                     disabled={enviandoWaId === abierta.id}
                     onClick={() => enviarWhatsApp(abierta)}
@@ -1767,6 +1785,7 @@ export default function OrdenesPropias({ onCambio, soloOrdenId = null }) {
           <div className="flex items-center justify-between gap-2 flex-wrap pt-4 mt-1 border-t border-[var(--border)]">
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={() => imprimir(abierta)} className="btn btn-sm"><i className="ti ti-file-text" aria-hidden="true" /> PDF de la orden</button>
+              <button onClick={() => imprimir(abierta, { conPrecios: false })} title="PDF para el proveedor: sin precios ni códigos internos" className="btn btn-sm"><i className="ti ti-file-off" aria-hidden="true" /> PDF sin precios</button>
               {/* 23/10/2026 — modo prueba YiQi (no autorizado Live) */}
               {abierta.estado === 'aprobada' && abierta.yiqi_id_creado && (
                 <button onClick={() => abrirAgregarMercaderia(abierta)} disabled={modoPrueba} title={modoPrueba ? 'Modo prueba: no se agrega mercadería en YiQi' : undefined} className="btn btn-sm"><i className="ti ti-plus" aria-hidden="true" /> Agregar mercadería</button>

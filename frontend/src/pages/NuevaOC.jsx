@@ -578,6 +578,7 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
   const requiereAprobacion =
     !esAdmin && items.length > 0 && (superaLimite || valorizacion.sinCosto > 0 || siempreAprueba)
 
+  // 17/11/2026 — feedback Ivana: el semáforo dice el motivo con números.
   const semaforo = items.length === 0
     ? null
     : esAdmin
@@ -585,11 +586,11 @@ function ArmarOrden({ proveedor, sugerencias, cargando, onGuardar, onCancelar, o
           ? { clase: 'bloque-amarillo', sem: 'sy', label: 'Orden directa — faltan costos en algunos artículos' }
           : { clase: 'bloque-verde', sem: 'sg', label: 'Orden directa (sin controles de aprobación)' })
       : siempreAprueba
-        ? { clase: 'bloque-azul', sem: 'sb', label: 'Este proveedor siempre requiere aprobación de Aris' }
+        ? { clase: 'bloque-azul', sem: 'sb', label: 'Este proveedor siempre requiere aprobación de Aris, porque está marcado así en Condiciones comerciales.' }
         : valorizacion.sinCosto > 0
-          ? { clase: 'bloque-amarillo', sem: 'sy', label: 'Falta costo de algunos artículos' }
+          ? { clase: 'bloque-amarillo', sem: 'sy', label: `Falta costo de ${valorizacion.sinCosto} ${valorizacion.sinCosto === 1 ? 'artículo' : 'artículos'}: no se puede confirmar que la orden esté dentro del límite, por eso requiere aprobación de Aris.` }
           : superaLimite
-            ? { clase: 'bloque-azul', sem: 'sb', label: 'Requiere aprobación de Aris' }
+            ? { clase: 'bloque-azul', sem: 'sb', label: `Supera el límite de aprobación ${condiciones?.limite_es_propio ? 'de este proveedor' : 'general'} (${formatoMoneda(limite)}; total ${formatoMoneda(valorizacion.total)}). Aris puede ${condiciones?.limite_es_propio ? 'subir el límite de este proveedor' : 'fijar un límite propio para este proveedor'} en Condiciones comerciales.` }
             : { clase: 'bloque-verde', sem: 'sg', label: 'Dentro del límite' }
 
   return (

@@ -75,18 +75,20 @@ function esc(s) {
   }[c]))
 }
 
-export function generarPdfOrden({ orden, items, empresa, proveedor }) {
+// 17/11/2026 — feedback Ivana: `conPrecios = false` genera la versión para el
+// proveedor: sin SKU interno, sin precios, subtotales ni total.
+export function generarPdfOrden({ orden, items, empresa, proveedor }, { conPrecios = true } = {}) {
   const e = empresa ?? {}
   const totalCalculado = Math.round(items.reduce((acc, i) => acc + subtotalLinea(i), 0) * 100) / 100
   const sinCosto = items.filter((i) => !i.costo_unitario).length
 
   const filas = items.map((i) => `
     <tr>
-      <td class="mono">${esc(i.mate_codigo)}</td>
+      ${conPrecios ? `<td class="mono">${esc(i.mate_codigo)}</td>` : ''}
       <td>${esc(i.mate_nombre ?? '')}</td>
       <td class="num">${numero(i.cantidad)}</td>
-      <td class="num">${i.costo_unitario ? moneda(precioRedondeado(i.costo_unitario)) : '<span class="gris">a confirmar</span>'}</td>
-      <td class="num">${i.costo_unitario ? moneda(subtotalLinea(i)) : '—'}</td>
+      ${conPrecios ? `<td class="num">${i.costo_unitario ? moneda(precioRedondeado(i.costo_unitario)) : '<span class="gris">a confirmar</span>'}</td>
+      <td class="num">${i.costo_unitario ? moneda(subtotalLinea(i)) : '—'}</td>` : ''}
     </tr>`).join('')
 
   const html = `<!doctype html>
@@ -206,26 +208,26 @@ export function generarPdfOrden({ orden, items, empresa, proveedor }) {
       <div class="val">${items.length}</div>
       <div class="sub">${numero(items.reduce((a, i) => a + Number(i.cantidad || 0), 0))} unidades en total</div>
     </div>
-    <div class="bloque">
+    ${conPrecios ? `<div class="bloque">
       <h3>Total estimado</h3>
       <div class="val">${moneda(totalCalculado)}</div>
       <div class="sub">${sinCosto > 0 ? sinCosto + ' artículos a confirmar precio' : 'Todos los precios confirmados'}</div>
-    </div>
+    </div>` : ''}
   </div>
 
   <table>
     <thead><tr>
-      <th>SKU</th><th>Artículo</th>
-      <th class="num">Cantidad</th><th class="num">Precio unit.</th><th class="num">Subtotal</th>
+      ${conPrecios ? '<th>SKU</th>' : ''}<th>Artículo</th>
+      <th class="num">Cantidad</th>${conPrecios ? '<th class="num">Precio unit.</th><th class="num">Subtotal</th>' : ''}
     </tr></thead>
     <tbody>${filas}</tbody>
-    <tfoot><tr>
+    ${conPrecios ? `<tfoot><tr>
       <td colspan="4" class="num">TOTAL ESTIMADO</td>
       <td class="num">${moneda(totalCalculado)}</td>
-    </tr></tfoot>
+    </tr></tfoot>` : ''}
   </table>
 
-  ${sinCosto > 0 ? `<div class="aviso">
+  ${conPrecios && sinCosto > 0 ? `<div class="aviso">
     ${sinCosto} ${sinCosto === 1 ? 'artículo no tiene' : 'artículos no tienen'} precio de referencia cargado:
     el total es estimativo y esos ítems quedan a confirmar con el proveedor.
   </div>` : ''}
@@ -274,7 +276,7 @@ function nombreArchivoOrden(orden) {
 // vía jsPDF. Pensado para el flujo semi-automático de WhatsApp: se llama
 // justo antes de abrir wa.me, así el archivo ya está en Descargas cuando
 // la persona quiere arrastrarlo a la conversación.
-export function generarPdfOrdenDescargable({ orden, items, empresa, proveedor }) {
+export function generarPdfOrdenDescargable({ orden, items, empresa, proveedor }, { conPrecios = true } = {}) {
   const e = empresa ?? {}
   const totalCalculado = Math.round(items.reduce((acc, i) => acc + subtotalLinea(i), 0) * 100) / 100
   const sinCosto = items.filter((i) => !i.costo_unitario).length
@@ -336,29 +338,32 @@ export function generarPdfOrdenDescargable({ orden, items, empresa, proveedor })
 
   y = Math.max(yProv, y + 10) + 4
 
-  const filas = items.map((i) => [
+  const filas = items.map((i) => conPrecios ? [
     i.mate_codigo ?? '',
     i.mate_nombre ?? '',
     numero(i.cantidad),
     i.costo_unitario ? moneda(precioRedondeado(i.costo_unitario)) : 'a confirmar',
     i.costo_unitario ? moneda(subtotalLinea(i)) : '—',
+  ] : [
+    i.mate_nombre ?? '',
+    numero(i.cantidad),
   ])
 
   doc.autoTable({
     startY: y,
     margin: { left: margenX, right: 14 },
-    head: [['SKU', 'Artículo', 'Cantidad', 'Precio unit.', 'Subtotal']],
+    head: conPrecios ? [['SKU', 'Artículo', 'Cantidad', 'Precio unit.', 'Subtotal']] : [['Artículo', 'Cantidad']],
     body: filas,
     styles: { fontSize: 8.5, cellPadding: 2, textColor: [31, 41, 55] },
     headStyles: { fillColor: [243, 244, 246], textColor: [107, 114, 128], fontStyle: 'bold', fontSize: 8 },
-    columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
-    foot: [['', '', '', 'TOTAL ESTIMADO', moneda(totalCalculado)]],
+    columnStyles: conPrecios ? { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } } : { 1: { halign: 'right' } },
+    ...(conPrecios ? { foot: [['', '', '', 'TOTAL ESTIMADO', moneda(totalCalculado)]] } : {}),
     footStyles: { fillColor: [255, 255, 255], textColor: [31, 41, 55], fontStyle: 'bold', fontSize: 10 },
   })
 
   let yFinal = doc.lastAutoTable.finalY + 8
 
-  if (sinCosto > 0) {
+  if (conPrecios && sinCosto > 0) {
     const texto = `${sinCosto} ${sinCosto === 1 ? 'artículo no tiene' : 'artículos no tienen'} precio de referencia cargado: el total es estimativo.`
     doc.setFillColor(254, 243, 199)
     doc.roundedRect(margenX, yFinal - 4, margenDer - margenX, 8, 1.5, 1.5, 'F')
