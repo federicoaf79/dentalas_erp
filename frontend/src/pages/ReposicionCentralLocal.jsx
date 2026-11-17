@@ -8,6 +8,7 @@ import { nombreDeposito } from '../lib/depositos'
 import BarraPasos from '../components/ui/BarraPasos'
 import { useEstadoAutomatismos } from '../hooks/useEstadoAutomatismos'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
+import NuevoPedidoEntreDepositos from '../components/NuevoPedidoEntreDepositos'
 
 // ============================================================
 // pages/ReposicionCentralLocal.jsx — 7/9/2026
@@ -246,6 +247,9 @@ export default function ReposicionCentralLocal() {
   const [error, setError] = useState(null)
   const [filtro, setFiltro] = useState('activas')
   const [expandidas, setExpandidas] = useState({})
+  // 17/11/2026 — pedido de Aris: crear pedidos entre depósitos desde acá (solo admin).
+  const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false)
+  const [avisoCreado, setAvisoCreado] = useState(null)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -322,8 +326,13 @@ export default function ReposicionCentralLocal() {
       {/* 23/10/2026 — feedback Ivana: encabezado v7 (EncabezadoPagina) y contenedor .pagina, mismo patrón que Reglas de compra. */}
       <EncabezadoPagina
         titulo="Reposición Central-Local"
-        bajada="Supervisión de los dos circuitos (Central→Local y Local→Central) — solo lectura"
+        bajada="Supervisión de los dos circuitos (Central→Local y Local→Central) — supervisión y alta de pedidos"
       >
+        {!permisos.cargando && permisos.esAdmin && (
+          <button onClick={() => setNuevoPedidoAbierto(true)} className="btn btn-sm">
+            <i className="ti ti-plus" /> Nuevo pedido entre depósitos
+          </button>
+        )}
         <button onClick={cargar} className="btn btn-sm">
           ↻ Actualizar
         </button>
@@ -331,10 +340,16 @@ export default function ReposicionCentralLocal() {
 
       <div className="pagina flex flex-col gap-3.5">
       <Aviso tipo="info" id="reposicion-central-local-criterio">
-        Las acciones del circuito (generar remito, declarar envía/no hay, confirmar recibido) se hacen desde las
-        cuentas de depósito, no acá — esta pantalla es para ver el estado y el historial completo, incluido lo que
-        ya se resolvió.
+        Desde acá se puede crear un pedido entre depósitos, pero preparar, declarar envía/no hay y confirmar
+        recibido se sigue haciendo desde las cuentas de depósito — esta pantalla es para ver el estado y el
+        historial completo, incluido lo que ya se resolvió.
       </Aviso>
+
+      {avisoCreado && (
+        <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-2.5 text-[13px]">
+          {avisoCreado}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-[var(--red)] rounded-lg p-4">
@@ -399,6 +414,16 @@ export default function ReposicionCentralLocal() {
         </div>
       </div>
       </div>
+      {nuevoPedidoAbierto && (
+        <NuevoPedidoEntreDepositos
+          onCerrar={() => setNuevoPedidoAbierto(false)}
+          onCreado={(msg) => {
+            setAvisoCreado(msg)
+            setTimeout(() => setAvisoCreado(null), 6000)
+            cargar()
+          }}
+        />
+      )}
     </div>
   )
 }
