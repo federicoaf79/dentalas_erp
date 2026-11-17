@@ -10,6 +10,7 @@ import { useEstadoAutomatismos } from '../hooks/useEstadoAutomatismos'
 import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import NuevoPedidoEntreDepositos from '../components/NuevoPedidoEntreDepositos'
 import Pastilla from '../components/ui/Pastilla'
+import HistorialReposicion from '../components/HistorialReposicion'
 
 // ============================================================
 // pages/ReposicionCentralLocal.jsx — 7/9/2026
@@ -295,6 +296,12 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
                 </tbody>
               </table>
             )}
+            {/* 17/11/2026 — historial de cada artículo (declaró, recibió, corrigió, revisó). */}
+            <HistorialReposicion
+              solicitudId={solicitud.id}
+              plegable="Historial del pedido"
+              className="bg-white rounded-lg border border-[var(--border)] px-3.5 py-2 mt-2"
+            />
           </td>
         </tr>
       )}

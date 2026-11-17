@@ -458,7 +458,7 @@ export default function SolicitudesParaPreparar() {
                               {l.estado_linea === 'recibida'
                                 ? '✓ Recibido'
                                 : l.estado_linea === 'con_diferencia'
-                                ? `⚠ Recibido con diferencia (${num(l.cantidad_recibida)} de ${num(l.cantidad_enviada)}) — lo revisa quien recibe`
+                                ? `⚠ Recibido con diferencia (${num(l.cantidad_recibida)} de ${num(l.cantidad_enviada)}) — si no estaba físico, corregilo arriba en "Diferencias en recepción"`
                                 : 'En tránsito — esperando recepción'}
                             </td>
                           </tr>

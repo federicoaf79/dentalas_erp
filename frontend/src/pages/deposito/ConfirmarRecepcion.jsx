@@ -65,7 +65,7 @@ const MOTIVOS_DIFERENCIA = [
   'Otro',
 ]
 
-function FilaLineaDeclarada({ linea, onConfirmar, guardando }) {
+function FilaLineaDeclarada({ linea, onConfirmar, guardando, correccion }) {
   const [cantidad, setCantidad] = useState(numInput(linea.cantidad_enviada))
   const [motivo, setMotivo] = useState('')
   const [nota, setNota] = useState('')
@@ -79,7 +79,16 @@ function FilaLineaDeclarada({ linea, onConfirmar, guardando }) {
     <tr className={`border-b border-gray-100 last:border-0 align-top ${difiere ? 'bg-amber-50/60' : ''}`}>
       <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
       <td className="px-3.5 py-1.5 text-sm">{linea.mate_nombre}</td>
-      <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(linea.cantidad_enviada)} en tránsito</td>
+      <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">
+        {num(linea.cantidad_enviada)} en tránsito
+        {/* 17/11/2026 — el depósito que envió corrigió la cantidad después de una diferencia. */}
+        {correccion && (
+          <div className="text-[11px] text-[var(--ind,#4338ca)] font-semibold mt-0.5">
+            Corregido por el otro depósito: figuraba {num(correccion.cantidad_anterior)}
+            {correccion.motivo ? ` (${correccion.motivo})` : ''}
+          </div>
+        )}
+      </td>
       <td className="px-3.5 py-1.5">
         <input
           type="number"
@@ -201,6 +210,8 @@ export default function ConfirmarRecepcion() {
   const [lineas, setLineas] = useState([])
   // 17/11/2026 — artículos frenados por diferencia (estado 'con_diferencia').
   const [conDiferencia, setConDiferencia] = useState([])
+  // 17/11/2026 — linea_id -> última corrección de lo enviado (reposicion_lineas_eventos).
+  const [correcciones, setCorrecciones] = useState({})
   const [solicitudesPorId, setSolicitudesPorId] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -263,6 +274,22 @@ export default function ConfirmarRecepcion() {
       if (errLin) throw errLin
       setLineas((filasLineas ?? []).filter((l) => l.estado_linea === 'declarada'))
       setConDiferencia((filasLineas ?? []).filter((l) => l.estado_linea === 'con_diferencia'))
+
+      // Correcciones de lo enviado (si la tabla de historial no existe, se ignora).
+      const idsDeclaradas = (filasLineas ?? []).filter((l) => l.estado_linea === 'declarada').map((l) => l.id)
+      if (idsDeclaradas.length) {
+        const { data: evs } = await supabase
+          .from('reposicion_lineas_eventos')
+          .select('linea_id, cantidad_anterior, motivo, creado_en')
+          .eq('evento', 'envio_corregido')
+          .in('linea_id', idsDeclaradas)
+          .order('creado_en')
+        const mapaCorr = {}
+        for (const e of evs ?? []) mapaCorr[e.linea_id] = e
+        setCorrecciones(mapaCorr)
+      } else {
+        setCorrecciones({})
+      }
 
       // Clase ABC congelada en la línea al generarse el remito
       // (migración 20260930100000). El depósito no llama más a
@@ -434,8 +461,10 @@ export default function ConfirmarRecepcion() {
                 ⚠ Recibido con diferencia — pendiente de revisar ({conDiferencia.length})
               </div>
               <div className="text-[11px] text-amber-800/80 mt-0.5">
-                Estos artículos están frenados: no se movió su stock y el pedido no se cierra. Cuando aclares la
-                diferencia (recontaste, hablaste con el otro depósito), poné la cantidad final y marcá &quot;Revisado&quot;.
+                Estos artículos están frenados: no se movió su stock y el pedido no se cierra. Si en el otro depósito
+                no tenían esa cantidad, la corrigen ellos desde su panel (&quot;Corregir lo enviado&quot;) y el artículo te
+                vuelve abajo para confirmar. Si se perdió o se rompió en el camino, poné la cantidad final y marcá
+                &quot;Revisado&quot;.
               </div>
             </div>
             <table className="w-full border-collapse">
@@ -520,6 +549,7 @@ export default function ConfirmarRecepcion() {
                         linea={l}
                         onConfirmar={confirmarRecepcion}
                         guardando={confirmando === l.id}
+                        correccion={correcciones[l.id]}
                       />
                     ))}
                   </tbody>

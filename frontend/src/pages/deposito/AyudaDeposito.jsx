@@ -150,6 +150,14 @@ export default function AyudaDeposito() {
                   chip "Con diferencias".
                 </li>
                 <li>
+                  {/* 17/11/2026 — corrección de lo enviado */}
+                  Si lo que figuraba enviado no existía físicamente (por ejemplo, el sistema decía 8 y mandaron 6), el
+                  depósito que envió lo corrige desde "Diferencias en recepción" con "Corregir lo enviado" (8 → 6) y un
+                  motivo. Ese artículo vuelve a "Confirmar recepción" del otro depósito con la cantidad corregida, y recién
+                  ahí se confirma. Todo queda en el historial: "Historial de diferencias" en la app de depósito e
+                  "Historial del pedido" en Reposición Central-Local.
+                </li>
+                <li>
                   El campo de cantidad recibida viene precargado con lo declarado, pero es editable — corregilo si lo
                   que llegó no coincide con lo físico antes de confirmar.
                 </li>

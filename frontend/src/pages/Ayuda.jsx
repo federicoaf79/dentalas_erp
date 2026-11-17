@@ -189,6 +189,8 @@ const MODULOS = [
           'Si el destino confirmó una cantidad distinta de la enviada, la fila muestra "Recibido con diferencia" (faltan / sobran N u), el detalle tiene una columna "Diferencia" (−N faltante, +N sobrante) y el chip "Con diferencias" filtra solo esos pedidos. El depósito que envió también lo ve en su app, arriba de "Solicitudes para preparar".',
           // 17/11/2026 — Parte B
           'Un artículo recibido con diferencia queda "frenado por diferencia": no se mueve su stock y el pedido sigue abierto hasta que el depósito que lo recibió lo marca "Revisado" con la cantidad final. Los artículos que coinciden se cierran OK. Si el depósito que prepara envía distinto de lo pedido (de menos o de más), tiene que escribir el motivo.',
+          // 17/11/2026 — corrección de lo enviado + historial
+          'Si lo enviado no existía físicamente (el sistema decía 8 y mandaron 6), el depósito que envió corrige la cantidad con "Corregir lo enviado" y el artículo vuelve al que recibe para confirmarlo. Cada paso (declarado, recibido, corregido, revisado) queda en "Historial del pedido", al abrir cada pedido.',
           'Click en una fila la expande y muestra el detalle línea por línea: SKU, producto, cantidad pedida, estado, cuánto se declaró que se envía, faltante y motivo si no se mandó todo, cuánto se confirmó recibido, y si el movimiento ya quedó registrado en YiQi (o si dio error).',
         ],
         reglas: [
