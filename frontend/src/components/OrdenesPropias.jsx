@@ -128,7 +128,7 @@ function vistaLlegada(o, diasPorProv, recibida) {
 function formatoFecha(f) {
   if (!f) return '—'
   try {
-    return new Date(f).toLocaleString('es-AR', {
+    return new Date(f).toLocaleString('es-AR', { hourCycle: 'h23',
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     })

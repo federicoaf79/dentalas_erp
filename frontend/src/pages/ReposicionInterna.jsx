@@ -59,7 +59,7 @@ const PRIORIDADES_OCULTAS_DEFAULT = [8, 9]
 function formatoFechaHora(fechaStr) {
   if (!fechaStr) return '—'
   try {
-    return new Date(fechaStr).toLocaleString('es-AR')
+    return new Date(fechaStr).toLocaleString('es-AR', { hourCycle: 'h23' })
   } catch {
     return fechaStr
   }

@@ -254,7 +254,7 @@ export default function Empresa() {
 
       {datos?.actualizado_en && !cargando && (
         <div className="mx-4 mb-6 text-[11px] text-gray-400">
-          Última modificación: {new Date(datos.actualizado_en).toLocaleString('es-AR')}
+          Última modificación: {new Date(datos.actualizado_en).toLocaleString('es-AR', { hourCycle: 'h23' })}
         </div>
       )}
     </div>

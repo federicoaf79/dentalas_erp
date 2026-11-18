@@ -54,7 +54,7 @@ const UMBRAL_SIMILITUD = 0.28 // Jaccard sobre trigramas — ver normalizar()/tr
 function formatoFechaHora(fechaStr) {
   if (!fechaStr) return '—'
   try {
-    return new Date(fechaStr).toLocaleString('es-AR')
+    return new Date(fechaStr).toLocaleString('es-AR', { hourCycle: 'h23' })
   } catch {
     return fechaStr
   }

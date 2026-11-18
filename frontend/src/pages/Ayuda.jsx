@@ -191,6 +191,10 @@ const MODULOS = [
           'Un artículo recibido con diferencia queda "frenado por diferencia": no se mueve su stock y el pedido sigue abierto hasta que el depósito que lo recibió lo marca "Revisado" con la cantidad final. Los artículos que coinciden se cierran OK. Si el depósito que prepara envía distinto de lo pedido (de menos o de más), tiene que escribir el motivo.',
           // 17/11/2026 — corrección de lo enviado + historial
           'Si lo enviado no existía físicamente (el sistema decía 8 y mandaron 6), el depósito que envió corrige la cantidad con "Corregir lo enviado" y el artículo vuelve al que recibe para confirmarlo. Cada paso (declarado, recibido, corregido, revisado) queda en "Historial del pedido", al abrir cada pedido.',
+          // 18/11/2026
+          'La tarjeta "Reposición automática Central → Local" (solo admin) prende o pausa el automático, y fija cada cuántas horas revisa y el máximo de artículos por remito. Con el automático prendido, el sistema crea el pedido y Central declara a mano lo que envía. Del Local hacia Central no hay automático: a Central la repone Compras.',
+          'Al pedir entre depósitos no se puede superar el stock real de YiQi del depósito que envía, menos lo ya comprometido en otros pedidos abiertos.',
+          'Al abrir cada pedido se ve la copia firmada del remito, si el depósito la subió.',
           'Click en una fila la expande y muestra el detalle línea por línea: SKU, producto, cantidad pedida, estado, cuánto se declaró que se envía, faltante y motivo si no se mandó todo, cuánto se confirmó recibido, y si el movimiento ya quedó registrado en YiQi (o si dio error).',
         ],
         reglas: [

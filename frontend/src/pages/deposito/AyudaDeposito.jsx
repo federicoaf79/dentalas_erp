@@ -158,6 +158,19 @@ export default function AyudaDeposito() {
                   "Historial del pedido" en Reposición Central-Local.
                 </li>
                 <li>
+                  {/* 18/11/2026 — artículos no previstos */}
+                  Si llegó otro artículo en lugar del del remito (decía vasos y llegaron platos), elegí el motivo "Llegó
+                  otro artículo" e indicá cuál llegó y cuántos. Si llegó algo que no está en el remito, usá "+ Llegó algo
+                  que no está en el remito" en el encabezado del pedido, antes de confirmar la última línea. Ese artículo
+                  queda frenado hasta que el depósito que envió lo acepte (se suma a lo enviado y se mueve el stock) o lo
+                  rechace (hay que devolverlo).
+                </li>
+                <li>
+                  {/* 18/11/2026 — remito firmado */}
+                  Con "📎 Subir remito firmado" guardás una foto o PDF del remito firmado en el pedido. Lo ve también el
+                  otro depósito y Aris.
+                </li>
+                <li>
                   El campo de cantidad recibida viene precargado con lo declarado, pero es editable — corregilo si lo
                   que llegó no coincide con lo físico antes de confirmar.
                 </li>
@@ -189,6 +202,12 @@ export default function AyudaDeposito() {
                 <li>
                   "📤 Enviar pedido" manda todo de una — a diferencia de "Solicitudes para preparar", acá no hay
                   ningún recálculo: es exactamente lo que vos cargaste, ni más ni menos.
+                </li>
+                <li>
+                  {/* 18/11/2026 — tope de stock */}
+                  No podés pedir más de lo que el otro depósito tiene en stock según YiQi (menos lo que ya está
+                  comprometido en otros pedidos abiertos): cada artículo muestra "Disponible en …" y, si te pasás, aparece
+                  "No hay más en stock: máximo disponible real N".
                 </li>
                 <li>
                   Le aparece de inmediato al otro depósito en su "Solicitudes para preparar", ya listo para que lo

@@ -22,7 +22,7 @@ const ROTULO = 'text-[11px] text-[var(--sub)] uppercase tracking-[.04em] font-se
 function formatoFechaHora(fechaStr) {
   if (!fechaStr) return 'Nunca'
   try {
-    return new Date(fechaStr).toLocaleString('es-AR')
+    return new Date(fechaStr).toLocaleString('es-AR', { hourCycle: 'h23' })
   } catch {
     return fechaStr
   }

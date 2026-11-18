@@ -117,7 +117,7 @@ function formatoSyncCorto(valor) {
   try {
     const d = new Date(valor)
     if (isNaN(d.getTime())) return null
-    return d.toLocaleString('es-AR', {
+    return d.toLocaleString('es-AR', { hourCycle: 'h23',
       day: '2-digit',
       month: '2-digit',
       hour: '2-digit',
