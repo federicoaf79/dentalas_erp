@@ -11,7 +11,8 @@ export const DEPOSITO_LOCAL = 155
 export const DEPOSITO_CENTRAL = 157
 
 const DEPOSITO_NOMBRES = {
-  [DEPOSITO_LOCAL]: 'el Local',
+  // 18/11/2026 — nombre unificado: antes "el Local" / "Depósito Central" (radiografía en vivo).
+  [DEPOSITO_LOCAL]: 'Depósito Local',
   [DEPOSITO_CENTRAL]: 'Depósito Central',
 }
 
@@ -26,6 +27,9 @@ export function nombreDeposito(id) {
 
 // "a el Local" / "de el Local" no existen en castellano: se contraen
 // ("al Local", "del Local"). 30/9/2026, bug "Pedir a el Local".
+// 18/11/2026 — con los nombres "Depósito Local" / "Depósito Central" salen
+// "a Depósito Local", "de Depósito Central" (sin contracción). Se deja la rama
+// "el X" por si algún día se agrega un nombre con artículo.
 export function aDeposito(id) {
   const n = nombreDeposito(id)
   return n.startsWith('el ') ? `al ${n.slice(3)}` : `a ${n}`

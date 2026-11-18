@@ -20,26 +20,40 @@ const ROTULO = 'text-[11px] text-[var(--sub)] uppercase tracking-[.04em] font-se
 const INPUT =
   'px-3 py-2 border border-[#d1d5db] rounded-lg text-[13px] bg-[#f9fafb] outline-none focus:border-[var(--ind)] disabled:text-gray-400 disabled:cursor-not-allowed'
 
-function Campo({ label, ayuda, valor, onChange, sufijo, disabled, min = 0, step = 'any' }) {
+// 18/11/2026 — radiografía en vivo: se sacó el eco "= 2" / "≈ 1.000.000" al lado del input.
+// El dinero se muestra con separador de miles es-AR dentro del mismo input (type text +
+// inputMode numeric) y al estado va el número limpio (solo dígitos), que es lo que se guarda.
+function Campo({ label, ayuda, valor, onChange, sufijo, disabled, min = 0, step = 'any', dinero = false }) {
   return (
     <div className="seccion">
       <label className="block">
         <div className={`${ROTULO} mb-2`}>{label}</div>
         <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={min}
-            step={step}
-            value={valor}
-            disabled={disabled}
-            onChange={(e) => onChange(e.target.value)}
-            className={`${INPUT} w-44 text-right font-bold`}
-          />
-          {sufijo && <span className="text-[12px] text-[var(--sub)]">{sufijo}</span>}
-          {/* 10/11/2026 — radiografía UX (ítem 4): el input nativo muestra "1000000"; acá el mismo valor en es-AR (solo lectura). */}
-          {valor !== '' && valor != null && Number.isFinite(Number(valor)) && (
-            <span className="text-[12px] text-[#9ca3af]">= {formatoNumero(valor, { decimales: 2 })}</span>
+          {dinero ? (
+            <>
+              <span className="text-[13px] text-[var(--sub)] font-semibold">$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={valor === '' || valor == null ? '' : formatoNumero(valor, { decimales: 0 })}
+                disabled={disabled}
+                onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+                className={`${INPUT} w-44 text-right font-bold`}
+              />
+            </>
+          ) : (
+            <input
+              type="number"
+              min={min}
+              step={step}
+              value={valor}
+              disabled={disabled}
+              onChange={(e) => onChange(e.target.value)}
+              className={`${INPUT} w-44 text-right font-bold`}
+            />
           )}
+          {sufijo && <span className="text-[12px] text-[var(--sub)]">{sufijo}</span>}
         </div>
         <div className="text-[11px] text-[#9ca3af] mt-1.5 leading-snug">{ayuda}</div>
       </label>
@@ -129,6 +143,17 @@ export default function ReglasAlertas() {
     }
   }
 
+  // 18/11/2026 — vuelve el formulario a lo guardado.
+  function descartar() {
+    if (!reglas) return
+    setForm({
+      limite: reglas.limite_aprobacion ?? '',
+      cajas: reglas.max_cajas_por_producto ?? '',
+      meses: reglas.meses_cobertura ?? '',
+    })
+    setError(null)
+  }
+
   const esAdmin = permisos.esAdmin
   const huboCambios =
     reglas &&
@@ -194,7 +219,7 @@ export default function ReglasAlertas() {
               onChange={(v) => setForm((f) => ({ ...f, limite: v }))}
               sufijo="pesos"
               disabled={!esAdmin}
-              step="1000"
+              dinero
             />
             <Campo
               label="Máximo de bultos por producto"
@@ -252,12 +277,33 @@ export default function ReglasAlertas() {
 
           {reglas?.actualizado_en && (
             <div className="text-[11px] text-gray-400">
-              Última modificación: {new Date(reglas.actualizado_en).toLocaleString('es-AR')}
+              Última modificación: {new Date(reglas.actualizado_en).toLocaleString('es-AR', { hourCycle: 'h23' })}
             </div>
           )}
         </>
       )}
       </div>
+
+      {/* 18/11/2026 — barra fija abajo: el botón de arriba queda lejos de los campos. */}
+      {esAdmin && !cargando && huboCambios && (
+        <div className="sticky bottom-0 z-10 border-t border-[var(--border)] bg-white px-6 py-3 flex items-center justify-between gap-3 shadow-[0_-2px_8px_rgba(0,0,0,.06)]">
+          <span className="text-[13px] text-amber-700 font-semibold">Tenés cambios sin guardar</span>
+          <div className="flex items-center gap-2">
+            <button onClick={descartar} disabled={guardando} className="btn btn-sm">
+              Descartar
+            </button>
+            <button
+              onClick={guardar}
+              disabled={guardando || hayCampoInvalido}
+              title={hayCampoInvalido ? 'Completá los tres campos con un número válido antes de guardar' : undefined}
+              className="btn btn-sm btn-pri"
+            >
+              <i className="ti ti-device-floppy" />
+              {guardando ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

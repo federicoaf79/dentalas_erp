@@ -1,8 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
+import { DEPOSITO_LOCAL, DEPOSITO_CENTRAL, nombreDeposito } from '../lib/depositos'
 
 // ============================================================
+// 18/11/2026 — columna y panel de depósito para cuentas de rol depósito.
 // UsuariosAccesos.jsx — v2, la lista de proveedores reales ahora
 // sale de material_yiqi (tabla propia, sincronizada cada 15 min)
 // en vez de pegarle a YiQi en vivo. La gestión de usuarios sigue
@@ -77,6 +79,32 @@ async function restablecerPassword(userId, password) {
   return data
 }
 
+// 18/11/2026 — asignación de depósitos de las cuentas de depósito. La tabla usuario_deposito
+// solo deja leer las propias por RLS, así que el admin usa dos RPC (migración 20261118160000).
+async function traerDepositosAsignados() {
+  const { data, error } = await supabase.rpc('admin_depositos_usuarios')
+  if (error) throw new Error(error.message)
+  const mapa = {}
+  for (const r of data ?? []) {
+    ;(mapa[r.usuario_id] ??= []).push(r.deposito_id)
+  }
+  return mapa
+}
+
+async function cambiarDeposito(userId, depositoId, accion) {
+  const { error } = await supabase.rpc('admin_asignar_deposito', {
+    p_usuario: userId,
+    p_deposito: depositoId,
+    p_accion: accion,
+  })
+  if (error) throw new Error(error.message)
+}
+
+function textoDepositos(ids) {
+  if (!ids || ids.length === 0) return null
+  return [...ids].sort((a, b) => a - b).map(nombreDeposito).join(' + ')
+}
+
 function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
   try {
@@ -84,6 +112,67 @@ function formatoFecha(fechaStr) {
   } catch {
     return fechaStr
   }
+}
+
+// 18/11/2026 — panel de "Gestionar accesos" para cuentas de rol depósito: qué depósito opera.
+function PanelDeposito({ usuario, asignados, errorCarga, onCambio }) {
+  const [guardando, setGuardando] = useState(null)
+
+  async function toggle(depId) {
+    const yaEsta = asignados.includes(depId)
+    setGuardando(depId)
+    try {
+      await cambiarDeposito(usuario.id, depId, yaEsta ? 'quitar' : 'agregar')
+      onCambio(usuario.id, depId, yaEsta ? 'quitar' : 'agregar')
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    } finally {
+      setGuardando(null)
+    }
+  }
+
+  return (
+    <div className="px-4 py-4 bg-gray-50">
+      <div className="text-[13px] font-semibold mb-1">Depósito que opera esta cuenta</div>
+      <div className="text-[12px] text-[var(--sub)] mb-3">
+        Define de qué depósito ve y prepara pedidos, y qué recepciones puede confirmar. Una cuenta normalmente
+        tiene un solo depósito. El cambio se aplica en el próximo ingreso de la persona.
+      </div>
+      {errorCarga && (
+        <div className="mb-3 text-[12px] text-[var(--red)]">
+          No se pudieron leer las asignaciones ({errorCarga}). Si es la primera vez, falta aplicar la migración
+          20261118160000.
+        </div>
+      )}
+      <div className="flex gap-2 flex-wrap">
+        {[DEPOSITO_LOCAL, DEPOSITO_CENTRAL].map((depId) => {
+          const activo = asignados.includes(depId)
+          return (
+            <label
+              key={depId}
+              className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border cursor-pointer ${
+                activo ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-200'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={activo}
+                disabled={guardando === depId || !!errorCarga}
+                onChange={() => toggle(depId)}
+              />
+              <span>{nombreDeposito(depId)}</span>
+              {guardando === depId && <span className="text-xs text-gray-400">…</span>}
+            </label>
+          )
+        })}
+      </div>
+      {asignados.length === 0 && !errorCarga && (
+        <div className="mt-3 text-[12px] text-amber-700">
+          Esta cuenta no tiene ningún depósito asignado: hoy no ve ninguna solicitud.
+        </div>
+      )}
+    </div>
+  )
 }
 
 function PanelAsignacion({ usuario, proveedores, onCambioOptimista }) {
@@ -243,6 +332,9 @@ export default function UsuariosAccesos() {
   const [modalPassword, setModalPassword] = useState(null) // usuario o null
   const [guardandoPassword, setGuardandoPassword] = useState(false)
   const [avisoPassword, setAvisoPassword] = useState(null)
+  // 18/11/2026 — depósitos por usuario { userId: [155|157] } y error de lectura (si falta la migración)
+  const [depositos, setDepositos] = useState({})
+  const [errorDepositos, setErrorDepositos] = useState(null)
 
   async function cargarTodo() {
     setLoading(true)
@@ -251,6 +343,12 @@ export default function UsuariosAccesos() {
       const [usuariosData, articulos] = await Promise.all([traerUsuarios(), traerMaterialLocal()])
       setUsuarios(usuariosData)
       setProveedores(derivarProveedoresReales(articulos))
+      try {
+        setDepositos(await traerDepositosAsignados())
+        setErrorDepositos(null)
+      } catch (e) {
+        setErrorDepositos(e.message)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -296,6 +394,14 @@ export default function UsuariosAccesos() {
         return { ...u, proveedores: u.proveedores.filter((p) => String(p.codigo) !== String(prov.codigo)) }
       })
     )
+  }
+
+  function actualizarDepositoLocal(userId, depId, accion) {
+    setDepositos((d) => {
+      const actuales = d[userId] ?? []
+      const nuevos = accion === 'agregar' ? [...new Set([...actuales, depId])] : actuales.filter((x) => x !== depId)
+      return { ...d, [userId]: nuevos }
+    })
   }
 
   function toggleUsuario(id) {
@@ -409,9 +515,17 @@ export default function UsuariosAccesos() {
                     <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(u.creadoEl)}</td>
                     <td className="px-3.5 py-1.5 text-[var(--sub)] text-xs">{formatoFecha(u.ultimoLogin)}</td>
                     <td className="px-3.5 py-1.5">
-                      {u.proveedores.length === 0 ? (
+                      {u.rol === 'deposito' ? (
+                        errorDepositos ? (
+                          <span className="text-gray-300 text-xs">— (cuenta de depósito)</span>
+                        ) : textoDepositos(depositos[u.id]) ? (
+                          <span className="text-xs text-gray-600 font-semibold">{textoDepositos(depositos[u.id])}</span>
+                        ) : (
+                          <span className="text-amber-700 text-xs">Sin depósito asignado</span>
+                        )
+                      ) : u.proveedores.length === 0 ? (
                         <span className="text-gray-300 text-xs">
-                          {u.rol === 'deposito' ? '— (cuenta de depósito)' : u.rol === 'admin' ? 'Todos (administrador)' : 'Ninguno (ve el catálogo completo)'}
+                          {u.rol === 'deposito' ? 'Sin depósito asignado' : u.rol === 'admin' ? 'Todos (administrador)' : 'Ninguno (ve el catálogo completo)'}
                         </span>
                       ) : (
                         <span className="text-xs text-gray-600">{u.proveedores.length} asignado(s)</span>
@@ -438,7 +552,16 @@ export default function UsuariosAccesos() {
                   {usuarioExpandido === u.id && (
                     <tr>
                       <td colSpan={6} className="p-0">
-                        <PanelAsignacion usuario={u} proveedores={proveedores} onCambioOptimista={actualizarUsuarioLocal} />
+                        {u.rol === 'deposito' ? (
+                          <PanelDeposito
+                            usuario={u}
+                            asignados={depositos[u.id] ?? []}
+                            errorCarga={errorDepositos}
+                            onCambio={actualizarDepositoLocal}
+                          />
+                        ) : (
+                          <PanelAsignacion usuario={u} proveedores={proveedores} onCambioOptimista={actualizarUsuarioLocal} />
+                        )}
                       </td>
                     </tr>
                   )}
