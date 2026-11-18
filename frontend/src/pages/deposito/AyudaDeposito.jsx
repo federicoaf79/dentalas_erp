@@ -84,6 +84,21 @@ export default function AyudaDeposito() {
           </Aviso>
         </Tarjeta>
 
+        {/* 18/11/2026 — camino B: Remito interno en YiQi */}
+        <Tarjeta icon="🔗" titulo="Pedidos que se gestionan en YiQi">
+          <p>
+            Cuando Aris activa el modo <strong>"Remito interno en YiQi"</strong>, cada pedido entre depósitos se crea
+            también en YiQi como Remito Interno Pendiente. Para esos pedidos <strong>no hay que declarar ni confirmar
+            nada en esta app</strong>: se trabajan en YiQi como siempre (enviar, recibir, procesar) y YiQi mueve el
+            stock.
+          </p>
+          <p>
+            En tus pantallas vas a ver un aviso azul con el número del remito, su estado y un link directo a YiQi. La
+            app lee el estado de vuelta, así que Aris puede seguir el pedido desde acá. Si el modo está apagado, todo
+            funciona como te explicamos más abajo.
+          </p>
+        </Tarjeta>
+
         <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
           <button
             onClick={() => toggle('preparar')}

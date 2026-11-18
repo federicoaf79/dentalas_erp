@@ -36,7 +36,9 @@ function rpcNoExiste(error) {
   return m.includes('pgrst202') || m.includes('42883') || m.includes('could not find the function') || m.includes('does not exist')
 }
 
-export default function ConfigReposicionAutomatica({ onCambio }) {
+// 18/11/2026 — camino B (decisión de Federico): sección "Remito interno en YiQi" con su propio interruptor
+// (RPC configurar_remito_yiqi). `onEstado` le avisa a la pantalla si el módulo está prendido.
+export default function ConfigReposicionAutomatica({ onCambio, onEstado }) {
   const [estado, setEstado] = useState(null)
   const [candidatos, setCandidatos] = useState(null)
   const [cargando, setCargando] = useState(true)
@@ -56,6 +58,11 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
   const [errorGuardar, setErrorGuardar] = useState(null)
   const [mensaje, setMensaje] = useState(null)
   const [detalleAbierto, setDetalleAbierto] = useState(false)
+  // 18/11/2026 — interruptor "Crear el remito interno en YiQi".
+  const [confirmandoYiqi, setConfirmandoYiqi] = useState(false)
+  const [guardandoYiqi, setGuardandoYiqi] = useState(false)
+  const [errorYiqi, setErrorYiqi] = useState(null)
+  const [mensajeYiqi, setMensajeYiqi] = useState(null)
 
   const aplicarRegla = useCallback((regla) => {
     if (!regla) return
@@ -79,6 +86,7 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
       }
       setNoDisponible(false)
       setEstado(data)
+      onEstado?.(data)
       aplicarRegla(data?.regla)
       // Lo más caro (recorre el universo) se pide aparte para no demorar la tarjeta.
       supabase
@@ -92,6 +100,7 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
     } finally {
       setCargando(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aplicarRegla])
 
   useEffect(() => {
@@ -101,6 +110,9 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
   const regla = estado?.regla ?? null
   const activa = regla?.activa === true
   const cronActivo = estado?.cron_activo === true
+  // 18/11/2026 — camino B: si el contrato todavía no está en la base, estos campos vienen undefined (apagado).
+  const yiqiPrendido = estado?.escribir_remito_en_yiqi === true
+  const escrituraHabilitada = estado?.escritura_yiqi_habilitada === true
 
   function leerFormulario() {
     const h = Number(String(horas).replace(',', '.'))
@@ -150,6 +162,38 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
     } finally {
       setGuardando(false)
     }
+  }
+
+  // 18/11/2026 — prender/apagar el módulo. La RPC devuelve { escribir_remito_en_yiqi, escritura_yiqi_habilitada }.
+  async function cambiarRemitoYiqi(nuevo) {
+    setErrorYiqi(null)
+    setMensajeYiqi(null)
+    setGuardandoYiqi(true)
+    try {
+      const { data, error } = await supabase.rpc('configurar_remito_yiqi', { p_activo: nuevo })
+      if (error) {
+        throw new Error(
+          rpcNoExiste(error) ? 'Todavía no está disponible: falta aplicar la migración de Remito interno en YiQi.' : error.message
+        )
+      }
+      const fila = Array.isArray(data) ? data[0] : data
+      const quedo = fila?.escribir_remito_en_yiqi ?? nuevo
+      setMensajeYiqi(quedo ? 'Remito interno en YiQi activado.' : 'Remito interno en YiQi desactivado.')
+      setConfirmandoYiqi(false)
+      await cargar()
+      onCambio?.()
+    } catch (err) {
+      setErrorYiqi(err.message || 'No se pudo guardar.')
+    } finally {
+      setGuardandoYiqi(false)
+    }
+  }
+
+  function clicInterruptorYiqi() {
+    setErrorYiqi(null)
+    setMensajeYiqi(null)
+    if (yiqiPrendido) cambiarRemitoYiqi(false)
+    else setConfirmandoYiqi(true)
   }
 
   function clicInterruptor() {
@@ -352,12 +396,78 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
                   {' · '}
                   {p.en_espera ? 'en espera — se actualiza solo' : 'Central ya empezó a armarlo'}
                   {p.recalculado_en ? ` · última actualización ${fechaHora(p.recalculado_en)}` : ''}
+                  {/* 18/11/2026 — camino B */}
+                  {p.gestion_en_yiqi && (
+                    <span className="text-[#1d4ed8]">
+                      {' · '}YiQi: Remito interno N° {p.yiqi_remito_nro ?? '—'} · {p.yiqi_remito_estado ?? 'sin estado'}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </div>
       )}
+
+      {/* 18/11/2026 — camino B: Remito interno en YiQi */}
+      <div className="border-t border-gray-100 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[240px]">
+            <div className="flex items-center gap-2">
+              <h3 className="text-[14px] font-bold">Remito interno en YiQi</h3>
+              <Pastilla tono={yiqiPrendido ? 'verde' : 'gris'}>{yiqiPrendido ? 'Activado' : 'Desactivado'}</Pastilla>
+            </div>
+            <p className="text-[12px] text-[var(--sub)] mt-1">
+              Crear el remito interno en YiQi: cada pedido que arma la app se crea en YiQi como Remito Interno
+              Pendiente, y los depósitos lo ejecutan desde YiQi.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={yiqiPrendido}
+            aria-label="Crear el remito interno en YiQi"
+            disabled={guardandoYiqi || !estado}
+            onClick={clicInterruptorYiqi}
+            className={`relative inline-flex items-center h-8 w-[60px] rounded-full border transition-colors shrink-0 ${
+              yiqiPrendido ? 'bg-[var(--grn,#059669)] border-[var(--grn,#059669)]' : 'bg-gray-200 border-gray-300'
+            } ${guardandoYiqi ? 'opacity-60' : ''}`}
+          >
+            <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${yiqiPrendido ? 'left-[32px]' : 'left-1'}`} />
+          </button>
+        </div>
+        {yiqiPrendido && !escrituraHabilitada && (
+          <div className="mt-2 bg-[var(--yel-bg,#fef3c7)] border border-amber-200 text-[#92400e] rounded-lg px-3 py-2 text-[12px]">
+            Modo prueba: la escritura a YiQi está deshabilitada; aunque lo prendas, no se crea nada en YiQi hasta que
+            Federico la habilite.
+          </div>
+        )}
+        {!yiqiPrendido && !escrituraHabilitada && estado && (
+          <div className="mt-2 text-[12px] text-[#92400e]">
+            Modo prueba: la escritura a YiQi está deshabilitada; aunque lo prendas, no se crea nada en YiQi hasta que
+            Federico la habilite.
+          </div>
+        )}
+        {confirmandoYiqi && (
+          <div className="mt-2 bg-blue-50 border border-blue-100 text-[#1d4ed8] rounded-lg px-3.5 py-3 text-[13px]">
+            <div className="font-semibold mb-1">¿Crear el remito interno en YiQi?</div>
+            <div>
+              Cada pedido que arma la app se crea en YiQi como Remito Interno Pendiente. Los depósitos lo envían, lo
+              reciben y lo procesan en YiQi, como hoy; YiQi mueve el stock. La app muestra el estado.
+            </div>
+            <div className="flex gap-2 mt-2.5">
+              <button className="btn btn-sm" disabled={guardandoYiqi} onClick={() => cambiarRemitoYiqi(true)}>
+                {guardandoYiqi ? 'Activando…' : 'Sí, activar'}
+              </button>
+              <button className="btn btn-sm" disabled={guardandoYiqi} onClick={() => setConfirmandoYiqi(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+        {errorYiqi && <div className="mt-2 text-[12px] text-[var(--red)]">{errorYiqi}</div>}
+        {mensajeYiqi && <div className="mt-2 text-[12px] text-green-700">{mensajeYiqi}</div>}
+      </div>
 
       {/* Estado: último pedido, cuántos entrarían hoy, quién lo configuró */}
       <div className="border-t border-gray-100 bg-gray-50 px-4 py-2.5 text-[12px] text-[var(--sub)] flex flex-wrap gap-x-6 gap-y-1">

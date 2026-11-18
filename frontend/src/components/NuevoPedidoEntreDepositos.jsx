@@ -4,6 +4,8 @@ import { traerStockPorDeposito } from '../lib/stockPorDeposito'
 import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
 import { DEPOSITO_LOCAL, DEPOSITO_CENTRAL, DEPOSITO_OTRO, nombreDeposito, aDeposito } from '../lib/depositos'
 import { formatoNumero } from '../lib/formato'
+// 18/11/2026 — camino B: el pedido manual también se crea en YiQi como Remito interno (si el módulo está prendido).
+import { publicarPedidoEnYiqi } from './AvisoRemitoYiqi'
 
 // ============================================================
 // components/NuevoPedidoEntreDepositos.jsx — 17/11/2026
@@ -159,14 +161,19 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
         mate_nombre: p.mate_nombre,
         cantidad: Number(p.cantidad),
       }))
-      const { error: errRpc } = await supabase.rpc('crear_remito_reposicion_manual', {
+      const { data: rpcData, error: errRpc } = await supabase.rpc('crear_remito_reposicion_manual', {
         p_origen: origen,
         p_destino: destino,
         p_lineas: lineas,
       })
       if (errRpc) throw errRpc
+      // 18/11/2026 — publicar en YiQi (fire-and-forget con espera corta; con modo prueba no dice nada extra).
+      const enYiqi = await publicarPedidoEnYiqi(supabase, rpcData)
       if (typeof onCreado === 'function') {
-        onCreado(`Pedido enviado: ${nombreDeposito(origen)} lo va a ver en Solicitudes para preparar.`)
+        onCreado(
+          `Pedido enviado: ${nombreDeposito(origen)} lo va a ver en Solicitudes para preparar.` +
+            (enYiqi === 'creado' ? ' Se creó en YiQi como Remito interno.' : '')
+        )
       }
       onCerrar()
     } catch (err) {

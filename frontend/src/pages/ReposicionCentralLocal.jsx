@@ -15,6 +15,8 @@ import RemitoFirmado from '../components/RemitoFirmado'
 // 18/11/2026 — interruptor de la reposición automática Central→Local (pedido de Aris) y modo prueba YiQi.
 import ConfigReposicionAutomatica from '../components/ConfigReposicionAutomatica'
 import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
+// 18/11/2026 — camino B: pedidos que se gestionan en YiQi como Remito interno.
+import { tonoEstadoYiqi, textoRemitoYiqi, urlRemitoYiqi } from '../components/AvisoRemitoYiqi'
 
 // ============================================================
 // pages/ReposicionCentralLocal.jsx — 7/9/2026
@@ -247,7 +249,7 @@ function FilaLinea({ linea, modoPrueba }) {
   )
 }
 
-function FilaSolicitud({ solicitud, lineas, expandida, onToggle, modoPrueba, tuvoDiferencia }) {
+function FilaSolicitud({ solicitud, lineas, expandida, onToggle, modoPrueba, tuvoDiferencia, onLeerYiqi, leyendoYiqi }) {
   const estado = estadoDetallado(solicitud, lineas)
   const { pasos, sigue, resumen } = pasosDeSolicitud(solicitud, lineas)
   const difs = resumenDiferencias(lineas)
@@ -279,6 +281,27 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle, modoPrueba, tuv
               </Pastilla>
             </div>
           )}
+          {/* 18/11/2026 — camino B: estado del remito interno en YiQi. */}
+          {solicitud.gestion_en_yiqi && (
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <Pastilla
+                tono={tonoEstadoYiqi(solicitud.yiqi_remito_estado)}
+                title="Se gestiona en YiQi como Remito interno; este es su estado en YiQi"
+              >
+                YiQi N° {solicitud.yiqi_remito_nro ?? solicitud.yiqi_remito_id ?? '—'} · {solicitud.yiqi_remito_estado ?? 'sin estado'}
+              </Pastilla>
+              {solicitud.yiqi_hay_diferencias && (
+                <Pastilla tono="amarillo" title="YiQi registró diferencias entre lo enviado y lo recibido">
+                  Con diferencias en YiQi
+                </Pastilla>
+              )}
+              {solicitud.yiqi_error && (
+                <span className="text-[13px] cursor-help" title={`Error al escribir en YiQi: ${solicitud.yiqi_error}`} aria-label="Error con YiQi">
+                  ⚠️
+                </span>
+              )}
+            </div>
+          )}
           {/* 17/11/2026 — diferencias de recepción */}
           {difs.hay && (
             <div className="mt-1">
@@ -300,6 +323,36 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle, modoPrueba, tuv
             <div className="bg-white rounded-lg border border-[var(--border)] px-4 py-3 mb-2">
               <BarraPasos pasos={pasos} sigue={sigue} />
             </div>
+            {/* 18/11/2026 — camino B: el pedido se ejecuta en YiQi; acá solo se lee su estado. */}
+            {solicitud.gestion_en_yiqi && (
+              <div className="bg-blue-50 border border-blue-100 text-[#1d4ed8] rounded-lg px-3.5 py-2.5 mb-2 text-[13px] flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>
+                  Se gestiona en YiQi — {textoRemitoYiqi(solicitud)}. Última lectura:{' '}
+                  {solicitud.yiqi_sincronizado_en ? formatoFechaHora(solicitud.yiqi_sincronizado_en) : 'todavía ninguna'}.
+                  {urlRemitoYiqi(solicitud) && (
+                    <>
+                      {' '}
+                      <a href={urlRemitoYiqi(solicitud)} target="_blank" rel="noreferrer" className="font-semibold underline">
+                        Abrir en YiQi ↗
+                      </a>
+                    </>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={leyendoYiqi}
+                  onClick={() => onLeerYiqi?.(solicitud.id)}
+                  title="Consulta en YiQi cómo está este remito interno y actualiza el estado acá"
+                >
+                  {leyendoYiqi ? 'Leyendo…' : 'Leer estado de YiQi'}
+                </button>
+                {solicitud.yiqi_requiere_actualizar && (
+                  <span className="text-[#92400e] font-semibold">El pedido cambió en la app: falta actualizarlo en YiQi.</span>
+                )}
+                {solicitud.yiqi_error && <span className="text-[var(--red)]">Error con YiQi: {solicitud.yiqi_error}</span>}
+              </div>
+            )}
             {lineas.length === 0 ? (
               <div className="text-xs text-[var(--sub)] py-2">Sin líneas todavía.</div>
             ) : (
@@ -358,6 +411,9 @@ export default function ReposicionCentralLocal() {
   // 18/11/2026 — pedido de Aris: botón "Recalcular remitos" (fuerza la actualización del armado).
   const [recalculando, setRecalculando] = useState(false)
   const [errorRecalculo, setErrorRecalculo] = useState(null)
+  // 18/11/2026 — camino B: ¿está prendido "Crear el remito interno en YiQi"? (lo informa la tarjeta de configuración)
+  const [moduloYiqi, setModuloYiqi] = useState(false)
+  const [leyendoYiqi, setLeyendoYiqi] = useState(null)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -412,6 +468,30 @@ export default function ReposicionCentralLocal() {
 
   // 18/11/2026 — llama a forzar_actualizacion_reposicion(): reformula los pedidos en espera con el
   // stock de ahora y, si el automático está activo y hay lugar, crea los que falten.
+  // 18/11/2026 — lee de YiQi el estado del remito interno de un pedido (accion 'sincronizar').
+  async function leerEstadoYiqi(solicitudId) {
+    setLeyendoYiqi(solicitudId)
+    setErrorRecalculo(null)
+    try {
+      const { data, error: errFn } = await supabase.functions.invoke('remito-interno-yiqi', {
+        body: { accion: 'sincronizar', solicitud_id: solicitudId },
+      })
+      if (errFn) throw errFn
+      if (data?.modo_prueba) {
+        setAvisoCreado('Modo prueba: la escritura a YiQi está deshabilitada, no se leyó nada de YiQi.')
+      } else if (data?.error) {
+        throw new Error(data.error)
+      } else {
+        setAvisoCreado('Estado leído de YiQi.')
+      }
+      await cargar()
+    } catch (err) {
+      setErrorRecalculo(err?.message || 'No se pudo leer el estado de YiQi.')
+    } finally {
+      setLeyendoYiqi(null)
+    }
+  }
+
   async function recalcularRemitos() {
     setRecalculando(true)
     setErrorRecalculo(null)
@@ -439,6 +519,19 @@ export default function ReposicionCentralLocal() {
       } else {
         const t = partes.join(' y ')
         texto = t.charAt(0).toUpperCase() + t.slice(1) + '.'
+      }
+      // 18/11/2026 — con el módulo YiQi prendido, el recálculo también publica/actualiza/lee los remitos
+      // internos en YiQi (accion 'ciclo'). Fire-and-forget: no demora ni rompe el recálculo.
+      if (moduloYiqi) {
+        try {
+          supabase.functions
+            .invoke('remito-interno-yiqi', { body: { accion: 'ciclo' } })
+            .then(() => cargar())
+            .catch(() => {})
+        } catch {
+          /* el recálculo ya terminó bien */
+        }
+        texto += ' También se está actualizando YiQi (Remito interno) en segundo plano.'
       }
       setAvisoCreado(texto)
       setVersionAuto((v) => v + 1)
@@ -519,7 +612,10 @@ export default function ReposicionCentralLocal() {
       <div className="pagina flex flex-col gap-3.5">
       {/* 18/11/2026 — pedido de Aris: interruptor de la reposición automática (solo admin). */}
       {!permisos.cargando && permisos.esAdmin && (
-        <ConfigReposicionAutomatica onCambio={() => { setVersionAuto((v) => v + 1); cargar() }} />
+        <ConfigReposicionAutomatica
+          onCambio={() => { setVersionAuto((v) => v + 1); cargar() }}
+          onEstado={(e) => setModuloYiqi(e?.escribir_remito_en_yiqi === true)}
+        />
       )}
       <Aviso tipo="info" id="reposicion-central-local-criterio">
         Desde acá se puede crear un pedido entre depósitos, pero preparar, declarar envía/no hay y confirmar
@@ -595,6 +691,8 @@ export default function ReposicionCentralLocal() {
                     onToggle={() => toggle(s.id)}
                     modoPrueba={modoPrueba}
                     tuvoDiferencia={conDiferenciaHistorica.has(s.id)}
+                    onLeerYiqi={leerEstadoYiqi}
+                    leyendoYiqi={leyendoYiqi === s.id}
                   />
                 ))}
               </tbody>

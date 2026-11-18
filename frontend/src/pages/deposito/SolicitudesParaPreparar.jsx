@@ -9,6 +9,8 @@ import { generarRemitoImprimible } from '../../lib/pdfRemito'
 // 17/11/2026 — diferencias de recepción: bloque para quien envió.
 import DiferenciasRecepcion from '../../components/DiferenciasRecepcion'
 import RemitoFirmado from '../../components/RemitoFirmado'
+// 18/11/2026 — pedidos que se gestionan en YiQi como Remito interno: sin acciones en la app.
+import AvisoRemitoYiqi from '../../components/AvisoRemitoYiqi'
 
 // ============================================================
 // pages/deposito/SolicitudesParaPreparar.jsx — 7/9/2026, v3 10/9/2026
@@ -440,7 +442,7 @@ export default function SolicitudesParaPreparar() {
                     </div>
                   )}
                   {/* 18/11/2026 — pedido automático en espera: se reformula solo con el stock. */}
-                  {estaEnEspera(s) && (
+                  {!s.gestion_en_yiqi && estaEnEspera(s) && (
                     <div className="text-[11px] text-[var(--sub)] mt-1">
                       Pedido automático: se actualiza solo con el stock hasta que lo imprimas o declares el primer artículo.
                       {s.recalculado_en ? ` Actualizado: ${fechaHoraH23(s.recalculado_en)}` : ''}
@@ -448,7 +450,7 @@ export default function SolicitudesParaPreparar() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {s.estado === 'en_preparacion' && (
+                  {s.estado === 'en_preparacion' && !s.gestion_en_yiqi && (
                     <button
                       onClick={() => {
                         generarRemitoImprimible({
@@ -465,7 +467,11 @@ export default function SolicitudesParaPreparar() {
                       🖨️ Imprimir remito
                     </button>
                   )}
-                  {s.estado === 'solicitada' ? (
+                  {s.gestion_en_yiqi ? (
+                    <span className="text-[11px] font-semibold text-[#1d4ed8] bg-blue-50 px-2.5 py-1 rounded-full">
+                      Se gestiona en YiQi
+                    </span>
+                  ) : s.estado === 'solicitada' ? (
                     <button
                       onClick={() => generarRemito(s)}
                       disabled={generando === s.id}
@@ -486,7 +492,9 @@ export default function SolicitudesParaPreparar() {
                 </div>
               </div>
 
-              {s.estado === 'en_preparacion' && (
+              {s.gestion_en_yiqi && <AvisoRemitoYiqi solicitud={s} className="m-3.5" />}
+
+              {s.estado === 'en_preparacion' && !s.gestion_en_yiqi && (
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100">

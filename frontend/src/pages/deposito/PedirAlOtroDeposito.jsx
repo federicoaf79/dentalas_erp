@@ -4,6 +4,8 @@ import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
 import { DEPOSITO_OTRO, nombreDeposito, aDeposito } from '../../lib/depositos'
 import { formatoNumero } from '../../lib/formato'
+// 18/11/2026 — camino B: el pedido manual también se crea en YiQi como Remito interno (si el módulo está prendido).
+import { publicarPedidoEnYiqi } from '../../components/AvisoRemitoYiqi'
 
 // ============================================================
 // pages/deposito/PedirAlOtroDeposito.jsx — 7/9/2026
@@ -139,15 +141,18 @@ export default function PedirAlOtroDeposito() {
         mate_nombre: p.mate_nombre,
         cantidad: Number(p.cantidad),
       }))
-      const { error: errRpc } = await supabase.rpc('crear_remito_reposicion_manual', {
+      const { data: rpcData, error: errRpc } = await supabase.rpc('crear_remito_reposicion_manual', {
         p_origen: otroDeposito,
         p_destino: miDeposito,
         p_lineas: lineas,
       })
       if (errRpc) throw errRpc
       setCarrito([])
+      // 18/11/2026 — publicar en YiQi (fire-and-forget con espera corta; con modo prueba no dice nada extra).
+      const enYiqi = await publicarPedidoEnYiqi(supabase, rpcData)
       setAviso(
-        `Pedido enviado ${aDeposito(otroDeposito)} — ${lineas.length} artículo${lineas.length === 1 ? '' : 's'}.`
+        `Pedido enviado ${aDeposito(otroDeposito)} — ${lineas.length} artículo${lineas.length === 1 ? '' : 's'}.` +
+          (enYiqi === 'creado' ? ' Se creó en YiQi como Remito interno.' : '')
       )
       setTimeout(() => setAviso(null), 5000)
     } catch (err) {

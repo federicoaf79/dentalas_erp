@@ -6,6 +6,8 @@ import Aviso from '../../components/Aviso'
 import { deDeposito, nombreDeposito } from '../../lib/depositos'
 import { generarRemitoImprimible } from '../../lib/pdfRemito'
 import RemitoFirmado from '../../components/RemitoFirmado'
+// 18/11/2026 — pedidos que se gestionan en YiQi como Remito interno: sin acciones en la app.
+import AvisoRemitoYiqi from '../../components/AvisoRemitoYiqi'
 // 23/10/2026 — modo prueba YiQi (no autorizado Live)
 import AvisoModoPrueba from '../../components/ui/AvisoModoPrueba'
 import { useModoPruebaYiqi } from '../../hooks/useModoPruebaYiqi'
@@ -458,6 +460,8 @@ export default function ConfirmarRecepcion() {
   // 17/11/2026 — linea_id -> última corrección de lo enviado (reposicion_lineas_eventos).
   const [correcciones, setCorrecciones] = useState({})
   const [solicitudesPorId, setSolicitudesPorId] = useState({})
+  // 18/11/2026 — pedidos hacia mis depósitos que se gestionan en YiQi (no se confirman acá).
+  const [pedidosYiqi, setPedidosYiqi] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
@@ -485,6 +489,7 @@ export default function ConfirmarRecepcion() {
     if (!misDepositos.length) {
       setLineas([])
       setConDiferencia([])
+      setPedidosYiqi([])
       setLoading(false)
       return
     }
@@ -493,7 +498,8 @@ export default function ConfirmarRecepcion() {
     try {
       const { data: solicitudes, error: errSol } = await supabase
         .from('solicitudes_reposicion')
-        .select('id, remito_numero, deposito_origen_id, deposito_destino_id, creada_en')
+        // 18/11/2026 — select('*') para traer gestion_en_yiqi / yiqi_* sin romper si aún no existen.
+        .select('*')
         .in('deposito_destino_id', misDepositos)
         .eq('estado', 'en_preparacion')
       if (errSol) throw errSol
@@ -502,10 +508,13 @@ export default function ConfirmarRecepcion() {
       for (const s of solicitudes ?? []) mapaSol[s.id] = s
       setSolicitudesPorId(mapaSol)
 
-      const idsSolicitud = (solicitudes ?? []).map((s) => s.id)
+      // 18/11/2026 — los pedidos con gestion_en_yiqi se muestran con aviso y link; sus líneas no se tocan.
+      setPedidosYiqi((solicitudes ?? []).filter((s) => s.gestion_en_yiqi === true))
+      const idsSolicitud = (solicitudes ?? []).filter((s) => s.gestion_en_yiqi !== true).map((s) => s.id)
       if (!idsSolicitud.length) {
         setLineas([])
         setConDiferencia([])
+        setCorrecciones({})
         return
       }
 
@@ -796,13 +805,35 @@ export default function ConfirmarRecepcion() {
           </div>
         )}
 
+        {/* 18/11/2026 — pedidos que se gestionan en YiQi: sin botones, con link al remito interno. */}
+        {pedidosYiqi.length > 0 && (
+          <div className="bg-white rounded-xl border border-blue-100 overflow-hidden">
+            <div className="px-3.5 py-2.5 bg-blue-50 border-b border-blue-100 font-bold text-sm text-[#1d4ed8]">
+              Pedidos que se gestionan en YiQi ({pedidosYiqi.length})
+            </div>
+            <div className="p-3.5 space-y-2.5">
+              {pedidosYiqi.map((p) => (
+                <div key={p.id}>
+                  <div className="text-[12px] font-semibold mb-1">
+                    {p.remito_numero ?? `Solicitud #${p.id}`}
+                    <span className="text-[11px] text-[var(--sub)] font-normal ml-2">
+                      {deDeposito(p.deposito_origen_id)} · {formatoFechaHora(p.creada_en)}
+                    </span>
+                  </div>
+                  <AvisoRemitoYiqi solicitud={p} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {cargandoAlgo && lineas.length === 0 ? (
           <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center text-[var(--sub)] text-sm">
             Cargando…
           </div>
         ) : Object.keys(grupos).length === 0 ? (
           <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center text-[var(--sub)] text-sm">
-            {conDiferencia.length ? 'No hay más envíos para confirmar.' : 'No tenés nada pendiente de confirmar. 🎉'}
+            {conDiferencia.length || pedidosYiqi.length ? 'No hay más envíos para confirmar acá.' : 'No tenés nada pendiente de confirmar. 🎉'}
           </div>
         ) : (
           Object.entries(grupos).map(([solicitudId, filasLineas]) => {

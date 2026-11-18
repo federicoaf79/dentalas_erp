@@ -4,6 +4,8 @@ import { formatoNumero } from '../lib/formato'
 import { nombreDeposito } from '../lib/depositos'
 import Pastilla from './ui/Pastilla'
 import HistorialReposicion from './HistorialReposicion'
+// 18/11/2026 — pedidos que se gestionan en YiQi (Remito interno): sin acciones de la app.
+import { urlRemitoYiqi, textoRemitoYiqi } from './AvisoRemitoYiqi'
 
 // 17/11/2026 — diferencias de recepción: bloque para el depósito que ENVIÓ.
 // Muestra las líneas que el otro depósito confirmó con distinta cantidad que la enviada
@@ -227,7 +229,8 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
         const ids = [...new Set(conDif.map((l) => l.solicitud_id))]
         let q = supabase
           .from('solicitudes_reposicion')
-          .select('id, remito_numero, deposito_origen_id, deposito_destino_id')
+          // 18/11/2026 — select('*') para traer gestion_en_yiqi / yiqi_* sin romper si aún no existen.
+          .select('*')
           .in('id', ids)
         if (!esAdmin) q = q.in('deposito_origen_id', depositosOrigen)
         const { data: sols, error: e2 } = await q
@@ -329,7 +332,17 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
             const recibidaInicial = l.cantidad_recibida_inicial ?? l.cantidad_recibida
             const dif = Number(recibidaInicial) - Number(l.cantidad_enviada)
             const pendiente = l.estado_linea === 'con_diferencia'
-            const puedeResolver = esAdmin || depositosOrigen.map(Number).includes(Number(l.sol.deposito_origen_id))
+            // 18/11/2026 — si el pedido se gestiona en YiQi, no se resuelve desde la app.
+            const enYiqi = l.sol.gestion_en_yiqi === true
+            const puedeResolver = !enYiqi && (esAdmin || depositosOrigen.map(Number).includes(Number(l.sol.deposito_origen_id)))
+            const notaYiqi = enYiqi ? (
+              <span className="block text-[10px] text-[#1d4ed8] mt-0.5">
+                Se gestiona en YiQi: {textoRemitoYiqi(l.sol)}.{' '}
+                {urlRemitoYiqi(l.sol) && (
+                  <a href={urlRemitoYiqi(l.sol)} target="_blank" rel="noreferrer" className="font-semibold underline">Abrir en YiQi ↗</a>
+                )}
+              </span>
+            ) : null
             // 18/11/2026 — artículo que no estaba en el remito.
             if (l.no_previsto) {
               const aceptado = !pendiente && Number(l.cantidad_recibida) > 0
@@ -361,6 +374,7 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
                       <>
                         <span className="font-semibold text-amber-700">Pendiente: ¿lo aceptás?</span>
                         {puedeResolver && <ResolverNoPrevisto linea={l} onResuelto={alResolver} />}
+                        {notaYiqi}
                       </>
                     ) : aceptado ? (
                       <span className="text-green-700">
@@ -404,6 +418,7 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
                       {puedeResolver && (
                         <CorregirEnvio linea={l} onCorregido={alCorregir} />
                       )}
+                      {notaYiqi}
                     </>
                   ) : l.diferencia_revisada_en ? (
                     <span className="text-green-700">
