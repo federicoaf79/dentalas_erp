@@ -28,7 +28,7 @@ function numero(n) {
 function fecha(f) {
   if (!f) return '—'
   try {
-    return new Date(f).toLocaleString('es-AR', {
+    return new Date(f).toLocaleString('es-AR', { hourCycle: 'h23',
       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
     })
   } catch { return '—' }
@@ -214,6 +214,7 @@ export function generarRemitoImprimible({ solicitud, lineas, empresa, claseAbcPo
     <div class="firma">Preparado por (${esc(origen)})</div>
     <div class="firma">Recibido por (${esc(destino)}) / Fecha</div>
   </div>
+  <div class="gris" style="margin-top:8px;font-size:11px">Firmado: subir foto de este remito en la app (Confirmar recepción).</div>
 
   ${e.pie_pagina ? `<div class="pie">${esc(e.pie_pagina)}</div>` : ''}
 </div>
