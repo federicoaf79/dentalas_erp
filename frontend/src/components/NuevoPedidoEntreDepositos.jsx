@@ -34,6 +34,39 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
   const [error, setError] = useState(null)
   const [stock, setStock] = useState(null) // null = no cargado / no disponible
 
+  // 18/11/2026 — tope por stock real del depósito origen (RPC stock_disponible_deposito).
+  const [disp, setDisp] = useState({}) // sku -> {stock, reservado, disponible}
+  const [dispFalla, setDispFalla] = useState(false)
+
+  async function cargarDisp(skus, deposito) {
+    const lista = [...new Set((skus ?? []).filter(Boolean))]
+    if (!lista.length || !deposito) return
+    const { data, error: errDisp } = await supabase.rpc('stock_disponible_deposito', {
+      p_deposito: deposito,
+      p_skus: lista,
+    })
+    if (errDisp || !data || typeof data !== 'object') {
+      setDispFalla(true)
+      return
+    }
+    setDispFalla(false)
+    setDisp((prev) => ({ ...prev, ...data }))
+  }
+
+  // null = no se pudo leer (sin tope)
+  function disponibleDe(sku) {
+    const f = disp[sku]
+    if (!f) return null
+    return Number(f.disponible ?? 0)
+  }
+
+  // Al cambiar la dirección, el disponible cambia de depósito: se vuelve a leer para lo ya visible.
+  useEffect(() => {
+    setDisp({})
+    cargarDisp([...resultados.map((r) => r.mate_codigo), ...carrito.map((c) => c.sku)], origen)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origen])
+
   // Stock por depósito: si falla, simplemente no se muestra.
   useEffect(() => {
     let vivo = true
@@ -76,6 +109,8 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
       if (!errRpc && rpcData && Array.isArray(rpcData.items)) {
         setResultados(rpcData.items)
         setTotal(Number(rpcData.total ?? rpcData.items.length))
+        // 18/11/2026 — disponible real del origen para los resultados.
+        cargarDisp(rpcData.items.map((i) => i.mate_codigo), origen)
       } else {
         const { data, error: errBusq } = await supabase
           .from('material_yiqi')
@@ -85,6 +120,7 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
         if (errBusq) throw errBusq
         setResultados(data ?? [])
         setTotal(null)
+        cargarDisp((data ?? []).map((i) => i.mate_codigo), origen)
       }
       setBuscado(texto)
     } catch (err) {
@@ -105,7 +141,13 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
     setCarrito((prev) => prev.map((p) => (p.sku === sku ? { ...p, cantidad } : p)))
   const quitar = (sku) => setCarrito((prev) => prev.filter((p) => p.sku !== sku))
 
-  const carritoValido = carrito.length > 0 && carrito.every((p) => Number(p.cantidad) > 0)
+  // 18/11/2026 — una línea "pasada" supera el disponible real del origen (sin dato = sin tope).
+  const pasada = (p) => {
+    const d = disponibleDe(p.sku)
+    return d !== null && Number(p.cantidad) > d
+  }
+  const carritoValido =
+    carrito.length > 0 && carrito.every((p) => Number(p.cantidad) > 0) && !carrito.some(pasada)
 
   async function enviar() {
     if (!carritoValido || enviando) return
@@ -208,6 +250,10 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
           </div>
         )}
 
+        {dispFalla && (
+          <div className="mt-2 text-[12px] text-amber-700">No se pudo leer el stock: el pedido se envía sin tope de cantidad.</div>
+        )}
+
         {resultados.length > 0 && (
           <div className="mt-2 border border-[var(--border)] rounded-xl overflow-hidden max-h-56 overflow-y-auto">
             {resultados.map((r) => {
@@ -220,17 +266,25 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
                   <div className="min-w-0">
                     <div className="font-mono text-xs">{r.mate_codigo}</div>
                     <div className="text-sm truncate">{r.mate_nombre}</div>
-                    {s !== null && (
+                    {/* 18/11/2026 — disponible real (stock menos lo ya comprometido en pedidos abiertos) */}
+                    {disponibleDe(r.mate_codigo) !== null ? (
                       <div className="text-[11px] text-[var(--sub)]">
-                        Stock en {nombreDeposito(origen)}: {formatoNumero(s)}
+                        Disponible en {nombreDeposito(origen)}: {formatoNumero(disponibleDe(r.mate_codigo), { decimales: 2, minDecimales: 0 })}
                       </div>
+                    ) : (
+                      s !== null && (
+                        <div className="text-[11px] text-[var(--sub)]">
+                          Stock en {nombreDeposito(origen)}: {formatoNumero(s)}
+                        </div>
+                      )
                     )}
                   </div>
                   <button
                     onClick={() => agregar(r)}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[var(--ind-bg)] text-[var(--ind)] hover:opacity-80 flex-shrink-0"
+                    disabled={disponibleDe(r.mate_codigo) === 0}
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[var(--ind-bg)] text-[var(--ind)] hover:opacity-80 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    + Agregar
+                    {disponibleDe(r.mate_codigo) === 0 ? `Sin stock en ${nombreDeposito(origen)}` : '+ Agregar'}
                   </button>
                 </div>
               )
@@ -248,15 +302,23 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
             <div className="border border-[var(--border)] rounded-xl overflow-hidden">
               {carrito.map((p) => {
                 const s = stockOrigen(p.sku)
+                const d = disponibleDe(p.sku)
                 return (
-                  <div key={p.sku} className="flex items-center gap-2 px-3.5 py-2 border-b border-gray-50 last:border-0">
+                  <div key={p.sku} className="px-3.5 py-2 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="font-mono text-xs">{p.sku}</div>
                       <div className="text-sm truncate">{p.mate_nombre}</div>
-                      {s !== null && (
+                      {d !== null ? (
                         <div className="text-[11px] text-[var(--sub)]">
-                          Stock en {nombreDeposito(origen)}: {formatoNumero(s)}
+                          Disponible en {nombreDeposito(origen)}: {formatoNumero(d, { decimales: 2, minDecimales: 0 })}
                         </div>
+                      ) : (
+                        s !== null && (
+                          <div className="text-[11px] text-[var(--sub)]">
+                            Stock en {nombreDeposito(origen)}: {formatoNumero(s)}
+                          </div>
+                        )
                       )}
                     </div>
                     <input
@@ -274,6 +336,20 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
                     >
                       <i className="ti ti-x" />
                     </button>
+                  </div>
+                  {pasada(p) && (
+                    <div className="mt-1.5 flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-2.5 py-1.5 text-[12px]">
+                      <span>No hay más en stock: máximo disponible real {formatoNumero(d, { decimales: 2, minDecimales: 0 })}</span>
+                      {d > 0 && (
+                        <button
+                          onClick={() => actualizarCantidad(p.sku, String(d))}
+                          className="px-2 py-0.5 rounded text-[11px] font-semibold bg-white border border-amber-300 hover:bg-amber-100 flex-shrink-0"
+                        >
+                          Usar {formatoNumero(d, { decimales: 2, minDecimales: 0 })}
+                        </button>
+                      )}
+                    </div>
+                  )}
                   </div>
                 )
               })}

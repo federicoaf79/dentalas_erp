@@ -4,10 +4,11 @@ import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
 import { useEstadoAutomatismos } from '../../hooks/useEstadoAutomatismos'
-import { nombreDeposito, DEPOSITO_CENTRAL } from '../../lib/depositos'
+import { nombreDeposito, DEPOSITO_CENTRAL, DEPOSITO_LOCAL } from '../../lib/depositos'
 import { generarRemitoImprimible } from '../../lib/pdfRemito'
 // 17/11/2026 — diferencias de recepción: bloque para quien envió.
 import DiferenciasRecepcion from '../../components/DiferenciasRecepcion'
+import RemitoFirmado from '../../components/RemitoFirmado'
 
 // ============================================================
 // pages/deposito/SolicitudesParaPreparar.jsx — 7/9/2026, v3 10/9/2026
@@ -83,7 +84,7 @@ function numInput(v) {
 function formatoFechaHora(fechaStr) {
   if (!fechaStr) return '—'
   try {
-    return new Date(fechaStr).toLocaleString('es-AR')
+    return new Date(fechaStr).toLocaleString('es-AR', { hourCycle: 'h23' })
   } catch {
     return fechaStr
   }
@@ -91,7 +92,7 @@ function formatoFechaHora(fechaStr) {
 
 // Un solo campo de cantidad enviada — lo que falta queda como "no hay"
 // automático, con el motivo que se escriba acá al lado.
-function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
+function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando, stockAca }) {
   const [cantidad, setCantidad] = useState(numInput(linea.cantidad_solicitada))
   const [motivo, setMotivo] = useState('')
 
@@ -100,6 +101,8 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
   // de menos o de más, se asienta el motivo.
   const sobrante = Math.max((Number(cantidad) || 0) - Number(linea.cantidad_solicitada), 0)
   const necesitaMotivo = faltante > 0 || sobrante > 0
+  // 18/11/2026 — aviso (no bloquea): se declara enviar más de lo que figura en stock en YiQi.
+  const pasaDelStock = stockAca != null && (Number(cantidad) || 0) > stockAca
 
   return (
     <tr className="border-b border-gray-100 last:border-0">
@@ -109,6 +112,8 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
       </td>
       <td className="px-3.5 py-1.5 text-sm">{linea.mate_nombre}</td>
       <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(linea.cantidad_solicitada)}</td>
+      {/* 18/11/2026 — stock real de YiQi del propio depósito */}
+      <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{stockAca != null ? num(stockAca) : '—'}</td>
       <td className="px-3.5 py-1.5">
         <input
           type="number"
@@ -116,6 +121,11 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
           onChange={(e) => setCantidad(e.target.value)}
           className="w-24 border border-[var(--border)] rounded-lg px-2 py-1 text-sm"
         />
+        {pasaDelStock && (
+          <div className="mt-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+            Declarás más de lo que figura en stock ({num(stockAca)})
+          </div>
+        )}
       </td>
       <td className="px-3.5 py-1.5">
         {necesitaMotivo ? (
@@ -127,7 +137,7 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando }) {
             className="w-56 border border-[var(--border)] rounded-lg px-2 py-1 text-sm"
           />
         ) : (
-          <span className="text-[11px] text-green-700">Envía todo lo pedido</span>
+          <span className="text-[11px] text-gray-500" title="18/11/2026: en gris, porque en verde se leía como ya hecho">Sin faltante</span>
         )}
       </td>
       <td className="px-3.5 py-1.5">
@@ -170,6 +180,14 @@ export default function SolicitudesParaPreparar() {
   // SKU -> clase_abc real (Aris), leída de la línea del remito (30/9/2026;
   // migración 20260930100000) — el depósito no lee ventas.
   const [claseAbcPorSku, setClaseAbcPorSku] = useState({})
+  // 18/11/2026 — SKU -> {stock_local, stock_central} de YiQi, para la columna "Stock acá".
+  const [stockPorSku, setStockPorSku] = useState({})
+  const stockAcaDe = (sku, origen) => {
+    const f = stockPorSku[sku]
+    if (!f) return null
+    const v = origen === DEPOSITO_LOCAL ? f.stock_local : origen === DEPOSITO_CENTRAL ? f.stock_central : null
+    return v == null ? null : Number(v)
+  }
 
   const misDepositos = permisos.misDepositos ?? []
   const claveFiltro = permisos.cargando || permisos.error ? null : misDepositos.join(',')
@@ -225,11 +243,16 @@ export default function SolicitudesParaPreparar() {
         if (skus.length) {
           const { data: filasStock } = await supabase
             .from('stock_yiqi')
-            .select('sku, en_transito')
+            .select('sku, en_transito, stock_local, stock_central')
             .in('sku', skus)
           const mapaStock = {}
-          for (const f of filasStock ?? []) mapaStock[f.sku] = f.en_transito
+          const mapaStockAca = {}
+          for (const f of filasStock ?? []) {
+            mapaStock[f.sku] = f.en_transito
+            mapaStockAca[f.sku] = { stock_local: f.stock_local, stock_central: f.stock_central }
+          }
           setEnTransitoYiqi(mapaStock)
+          setStockPorSku(mapaStockAca)
 
           // Clase ABC congelada en la línea al generarse el remito
           // (migración 20260930100000). El depósito no llama más a
@@ -313,7 +336,7 @@ export default function SolicitudesParaPreparar() {
 
       {/* 17/11/2026 — diferencias de recepción: líneas que el destino confirmó con distinta cantidad que la enviada. */}
       {claveFiltro !== null && (
-        <DiferenciasRecepcion depositosOrigen={misDepositos} esAdmin={!!permisos.esAdmin} />
+        <DiferenciasRecepcion depositosOrigen={misDepositos} esAdmin={!!permisos.esAdmin} onCambio={cargar} />
       )}
 
       {permisos.error && (
@@ -359,6 +382,12 @@ export default function SolicitudesParaPreparar() {
                   <span className="text-[11px] text-[var(--sub)] ml-2">
                     → {nombreDeposito(s.deposito_destino_id)} · {formatoFechaHora(s.creada_en)}
                   </span>
+                  {/* 18/11/2026 — copia firmada del remito (también la puede subir el que envía). */}
+                  {s.estado === 'en_preparacion' && (
+                    <div className="mt-1">
+                      <RemitoFirmado solicitudId={s.id} compacto />
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {s.estado === 'en_preparacion' && (
@@ -402,7 +431,7 @@ export default function SolicitudesParaPreparar() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['SKU', 'Clase', 'Producto', 'Pedido', 'Envía', 'Motivo si falta', ''].map((h) => (
+                      {['SKU', 'Clase', 'Producto', 'Pedido', 'Stock acá', 'Envía', 'Motivo si falta', ''].map((h) => (
                         <th
                           key={h}
                           className="text-left px-3.5 py-1.5 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide"
@@ -415,7 +444,7 @@ export default function SolicitudesParaPreparar() {
                   <tbody>
                     {(lineasPorSolicitud[s.id] ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-3.5 py-4 text-center text-[var(--sub)] text-sm">
+                        <td colSpan={8} className="px-3.5 py-4 text-center text-[var(--sub)] text-sm">
                           No hay artículos con necesidad neta en este momento.
                         </td>
                       </tr>
@@ -428,6 +457,7 @@ export default function SolicitudesParaPreparar() {
                             claseAbc={l.clase_abc ?? claseAbcPorSku[l.sku]}
                             onDeclarar={declararLinea}
                             guardando={declarando === l.id}
+                            stockAca={stockAcaDe(l.sku, s.deposito_origen_id)}
                           />
                         ) : (
                           <tr key={l.id} className="border-b border-gray-50 last:border-0 bg-gray-50/50">
@@ -437,6 +467,7 @@ export default function SolicitudesParaPreparar() {
                             </td>
                             <td className="px-3.5 py-1.5 text-sm">{l.mate_nombre}</td>
                             <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">{num(l.cantidad_solicitada)}</td>
+                            <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">—</td>
                             <td className="px-3.5 py-1.5 text-sm font-semibold">
                               {num(l.cantidad_enviada)}
                               {enTransitoYiqi[l.sku] != null && l.estado_linea !== 'recibida' && (

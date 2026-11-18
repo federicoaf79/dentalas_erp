@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
 import { DEPOSITO_OTRO, nombreDeposito, aDeposito } from '../../lib/depositos'
+import { formatoNumero } from '../../lib/formato'
 
 // ============================================================
 // pages/deposito/PedirAlOtroDeposito.jsx — 7/9/2026
@@ -37,6 +38,32 @@ export default function PedirAlOtroDeposito() {
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
 
+  // 18/11/2026 — tope por stock real del depósito origen (RPC stock_disponible_deposito).
+  const [disp, setDisp] = useState({}) // sku -> {stock, reservado, disponible}
+  const [dispFalla, setDispFalla] = useState(false)
+
+  async function cargarDisp(skus, deposito) {
+    const lista = [...new Set((skus ?? []).filter(Boolean))]
+    if (!lista.length || !deposito) return
+    const { data, error: errDisp } = await supabase.rpc('stock_disponible_deposito', {
+      p_deposito: deposito,
+      p_skus: lista,
+    })
+    if (errDisp || !data || typeof data !== 'object') {
+      setDispFalla(true)
+      return
+    }
+    setDispFalla(false)
+    setDisp((prev) => ({ ...prev, ...data }))
+  }
+
+  // null = no se pudo leer (sin tope)
+  function disponibleDe(sku) {
+    const f = disp[sku]
+    if (!f) return null
+    return Number(f.disponible ?? 0)
+  }
+
   async function buscar() {
     if (busqueda.trim().length < 2) {
       setResultados([])
@@ -58,6 +85,8 @@ export default function PedirAlOtroDeposito() {
       if (!errRpc && rpcData && Array.isArray(rpcData.items)) {
         setResultados(rpcData.items)
         setTotal(Number(rpcData.total ?? rpcData.items.length))
+        // 18/11/2026 — disponible real del origen para los resultados.
+        cargarDisp(rpcData.items.map((i) => i.mate_codigo), otroDeposito)
       } else {
         const { data, error: errBusq } = await supabase
           .from('material_yiqi')
@@ -67,6 +96,7 @@ export default function PedirAlOtroDeposito() {
         if (errBusq) throw errBusq
         setResultados(data ?? [])
         setTotal(null)
+        cargarDisp((data ?? []).map((i) => i.mate_codigo), otroDeposito)
       }
       setBuscado(texto)
     } catch (err) {
@@ -91,7 +121,13 @@ export default function PedirAlOtroDeposito() {
     setCarrito((prev) => prev.filter((p) => p.sku !== sku))
   }
 
-  const carritoValido = carrito.length > 0 && carrito.every((p) => Number(p.cantidad) > 0)
+  // 18/11/2026 — una línea "pasada" supera el disponible real del origen (sin dato = sin tope).
+  const pasada = (p) => {
+    const d = disponibleDe(p.sku)
+    return d !== null && Number(p.cantidad) > d
+  }
+  const hayPasadas = carrito.some(pasada)
+  const carritoValido = carrito.length > 0 && carrito.every((p) => Number(p.cantidad) > 0) && !hayPasadas
 
   async function enviarPedido() {
     if (!miDeposito || !otroDeposito || !carritoValido) return
@@ -188,6 +224,10 @@ export default function PedirAlOtroDeposito() {
         </div>
       )}
 
+      {dispFalla && (
+        <div className="mx-4 mt-2 max-w-xl text-[12px] text-amber-700">No se pudo leer el stock: el pedido se envía sin tope de cantidad.</div>
+      )}
+
       {resultados.length > 0 && (
         <div className="mx-4 mt-2 max-w-xl bg-white rounded-xl border border-[var(--border)] overflow-hidden max-h-64 overflow-y-auto">
           {resultados.map((r) => (
@@ -198,17 +238,19 @@ export default function PedirAlOtroDeposito() {
               <div className="min-w-0">
                 <div className="font-mono text-xs">{r.mate_codigo}</div>
                 <div className="text-sm truncate">{r.mate_nombre}</div>
-                {r.stock_local !== undefined && (
+                {/* 18/11/2026 — disponible real en el depósito al que se le pide */}
+                {disponibleDe(r.mate_codigo) !== null && (
                   <div className="text-[11px] text-[var(--sub)]">
-                    Local: {Number(r.stock_local ?? 0)} · Central: {Number(r.stock_central ?? 0)}
+                    Disponible {otroDeposito ? `en ${nombreDeposito(otroDeposito)}` : ''}: {formatoNumero(disponibleDe(r.mate_codigo), { decimales: 2, minDecimales: 0 })}
                   </div>
                 )}
               </div>
               <button
                 onClick={() => agregarAlCarrito(r)}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[var(--ind-bg)] text-[var(--ind)] hover:opacity-80 flex-shrink-0"
+                disabled={disponibleDe(r.mate_codigo) === 0}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[var(--ind-bg)] text-[var(--ind)] hover:opacity-80 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                + Agregar
+                {disponibleDe(r.mate_codigo) === 0 ? `Sin stock en ${nombreDeposito(otroDeposito)}` : '+ Agregar'}
               </button>
             </div>
           ))}
@@ -223,27 +265,50 @@ export default function PedirAlOtroDeposito() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
-            {carrito.map((p) => (
-              <div key={p.sku} className="flex items-center gap-2 px-3.5 py-2 border-b border-gray-50 last:border-0">
-                <div className="flex-1 min-w-0">
-                  <div className="font-mono text-xs">{p.sku}</div>
-                  <div className="text-sm truncate">{p.mate_nombre}</div>
+            {carrito.map((p) => {
+              const d = disponibleDe(p.sku)
+              return (
+                <div key={p.sku} className="px-3.5 py-2 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-xs">{p.sku}</div>
+                      <div className="text-sm truncate">{p.mate_nombre}</div>
+                      {d !== null && (
+                        <div className="text-[11px] text-[var(--sub)]">
+                          Disponible en {nombreDeposito(otroDeposito)}: {formatoNumero(d, { decimales: 2, minDecimales: 0 })}
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      value={p.cantidad}
+                      onChange={(e) => actualizarCantidad(p.sku, e.target.value)}
+                      className="w-20 border border-[var(--border)] rounded-lg px-2 py-1 text-sm"
+                    />
+                    <button
+                      onClick={() => quitarDelCarrito(p.sku)}
+                      title="Quitar"
+                      className="text-gray-400 hover:text-[var(--red)] text-sm px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {pasada(p) && (
+                    <div className="mt-1.5 flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-2.5 py-1.5 text-[12px]">
+                      <span>No hay más en stock: máximo disponible real {formatoNumero(d, { decimales: 2, minDecimales: 0 })}</span>
+                      {d > 0 && (
+                        <button
+                          onClick={() => actualizarCantidad(p.sku, String(d))}
+                          className="px-2 py-0.5 rounded text-[11px] font-semibold bg-white border border-amber-300 hover:bg-amber-100 flex-shrink-0"
+                        >
+                          Usar {formatoNumero(d, { decimales: 2, minDecimales: 0 })}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <input
-                  type="number"
-                  value={p.cantidad}
-                  onChange={(e) => actualizarCantidad(p.sku, e.target.value)}
-                  className="w-20 border border-[var(--border)] rounded-lg px-2 py-1 text-sm"
-                />
-                <button
-                  onClick={() => quitarDelCarrito(p.sku)}
-                  title="Quitar"
-                  className="text-gray-400 hover:text-[var(--red)] text-sm px-1"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
