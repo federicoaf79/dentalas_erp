@@ -459,3 +459,8 @@ verify_jwt = false
 # entrada, un deploy la dejaba con verify_jwt=true (default).
 [functions.mover-stock-reposicion]
 verify_jwt = false
+
+# 18/11/2026 -- remito-interno-yiqi usa verificarLlamador() (auth propia, mismo criterio que las
+# de arriba): la llama el cron con la service key y el front con la sesión del usuario.
+[functions.remito-interno-yiqi]
+verify_jwt = false

@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
     // de forma directa contra el schema cache sin configurarlo).
     const { data: linea, error: errLinea } = await supabaseAdmin
       .from('solicitudes_reposicion_lineas')
-      .select('*, solicitudes_reposicion:solicitud_id (deposito_origen_id, deposito_destino_id)')
+      .select('*, solicitudes_reposicion:solicitud_id (deposito_origen_id, deposito_destino_id, gestion_en_yiqi, yiqi_remito_nro)')
       .eq('id', lineaId)
       .maybeSingle();
 
@@ -95,6 +95,16 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ ok: false, error: `No existe la línea #${lineaId}` }),
         { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 18/11/2026 — Remito Interno en YiQi (camino B): si el pedido se gestiona en YiQi, YiQi mueve el
+    // stock solo al procesar el remito ("Crea mov. de stock de los recibidos"). Escribir además un
+    // MOVIMIENTO_STOCK lo duplicaría. No se escribe nada.
+    if (linea.solicitudes_reposicion?.gestion_en_yiqi === true) {
+      return new Response(
+        JSON.stringify({ ok: true, enviada: false, motivo: 'Lo gestiona YiQi (Remito Interno): YiQi mueve el stock al procesar' }),
+        { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
 
