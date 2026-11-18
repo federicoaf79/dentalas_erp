@@ -11,6 +11,10 @@ import EncabezadoPagina from '../components/ui/EncabezadoPagina'
 import NuevoPedidoEntreDepositos from '../components/NuevoPedidoEntreDepositos'
 import Pastilla from '../components/ui/Pastilla'
 import HistorialReposicion from '../components/HistorialReposicion'
+import RemitoFirmado from '../components/RemitoFirmado'
+// 18/11/2026 — interruptor de la reposición automática Central→Local (pedido de Aris) y modo prueba YiQi.
+import ConfigReposicionAutomatica from '../components/ConfigReposicionAutomatica'
+import { useModoPruebaYiqi } from '../hooks/useModoPruebaYiqi'
 
 // ============================================================
 // pages/ReposicionCentralLocal.jsx — 7/9/2026
@@ -28,18 +32,15 @@ import HistorialReposicion from '../components/HistorialReposicion'
 // Esta pantalla es de solo lectura — ninguna acción del circuito se
 // hace acá, esas siguen siendo las 3 pantallas de depósito.
 //
-// A propósito NO incluye todavía la configuración de
-// reglas_reposicion_central: los parámetros reales (frecuencia,
-// umbral) los tiene que definir Aris (ver RELEVAMIENTO_impacto_
-// equipo_deposito_7-9-2026.md) y ningún job los consume todavía —
-// construir esa UI ahora sería resolver un problema que no existe
-// aún. Se agrega en una tanda futura, cuando el job periódico exista.
+// 18/11/2026: la configuración de reglas_reposicion_central (interruptor
+// Activada/Pausada, frecuencia, máximo por remito, umbral) vive arriba de la
+// lista, en ConfigReposicionAutomatica (pedido de Aris).
 // ============================================================
 
 function formatoFechaHora(fechaStr) {
   if (!fechaStr) return '—'
   try {
-    return new Date(fechaStr).toLocaleString('es-AR')
+    return new Date(fechaStr).toLocaleString('es-AR', { hourCycle: 'h23' })
   } catch {
     return fechaStr
   }
@@ -84,7 +85,7 @@ function fechaPaso(valor) {
   if (!valor) return null
   const d = new Date(valor)
   if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString('es-AR', { hourCycle: 'h23', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 // Fecha más temprana (modo 'min') o más tardía (modo 'max') de las columnas
@@ -107,14 +108,19 @@ function pasosDeSolicitud(solicitud, lineas) {
   const recibida = completada || todasRecibidas
   const enPreparacion = solicitud.estado !== 'solicitada'
   const enTransito = recibida || lineas.some((l) => ESTADOS_LINEA_EN_CAMINO.includes(l.estado_linea))
-  const hechos = [true, enPreparacion, enTransito, recibida]
-  const idxActual = hechos.indexOf(false) // primer paso no hecho (-1 = circuito cerrado)
   const anulada = solicitud.estado === 'anulada'
   const reemplazada = solicitud.estado === 'reemplazada'
+  // 18/11/2026 — "En preparación" sigue siendo el paso actual hasta que el origen declara
+  // lo que envía (antes, con el remito generado y sin declarar, decía "Paso 3 · En tránsito").
+  // En anuladas/reemplazadas se mantiene el criterio anterior (remito generado = preparación hecha).
+  const preparacionHecha = anulada || reemplazada ? enPreparacion : enTransito
+  const sinDeclarar = lineas.filter((l) => l.estado_linea === 'reservada').length
+  const hechos = [true, preparacionHecha, enTransito, recibida]
+  const idxActual = hechos.indexOf(false) // primer paso no hecho (-1 = circuito cerrado)
 
   const fechas = [
     fechaPaso(solicitud.creada_en),
-    enPreparacion ? fechaPaso(solicitud.procesada_en) : null,
+    enPreparacion ? fechaPaso(solicitud.procesada_en) : null, // 18/11/2026: fecha del remito aunque falte declarar
     enTransito ? fechaPaso(fechaExtrema(lineas, ['declarada_en'], 'min')) : null,
     recibida ? fechaPaso(fechaExtrema(lineas, ['recibida_en'], 'max') ?? solicitud.cerrada_en) : null,
   ]
@@ -133,16 +139,22 @@ function pasosDeSolicitud(solicitud, lineas) {
   if (anulada) sigue = corteEn ? `Solicitud anulada: el pedido se cortó antes de «${corteEn}».` : 'Solicitud anulada.'
   else if (reemplazada) sigue = 'Solicitud reemplazada por otra: este pedido ya no sigue el circuito.'
   else if (idxActual === -1) sigue = 'Recibida completa. No queda nada pendiente.'
-  else if (idxActual === 1) sigue = `Esperando que ${origen} genere el remito.`
+  else if (idxActual === 1) sigue = solicitud.estado === 'solicitada'
+    ? `Esperando que ${origen} genere el remito.`
+    : `Remito generado. Falta que ${origen} declare lo que envía.`
   else if (idxActual === 2) sigue = `${origen} está preparando el pedido; todavía no declaró el envío.`
-  else sigue = `Mercadería en camino. Esperando que ${destino} confirme la recepción.`
+  else sigue = `Mercadería en camino. Esperando que ${destino} confirme la recepción.${sinDeclarar > 0 ? ` Quedan ${sinDeclarar} artículos sin declarar en ${origen}.` : ''}`
 
   // Mini indicación para la fila contraída (no aplica a anuladas/reemplazadas).
   const resumen = anulada || reemplazada
     ? null
     : idxActual === -1
       ? `Paso 4 de 4 · ${PASOS_REPOSICION[3]}`
-      : `Paso ${idxActual + 1} de 4 · ${PASOS_REPOSICION[idxActual]}`
+      : idxActual === 1 && enPreparacion
+        ? `Paso 2 de 4 · ${PASOS_REPOSICION[1]} — falta declarar`
+        : idxActual === 3 && sinDeclarar > 0
+          ? `Paso 3 de 4 · ${PASOS_REPOSICION[2]} parcial — quedan ${sinDeclarar} sin declarar`
+          : `Paso ${idxActual + 1} de 4 · ${PASOS_REPOSICION[idxActual]}`
 
   return { pasos, sigue, resumen }
 }
@@ -183,7 +195,7 @@ const FILTROS = [
   { key: 'todas', label: 'Todas' },
 ]
 
-function FilaLinea({ linea }) {
+function FilaLinea({ linea, modoPrueba }) {
   const tieneError = !!linea.yiqi_error
   const dif = difLinea(linea)
   return (
@@ -221,6 +233,9 @@ function FilaLinea({ linea }) {
             <span className="text-[var(--red)]" title={linea.yiqi_error}>⚠️ error YiQi</span>
           ) : linea.yiqi_movimiento_id ? (
             <span className="text-[var(--grn,#059669)]">✓ {linea.yiqi_movimiento_id}</span>
+          ) : modoPrueba ? (
+            // 18/11/2026 — en modo prueba la app no escribe en YiQi: no es un "pendiente" real.
+            <span className="text-[var(--sub)]" title="El modo prueba no escribe movimientos en YiQi">modo prueba</span>
           ) : (
             <span className="text-[var(--sub)]">pendiente</span>
           )
@@ -232,7 +247,7 @@ function FilaLinea({ linea }) {
   )
 }
 
-function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
+function FilaSolicitud({ solicitud, lineas, expandida, onToggle, modoPrueba, tuvoDiferencia }) {
   const estado = estadoDetallado(solicitud, lineas)
   const { pasos, sigue, resumen } = pasosDeSolicitud(solicitud, lineas)
   const difs = resumenDiferencias(lineas)
@@ -248,13 +263,22 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
           {nombreDeposito(solicitud.deposito_origen_id)} → {nombreDeposito(solicitud.deposito_destino_id)}
         </td>
         <td className="px-3.5 py-2 text-xs text-[var(--sub)]">
-          {solicitud.generada_por === 'manual' ? 'Manual' : 'Regla automática'}
+          {/* 18/11/2026 — antes "Origen / Regla automática": se confundía con el depósito origen. */}
+          {solicitud.generada_por === 'manual' ? 'Manual' : 'Automático'}
         </td>
         <td className="px-3.5 py-2 text-xs text-[var(--sub)]">{formatoFechaHora(solicitud.creada_en)}</td>
         <td className={`px-3.5 py-2 text-sm ${estado.clase}`}>
           {estado.texto}
           {/* 23/10/2026 — feedback Ivana: paso actual del circuito, sin tocar las columnas. */}
           {resumen && <div className="text-[10px] font-normal text-[var(--sub)] mt-0.5">{resumen}</div>}
+          {/* 18/11/2026 — un pedido que tuvo diferencia y se corrigió termina "✓ Completa" sin señal: la marcamos. */}
+          {!difs.hay && tuvoDiferencia && (
+            <div className="mt-1">
+              <Pastilla tono="gris" title="Al recibir hubo una diferencia con lo enviado; ya se resolvió (ver el historial del pedido)">
+                Tuvo diferencia (resuelta)
+              </Pastilla>
+            </div>
+          )}
           {/* 17/11/2026 — diferencias de recepción */}
           {difs.hay && (
             <div className="mt-1">
@@ -291,11 +315,15 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
                 </thead>
                 <tbody>
                   {lineas.map((l) => (
-                    <FilaLinea key={l.id} linea={l} />
+                    <FilaLinea key={l.id} linea={l} modoPrueba={modoPrueba} />
                   ))}
                 </tbody>
               </table>
             )}
+            {/* 18/11/2026 — copia firmada del remito (solo ver). */}
+            <div className="bg-white rounded-lg border border-[var(--border)] px-3.5 py-2 mt-2">
+              <RemitoFirmado solicitudId={solicitud.id} puedeSubir={false} />
+            </div>
             {/* 17/11/2026 — historial de cada artículo (declaró, recibió, corrigió, revisó). */}
             <HistorialReposicion
               solicitudId={solicitud.id}
@@ -312,7 +340,12 @@ function FilaSolicitud({ solicitud, lineas, expandida, onToggle }) {
 export default function ReposicionCentralLocal() {
   const permisos = usePermisos()
   // 10/11/2026 — radiografía UX (ítem 18): null = no se sabe (no se muestra nada).
-  const automatismos = useEstadoAutomatismos()
+  // 18/11/2026 — `versionAuto` se incrementa al activar/pausar desde la tarjeta para refrescar el aviso.
+  const [versionAuto, setVersionAuto] = useState(0)
+  const automatismos = useEstadoAutomatismos(versionAuto)
+  const { modoPrueba } = useModoPruebaYiqi()
+  // 18/11/2026 — ids de pedidos que tuvieron una diferencia de recepción (aunque ya esté resuelta).
+  const [conDiferenciaHistorica, setConDiferenciaHistorica] = useState(() => new Set())
   const [solicitudes, setSolicitudes] = useState([])
   const [lineasPorSolicitud, setLineasPorSolicitud] = useState({})
   const [loading, setLoading] = useState(true)
@@ -338,6 +371,7 @@ export default function ReposicionCentralLocal() {
       const ids = (sols ?? []).map((s) => s.id)
       if (!ids.length) {
         setLineasPorSolicitud({})
+        setConDiferenciaHistorica(new Set())
         return
       }
       const { data: lineas, error: errLin } = await supabase
@@ -353,6 +387,19 @@ export default function ReposicionCentralLocal() {
         agrupadas[l.solicitud_id].push(l)
       }
       setLineasPorSolicitud(agrupadas)
+
+      // 18/11/2026 — historial: ¿qué pedidos tuvieron una recepción con diferencia? Si la tabla
+      // no existe o falla, se ignora (la pantalla sigue como antes).
+      try {
+        const { data: evs, error: errEv } = await supabase
+          .from('reposicion_lineas_eventos')
+          .select('solicitud_id')
+          .eq('evento', 'recibida_con_diferencia')
+          .in('solicitud_id', ids)
+        setConDiferenciaHistorica(errEv ? new Set() : new Set((evs ?? []).map((e) => e.solicitud_id)))
+      } catch {
+        setConDiferenciaHistorica(new Set())
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -384,13 +431,15 @@ export default function ReposicionCentralLocal() {
     const lineas = lineasPorSolicitud[s.id] ?? []
     const estado = estadoDetallado(s, lineas)
     if (filtro === 'todas') return true
-    if (filtro === 'diferencias') return resumenDiferencias(lineas).hay
+    if (filtro === 'diferencias') return resumenDiferencias(lineas).hay || conDiferenciaHistorica.has(s.id)
     if (filtro === 'completas') return estado.texto === '✓ Completa'
     // activas: todo lo que no es completa ni reemplazada
     return estado.texto !== '✓ Completa' && s.estado !== 'reemplazada' && s.estado !== 'anulada'
   })
 
-  const cantConDiferencias = solicitudes.filter((s) => resumenDiferencias(lineasPorSolicitud[s.id] ?? []).hay).length
+  const cantConDiferencias = solicitudes.filter(
+    (s) => resumenDiferencias(lineasPorSolicitud[s.id] ?? []).hay || conDiferenciaHistorica.has(s.id)
+  ).length
 
   function toggle(id) {
     setExpandidas((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -414,6 +463,10 @@ export default function ReposicionCentralLocal() {
       </EncabezadoPagina>
 
       <div className="pagina flex flex-col gap-3.5">
+      {/* 18/11/2026 — pedido de Aris: interruptor de la reposición automática (solo admin). */}
+      {!permisos.cargando && permisos.esAdmin && (
+        <ConfigReposicionAutomatica onCambio={() => { setVersionAuto((v) => v + 1); cargar() }} />
+      )}
       <Aviso tipo="info" id="reposicion-central-local-criterio">
         Desde acá se puede crear un pedido entre depósitos, pero preparar, declarar envía/no hay y confirmar
         recibido se sigue haciendo desde las cuentas de depósito — esta pantalla es para ver el estado y el
@@ -466,7 +519,7 @@ export default function ReposicionCentralLocal() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {['', 'Remito', 'Circuito', 'Origen', 'Creada', 'Estado', 'Líneas'].map((h) => (
+                  {['', 'Remito', 'Circuito', 'Generado', 'Creada', 'Estado', 'Líneas'].map((h) => (
                     <th key={h} className="text-left px-3.5 py-2 text-[10px] font-bold text-[var(--sub)] uppercase tracking-wide">
                       {h}
                     </th>
@@ -481,6 +534,8 @@ export default function ReposicionCentralLocal() {
                     lineas={lineasPorSolicitud[s.id] ?? []}
                     expandida={!!expandidas[s.id]}
                     onToggle={() => toggle(s.id)}
+                    modoPrueba={modoPrueba}
+                    tuvoDiferencia={conDiferenciaHistorica.has(s.id)}
                   />
                 ))}
               </tbody>

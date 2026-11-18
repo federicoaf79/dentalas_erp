@@ -6,7 +6,9 @@ import { supabase } from '../lib/supabase'
 // reposición automática están activos. Falla silenciosa: si la RPC no existe
 // (migración sin aplicar) o da error, devuelve null y la pantalla no muestra nada.
 // Devuelve { reposicion_central_activa, reposicion_interna_activa } o null.
-export function useEstadoAutomatismos() {
+// 18/11/2026 — `clave` opcional: al cambiar (p. ej. después de activar/pausar la reposición
+// automática desde la pantalla) vuelve a leer el estado. Sin argumento se comporta igual que antes.
+export function useEstadoAutomatismos(clave = 0) {
   const [estado, setEstado] = useState(null)
 
   useEffect(() => {
@@ -24,7 +26,7 @@ export function useEstadoAutomatismos() {
     return () => {
       vivo = false
     }
-  }, [])
+  }, [clave])
 
   return estado
 }
