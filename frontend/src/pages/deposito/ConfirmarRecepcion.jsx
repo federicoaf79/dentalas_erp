@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { usePermisos } from '../../hooks/usePermisos'
 import Aviso from '../../components/Aviso'
-import { deDeposito } from '../../lib/depositos'
+import { deDeposito, nombreDeposito } from '../../lib/depositos'
 import { generarRemitoImprimible } from '../../lib/pdfRemito'
+import RemitoFirmado from '../../components/RemitoFirmado'
 // 23/10/2026 — modo prueba YiQi (no autorizado Live)
 import AvisoModoPrueba from '../../components/ui/AvisoModoPrueba'
 import { useModoPruebaYiqi } from '../../hooks/useModoPruebaYiqi'
@@ -46,7 +47,7 @@ function numInput(v) {
 function formatoFechaHora(fechaStr) {
   if (!fechaStr) return '—'
   try {
-    return new Date(fechaStr).toLocaleString('es-AR')
+    return new Date(fechaStr).toLocaleString('es-AR', { hourCycle: 'h23' })
   } catch {
     return fechaStr
   }
@@ -62,19 +63,193 @@ const MOTIVOS_DIFERENCIA = [
   'Llegó roto o dañado',
   'Llegó de más',
   'Error de conteo al enviar',
+  // 18/11/2026 — llegó un artículo distinto del que decía el remito (caso de Aris: "decía vasos y llegaron platos").
+  'Llegó otro artículo',
   'Otro',
 ]
+const MOTIVO_OTRO_ARTICULO = 'Llegó otro artículo'
+
+// 18/11/2026 — buscador de artículos para registrar lo que llegó y no estaba en el remito.
+// Misma RPC que "Pedir al otro depósito" (buscar_articulos_deposito); si falla, cae a material_yiqi.
+function BuscadorArticulo({ elegido, onElegir, onLimpiar }) {
+  const [texto, setTexto] = useState('')
+  const [resultados, setResultados] = useState([])
+  const [buscando, setBuscando] = useState(false)
+  const [buscado, setBuscado] = useState('')
+  const [error, setError] = useState(null)
+
+  async function buscar() {
+    const t = texto.trim().replace(/,/g, ' ')
+    if (!t) return
+    setBuscando(true)
+    setError(null)
+    try {
+      const { data, error: errRpc } = await supabase.rpc('buscar_articulos_deposito', { p_texto: t, p_limite: 12 })
+      if (!errRpc && data && Array.isArray(data.items)) {
+        setResultados(data.items)
+      } else {
+        const { data: d2, error: e2 } = await supabase
+          .from('material_yiqi')
+          .select('mate_codigo, mate_nombre')
+          .or(`mate_codigo.ilike.%${t}%,mate_nombre.ilike.%${t}%`)
+          .limit(12)
+        if (e2) throw e2
+        setResultados(d2 ?? [])
+      }
+      setBuscado(t)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBuscando(false)
+    }
+  }
+
+  if (elegido) {
+    return (
+      <div className="flex items-center gap-2 text-[12px] bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1">
+        <span className="font-mono text-[11px]">{elegido.mate_codigo}</span>
+        <span className="flex-1">{elegido.mate_nombre}</span>
+        <button type="button" onClick={onLimpiar} className="text-[11px] font-semibold text-[var(--ind,#4338ca)]">
+          Cambiar
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); buscar() } }}
+          placeholder="Buscá el artículo que llegó (código o nombre)"
+          aria-label="Buscar el artículo que llegó"
+          className="flex-1 border border-[var(--border)] rounded-lg px-2 py-1 text-[12px]"
+        />
+        <button
+          type="button"
+          onClick={buscar}
+          disabled={buscando || !texto.trim()}
+          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[var(--border)] bg-white disabled:opacity-50"
+        >
+          {buscando ? 'Buscando…' : 'Buscar'}
+        </button>
+      </div>
+      {error && <div className="text-[11px] text-[var(--red)]">{error}</div>}
+      {buscado && !buscando && resultados.length === 0 && (
+        <div className="text-[11px] text-[var(--sub)]">No encontré artículos para &quot;{buscado}&quot;.</div>
+      )}
+      {resultados.length > 0 && (
+        <ul className="max-h-40 overflow-y-auto border border-[var(--border)] rounded-lg bg-white divide-y divide-gray-100">
+          {resultados.map((r) => (
+            <li key={r.mate_codigo}>
+              <button
+                type="button"
+                onClick={() => onElegir(r)}
+                className="w-full text-left px-2 py-1 text-[12px] hover:bg-gray-50"
+              >
+                <span className="font-mono text-[11px]">{r.mate_codigo}</span> {r.mate_nombre}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// 18/11/2026 — "+ Llegó algo que no está en el remito": el artículo queda frenado y lo acepta
+// o rechaza el depósito que envió (resolver_no_previsto). No se mueve stock hasta que lo acepta.
+function AgregarNoPrevisto({ solicitudId, onRegistrar }) {
+  const [abierto, setAbierto] = useState(false)
+  const [articulo, setArticulo] = useState(null)
+  const [cantidad, setCantidad] = useState('')
+  const [nota, setNota] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const cantNum = cantidad === '' ? null : Number(cantidad)
+  const valida = articulo && cantNum != null && !Number.isNaN(cantNum) && cantNum > 0
+
+  async function guardar() {
+    setGuardando(true)
+    const ok = await onRegistrar({ solicitudId, articulo, cantidad: cantNum, nota })
+    setGuardando(false)
+    if (ok) {
+      setAbierto(false)
+      setArticulo(null)
+      setCantidad('')
+      setNota('')
+    }
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        onClick={() => setAbierto(true)}
+        title="Si llegó un artículo que no figura en este remito, asentalo acá: queda frenado hasta que el otro depósito lo acepte o lo rechace"
+        className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+      >
+        + Llegó algo que no está en el remito
+      </button>
+    )
+  }
+  return (
+    <div className="w-full mt-1 space-y-1.5 bg-white border border-amber-200 rounded-lg p-2.5">
+      <div className="text-[12px] font-semibold text-amber-800">Llegó algo que no estaba en el remito</div>
+      <BuscadorArticulo elegido={articulo} onElegir={setArticulo} onLimpiar={() => setArticulo(null)} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="number"
+          min="0"
+          value={cantidad}
+          onChange={(e) => setCantidad(e.target.value)}
+          placeholder="Cantidad"
+          aria-label="Cantidad que llegó del artículo no previsto"
+          className="w-24 border border-[var(--border)] rounded-lg px-2 py-1 text-[12px]"
+        />
+        <input
+          type="text"
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          placeholder="Nota (opcional)"
+          className="flex-1 min-w-[160px] border border-[var(--border)] rounded-lg px-2 py-1 text-[12px]"
+        />
+      </div>
+      <div className="text-[10px] text-[var(--sub)]">
+        Queda frenado: no se mueve stock hasta que el depósito que envió lo acepte. Si lo rechaza, hay que devolverlo.
+      </div>
+      <div className="flex gap-1.5">
+        <button
+          onClick={guardar}
+          disabled={guardando || !valida}
+          className="px-2.5 py-1 rounded text-[11px] font-semibold text-white bg-amber-600 disabled:opacity-50"
+        >
+          {guardando ? 'Guardando…' : 'Registrar'}
+        </button>
+        <button onClick={() => setAbierto(false)} className="px-2.5 py-1 rounded text-[11px] border border-[var(--border)]">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function FilaLineaDeclarada({ linea, onConfirmar, guardando, correccion }) {
   const [cantidad, setCantidad] = useState(numInput(linea.cantidad_enviada))
   const [motivo, setMotivo] = useState('')
   const [nota, setNota] = useState('')
+  // 18/11/2026 — "Llegó otro artículo": cuál llegó y cuántas unidades.
+  const [otroArticulo, setOtroArticulo] = useState(null)
+  const [otraCantidad, setOtraCantidad] = useState('')
   const cantNum = cantidad === '' ? null : Number(cantidad)
   const valida = cantNum != null && !Number.isNaN(cantNum) && cantNum >= 0
   const difiere = valida && Math.abs(cantNum - Number(linea.cantidad_enviada)) > 1e-9
   const dif = valida ? cantNum - Number(linea.cantidad_enviada) : 0
+  const esOtroArticulo = difiere && motivo === MOTIVO_OTRO_ARTICULO
+  const otraNum = otraCantidad === '' ? null : Number(otraCantidad)
+  const faltaOtro = esOtroArticulo && (!otroArticulo || otraNum == null || Number.isNaN(otraNum) || otraNum <= 0)
   const faltaMotivo = difiere && (!motivo || (motivo === 'Otro' && !nota.trim()))
-  const deshabilitado = guardando || !valida || (!difiere && cantNum <= 0) || faltaMotivo
+  const deshabilitado = guardando || !valida || (!difiere && cantNum <= 0) || faltaMotivo || faltaOtro
   return (
     <tr className={`border-b border-gray-100 last:border-0 align-top ${difiere ? 'bg-amber-50/60' : ''}`}>
       <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
@@ -121,6 +296,29 @@ function FilaLineaDeclarada({ linea, onConfirmar, guardando, correccion }) {
               placeholder={motivo === 'Otro' ? 'Contá qué pasó (obligatorio)' : 'Nota (opcional)'}
               className="w-full border border-[var(--border)] rounded-lg px-2 py-1 text-[12px]"
             />
+            {esOtroArticulo && (
+              <div className="space-y-1 border-t border-amber-200 pt-1.5">
+                <div className="text-[11px] font-semibold text-amber-800">¿Qué llegó en lugar de {linea.sku}?</div>
+                <BuscadorArticulo
+                  elegido={otroArticulo}
+                  onElegir={setOtroArticulo}
+                  onLimpiar={() => setOtroArticulo(null)}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={otraCantidad}
+                  onChange={(e) => setOtraCantidad(e.target.value)}
+                  placeholder="Cuántas llegaron"
+                  aria-label="Cantidad del artículo que llegó"
+                  className="w-28 border border-[var(--border)] rounded-lg px-2 py-1 text-[12px]"
+                />
+                <div className="text-[10px] text-[var(--sub)]">
+                  Arriba dejá la cantidad que llegó de {linea.sku} (0 si no llegó nada). El artículo que llegó queda
+                  frenado hasta que el otro depósito lo acepte.
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-[10px] text-gray-400 mt-0.5">Corregí si no coincide contra lo físico</div>
@@ -128,7 +326,14 @@ function FilaLineaDeclarada({ linea, onConfirmar, guardando, correccion }) {
       </td>
       <td className="px-3.5 py-1.5">
         <button
-          onClick={() => onConfirmar(linea, cantNum, difiere ? { motivo, nota } : null)}
+          onClick={() =>
+            onConfirmar(
+              linea,
+              cantNum,
+              difiere ? { motivo, nota } : null,
+              esOtroArticulo ? { articulo: otroArticulo, cantidad: otraNum } : null
+            )
+          }
           disabled={deshabilitado}
           title={
             difiere
@@ -144,22 +349,62 @@ function FilaLineaDeclarada({ linea, onConfirmar, guardando, correccion }) {
         {difiere && faltaMotivo && (
           <div className="text-[10px] text-amber-700 mt-1">Falta el motivo</div>
         )}
+        {faltaOtro && !faltaMotivo && (
+          <div className="text-[10px] text-amber-700 mt-1">Falta indicar qué llegó y cuántas</div>
+        )}
       </td>
     </tr>
   )
 }
 
 // Artículo frenado por diferencia: lo resuelve quien recibe con "Revisado".
-function FilaConDiferencia({ linea, onRevisar, guardando }) {
+function FilaConDiferencia({ linea, onRevisar, guardando, solicitud }) {
   const [cantidad, setCantidad] = useState(numInput(linea.cantidad_recibida))
   const [nota, setNota] = useState('')
   const cantNum = cantidad === '' ? null : Number(cantidad)
   const valida = cantNum != null && !Number.isNaN(cantNum) && cantNum >= 0
   const dif = Number(linea.cantidad_recibida) - Number(linea.cantidad_enviada)
+  const origenNombre = solicitud ? nombreDeposito(solicitud.deposito_origen_id) : null
+  // 18/11/2026 — de qué pedido es y quién lo envió (antes no se veía).
+  const infoPedido = (
+    <div className="text-[10px] text-[var(--sub)] mt-0.5">
+      Remito {solicitud?.remito_numero ?? `#${linea.solicitud_id}`}
+      {origenNombre ? ` · lo envió ${origenNombre}` : ''}
+    </div>
+  )
+  // 18/11/2026 — artículo que no estaba en el remito: lo acepta o rechaza el depósito que envió.
+  if (linea.no_previsto) {
+    return (
+      <tr className="border-b border-gray-100 last:border-0 align-top bg-amber-50/40">
+        <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
+        <td className="px-3.5 py-1.5 text-sm">
+          {linea.mate_nombre}
+          {infoPedido}
+        </td>
+        <td className="px-3.5 py-1.5 text-sm">
+          <div>Recibido {num(linea.cantidad_recibida)}</div>
+          <div className="text-[11px] font-semibold text-amber-700">
+            No estaba en el remito — lo acepta o rechaza {origenNombre ?? 'el depósito que envió'}
+          </div>
+          <div className="text-[11px] text-[var(--sub)] mt-0.5">
+            {linea.motivo_diferencia}
+            {linea.nota_diferencia ? ` — ${linea.nota_diferencia}` : ''}
+          </div>
+          <div className="text-[10px] text-gray-400">{formatoFechaHora(linea.recibida_en)}</div>
+        </td>
+        <td className="px-3.5 py-1.5 text-[11px] text-[var(--sub)]" colSpan={2}>
+          Pendiente de que el otro depósito lo acepte. No se movió stock.
+        </td>
+      </tr>
+    )
+  }
   return (
     <tr className="border-b border-gray-100 last:border-0 align-top">
       <td className="px-3.5 py-1.5 font-mono text-xs">{linea.sku}</td>
-      <td className="px-3.5 py-1.5 text-sm">{linea.mate_nombre}</td>
+      <td className="px-3.5 py-1.5 text-sm">
+        {linea.mate_nombre}
+        {infoPedido}
+      </td>
       <td className="px-3.5 py-1.5 text-sm">
         <div>Enviado {num(linea.cantidad_enviada)} · recibido {num(linea.cantidad_recibida)}</div>
         <div className="text-[11px] font-semibold text-amber-700">
@@ -269,7 +514,8 @@ export default function ConfirmarRecepcion() {
         .select('*')
         .in('solicitud_id', idsSolicitud)
         .in('estado_linea', ['declarada', 'con_diferencia'])
-        .gt('cantidad_enviada', 0)
+        // 18/11/2026 — los no previstos tienen cantidad_enviada 0: se ven igual si están frenados.
+        .or('cantidad_enviada.gt.0,estado_linea.eq.con_diferencia')
         .order('sku')
       if (errLin) throw errLin
       setLineas((filasLineas ?? []).filter((l) => l.estado_linea === 'declarada'))
@@ -332,7 +578,7 @@ export default function ConfirmarRecepcion() {
     setTimeout(() => setAviso(null), 5000)
   }
 
-  async function confirmarRecepcion(linea, cantidadRecibida, diferencia) {
+  async function confirmarRecepcion(linea, cantidadRecibida, diferencia, otro = null) {
     setConfirmando(linea.id)
     setError(null)
     try {
@@ -343,6 +589,39 @@ export default function ConfirmarRecepcion() {
         p_nota_diferencia: diferencia?.nota ?? null,
       })
       if (errRpc) throw errRpc
+
+      // 18/11/2026 — "Llegó otro artículo": además de confirmar este, se asienta el que llegó.
+      if (otro?.articulo) {
+        const { error: errNo } = await supabase.rpc('registrar_no_previsto', {
+          p_solicitud_id: linea.solicitud_id,
+          p_sku: otro.articulo.mate_codigo,
+          p_cantidad: otro.cantidad,
+          p_motivo: diferencia?.motivo ?? MOTIVO_OTRO_ARTICULO,
+          p_nota: `En lugar de ${linea.sku}${diferencia?.nota ? ` — ${diferencia.nota}` : ''}`,
+          p_reemplaza_linea_id: linea.id,
+        })
+        if (errNo) {
+          await cargar()
+          throw new Error(
+            `Se confirmó ${linea.sku} con diferencia, pero no se pudo registrar el artículo que llegó: ${errNo.message}. ` +
+              'Registralo con "+ Llegó algo que no está en el remito".'
+          )
+        }
+        // Si del artículo del remito no llegó nada, no queda nada que revisar: se cierra con 0 (no mueve stock).
+        if (estado === 'con_diferencia' && Number(cantidadRecibida) === 0) {
+          await supabase.rpc('revisar_diferencia_linea', {
+            p_linea_id: linea.id,
+            p_cantidad_final: 0,
+            p_nota: `Llegó ${otro.articulo.mate_codigo} en su lugar`,
+          })
+        }
+        await cargar()
+        avisar(
+          `${linea.sku} confirmado con diferencia y ${otro.articulo.mate_codigo} registrado como "no estaba en el remito". ` +
+            'No se movió stock: el depósito que envió tiene que aceptarlo.'
+        )
+        return
+      }
 
       setLineas((prev) => prev.filter((l) => l.id !== linea.id))
       if (estado === 'con_diferencia') {
@@ -358,7 +637,7 @@ export default function ConfirmarRecepcion() {
             recibida_en: new Date().toISOString(),
           },
         ])
-        avisar(`${linea.sku} quedó frenado por diferencia. No se movió stock: revisalo abajo y marcalo "Revisado".`)
+        avisar(`${linea.sku} quedó frenado por diferencia. No se movió stock: revisalo arriba y marcalo "Revisado".`)
         return
       }
 
@@ -372,6 +651,28 @@ export default function ConfirmarRecepcion() {
       setError(err.message)
     } finally {
       setConfirmando(null)
+    }
+  }
+
+  // 18/11/2026 — artículo que llegó y no estaba en el remito (desde el encabezado del pedido).
+  async function registrarNoPrevisto({ solicitudId, articulo, cantidad, nota }) {
+    setError(null)
+    try {
+      const { error: errRpc } = await supabase.rpc('registrar_no_previsto', {
+        p_solicitud_id: Number(solicitudId),
+        p_sku: articulo.mate_codigo,
+        p_cantidad: cantidad,
+        p_motivo: 'Llegó algo que no estaba en el remito',
+        p_nota: nota?.trim() || null,
+        p_reemplaza_linea_id: null,
+      })
+      if (errRpc) throw errRpc
+      await cargar()
+      avisar(`${articulo.mate_codigo} registrado como "no estaba en el remito". No se movió stock: el depósito que envió tiene que aceptarlo.`)
+      return true
+    } catch (err) {
+      setError(err.message)
+      return false
     }
   }
 
@@ -463,7 +764,7 @@ export default function ConfirmarRecepcion() {
               <div className="text-[11px] text-amber-800/80 mt-0.5">
                 Estos artículos están frenados: no se movió su stock y el pedido no se cierra. Si en el otro depósito
                 no tenían esa cantidad, la corrigen ellos desde su panel (&quot;Corregir lo enviado&quot;) y el artículo te
-                vuelve abajo para confirmar. Si se perdió o se rompió en el camino, poné la cantidad final y marcá
+                vuelve abajo para confirmar. Los artículos &quot;No estaba en el remito&quot; los acepta o rechaza el otro depósito. Si se perdió o se rompió en el camino, poné la cantidad final y marcá
                 &quot;Revisado&quot;.
               </div>
             </div>
@@ -487,6 +788,7 @@ export default function ConfirmarRecepcion() {
                     linea={l}
                     onRevisar={revisarDiferencia}
                     guardando={confirmando === l.id}
+                    solicitud={solicitudesPorId[l.solicitud_id]}
                   />
                 ))}
               </tbody>
@@ -513,7 +815,13 @@ export default function ConfirmarRecepcion() {
                     <span className="text-[11px] text-[var(--sub)] ml-2">
                       {deDeposito(s?.deposito_origen_id)} · {formatoFechaHora(s?.creada_en)}
                     </span>
+                    {/* 18/11/2026 — copia firmada del remito (la sube quien recibe). */}
+                    <div className="mt-1">
+                      <RemitoFirmado solicitudId={Number(solicitudId)} puedeSubir compacto />
+                    </div>
                   </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                  <AgregarNoPrevisto solicitudId={solicitudId} onRegistrar={registrarNoPrevisto} />
                   <button
                     onClick={() =>
                       generarRemitoImprimible({
@@ -528,6 +836,7 @@ export default function ConfirmarRecepcion() {
                   >
                     🖨️ Ver / imprimir remito
                   </button>
+                  </div>
                 </div>
                 <table className="w-full border-collapse">
                   <thead>

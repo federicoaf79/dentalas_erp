@@ -102,8 +102,90 @@ function CorregirEnvio({ linea, onCorregido }) {
   )
 }
 
-export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = false }) {
+// 18/11/2026 — artículo que llegó y no estaba en el remito: lo acepta (suma a lo enviado y mueve
+// stock) o lo rechaza (no mueve stock; hay que devolverlo) el depósito que ENVIÓ.
+function ResolverNoPrevisto({ linea, onResuelto }) {
+  const [rechazando, setRechazando] = useState(false)
+  const [motivo, setMotivo] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function resolver(aceptar) {
+    setGuardando(true)
+    setError(null)
+    try {
+      const { error: e } = await supabase.rpc('resolver_no_previsto', {
+        p_linea_id: linea.id,
+        p_aceptar: aceptar,
+        p_motivo: aceptar ? null : motivo.trim(),
+      })
+      if (e) throw e
+      onResuelto?.(linea, aceptar)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  if (rechazando) {
+    return (
+      <div className="mt-1 space-y-1 max-w-[240px]">
+        <input
+          type="text"
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Motivo del rechazo (obligatorio)"
+          className="w-full border border-[var(--border)] rounded px-1.5 py-0.5 text-[12px]"
+        />
+        <div className="text-[10px] text-[var(--sub)]">No se mueve stock: hay que devolverlo físicamente.</div>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => resolver(false)}
+            disabled={guardando || !motivo.trim()}
+            className="px-2 py-0.5 rounded text-[11px] font-semibold text-white bg-[var(--red,#b91c1c)] disabled:opacity-50"
+          >
+            {guardando ? 'Guardando…' : 'Confirmar rechazo'}
+          </button>
+          <button onClick={() => setRechazando(false)} className="px-2 py-0.5 rounded text-[11px] border border-[var(--border)]">
+            Cancelar
+          </button>
+        </div>
+        {error && <div className="text-[11px] text-[var(--red)]">{error}</div>}
+      </div>
+    )
+  }
+  return (
+    <div className="mt-1">
+      <div className="flex gap-1.5">
+        <button
+          onClick={() => resolver(true)}
+          disabled={guardando}
+          title="Suma lo recibido a lo enviado y mueve el stock"
+          className="px-2 py-0.5 rounded text-[11px] font-semibold text-white bg-[var(--grn,#059669)] disabled:opacity-50"
+        >
+          {guardando ? 'Guardando…' : 'Aceptar'}
+        </button>
+        <button
+          onClick={() => setRechazando(true)}
+          disabled={guardando}
+          title="No se mueve stock: hay que devolverlo"
+          className="px-2 py-0.5 rounded text-[11px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
+        >
+          Rechazar
+        </button>
+      </div>
+      {error && <div className="text-[11px] text-[var(--red)] mt-1">{error}</div>}
+    </div>
+  )
+}
+
+export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = false, onCambio = null }) {
   const [filas, setFilas] = useState([])
+  // 18/11/2026 — pedidos que este usuario envió (null = admin, sin límite): filtra el historial.
+  const [idsOrigen, setIdsOrigen] = useState(null)
+  // linea_id -> sku, para "en lugar de <sku>".
+  const [skuReemplazada, setSkuReemplazada] = useState({})
   const [recarga, setRecarga] = useState(0)
   const [aviso, setAviso] = useState(null)
   const clave = depositosOrigen.join(',')
@@ -112,7 +194,19 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
     let vivo = true
     async function cargar() {
       try {
-        if (!esAdmin && !depositosOrigen.length) { setFilas([]); return }
+        if (!esAdmin && !depositosOrigen.length) { setFilas([]); setIdsOrigen([]); return }
+        // 18/11/2026 — este bloque es la pantalla del que ENVÍA: el historial se limita a sus pedidos.
+        if (esAdmin) {
+          if (vivo) setIdsOrigen(null)
+        } else {
+          const { data: propios } = await supabase
+            .from('solicitudes_reposicion')
+            .select('id')
+            .in('deposito_origen_id', depositosOrigen)
+            .order('id', { ascending: false })
+            .limit(1000)
+          if (vivo) setIdsOrigen((propios ?? []).map((r) => r.id))
+        }
         const desde = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
         const { data: lineas, error } = await supabase
           .from('solicitudes_reposicion_lineas')
@@ -124,7 +218,7 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
         if (error) throw error
         const conDif = (lineas ?? []).filter((l) => {
           const recibidaInicial = l.cantidad_recibida_inicial ?? l.cantidad_recibida
-          return l.estado_linea === 'con_diferencia' || (
+          return l.estado_linea === 'con_diferencia' || l.no_previsto || (
             l.cantidad_enviada != null && recibidaInicial != null &&
             Number(recibidaInicial) !== Number(l.cantidad_enviada)
           )
@@ -140,6 +234,12 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
         if (e2) throw e2
         const mapa = Object.fromEntries((sols ?? []).map((s) => [s.id, s]))
         const res = conDif.filter((l) => mapa[l.solicitud_id]).map((l) => ({ ...l, sol: mapa[l.solicitud_id] }))
+        // 18/11/2026 — sku de la línea del remito a la que reemplaza un no previsto.
+        const idsReemp = [...new Set(res.map((l) => l.reemplaza_linea_id).filter(Boolean))]
+        if (idsReemp.length) {
+          const { data: reemp } = await supabase.from('solicitudes_reposicion_lineas').select('id, sku').in('id', idsReemp)
+          if (vivo) setSkuReemplazada(Object.fromEntries((reemp ?? []).map((r) => [r.id, r.sku])))
+        }
         if (vivo) setFilas(res)
       } catch {
         if (vivo) setFilas([])
@@ -154,6 +254,32 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
     setAviso(`${linea.sku}: corregido a ${num(cantidad)} u enviadas. Volvió al otro depósito para que lo confirme.`)
     setTimeout(() => setAviso(null), 6000)
     setRecarga((r) => r + 1)
+    // 18/11/2026 — refresca la tarjeta del pedido en la pantalla que embebe este bloque.
+    onCambio?.()
+  }
+
+  // 18/11/2026 — no previsto aceptado o rechazado. Si se aceptó, se mueve el stock (fire-and-forget:
+  // un error acá nunca deshace la resolución; en modo prueba no es un error).
+  function alResolver(linea, aceptado) {
+    if (aceptado) {
+      supabase.functions
+        .invoke('mover-stock-reposicion', { body: { linea_id: linea.id } })
+        .then(({ data }) => {
+          if (data?.modo_prueba) {
+            setAviso(`${linea.sku}: aceptado. Modo prueba: no se movió stock en YiQi.`)
+            setTimeout(() => setAviso(null), 6000)
+          }
+        })
+        .catch((e) => console.error('[mover-stock-reposicion]', e))
+    }
+    setAviso(
+      aceptado
+        ? `${linea.sku}: aceptado, suma ${num(linea.cantidad_recibida)} u a lo enviado.`
+        : `${linea.sku}: rechazado. No se movió stock: hay que devolverlo al otro depósito.`
+    )
+    setTimeout(() => setAviso(null), 6000)
+    setRecarga((r) => r + 1)
+    onCambio?.()
   }
 
   if (!filas.length) {
@@ -167,6 +293,7 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
           soloDiferencias
           diasAtras={30}
           recarga={recarga}
+          solicitudIds={idsOrigen}
           plegable="Historial de diferencias (últimos 30 días)"
           className="bg-white rounded-xl border border-[var(--border)] px-3.5 py-2"
         />
@@ -185,7 +312,8 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
           ese artículo está frenado: no se movió su stock. Revisá si quedó mercadería sin despachar o si se perdió en el
           camino. Si lo que figuraba enviado no estaba físicamente acá, usá &quot;Corregir lo enviado&quot;: vuelve al
           otro depósito con la cantidad real para que lo confirme. Si se perdió o se rompió en el camino, lo cierra
-          quien recibió con &quot;Revisado&quot;. (Últimos 30 días.)
+          quien recibió con &quot;Revisado&quot;. Si llegó un artículo que no estaba en el remito, lo aceptás (suma a lo
+          enviado y mueve el stock) o lo rechazás (no mueve stock y hay que devolverlo). (Últimos 30 días.)
         </div>
       </div>
       <table className="w-full border-collapse">
@@ -201,13 +329,61 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
             const recibidaInicial = l.cantidad_recibida_inicial ?? l.cantidad_recibida
             const dif = Number(recibidaInicial) - Number(l.cantidad_enviada)
             const pendiente = l.estado_linea === 'con_diferencia'
+            const puedeResolver = esAdmin || depositosOrigen.map(Number).includes(Number(l.sol.deposito_origen_id))
+            // 18/11/2026 — artículo que no estaba en el remito.
+            if (l.no_previsto) {
+              const aceptado = !pendiente && Number(l.cantidad_recibida) > 0
+              return (
+                <tr key={l.id} className="border-b border-gray-50 last:border-0 bg-amber-50/40">
+                  <td className="px-3.5 py-1.5 text-sm font-semibold">
+                    {l.sol.remito_numero || `#${l.sol.id}`}
+                    <div className="text-[10px] font-normal text-[var(--sub)]">→ {nombreDeposito(l.sol.deposito_destino_id)}</div>
+                  </td>
+                  <td className="px-3.5 py-1.5 text-xs text-[var(--sub)]">{new Date(l.recibida_en).toLocaleString('es-AR', { hourCycle: 'h23' })}</td>
+                  <td className="px-3.5 py-1.5 text-sm">
+                    <span className="font-mono text-xs">{l.sku}</span> {l.mate_nombre}
+                    {l.reemplaza_linea_id && skuReemplazada[l.reemplaza_linea_id] && (
+                      <div className="text-[10px] text-[var(--sub)]">en lugar de {skuReemplazada[l.reemplaza_linea_id]}</div>
+                    )}
+                  </td>
+                  <td className="px-3.5 py-1.5 text-sm text-[var(--sub)]">—</td>
+                  <td className="px-3.5 py-1.5 text-sm">{num(recibidaInicial)}</td>
+                  <td className="px-3.5 py-1.5 text-sm">
+                    <Pastilla tono="amarillo">No estaba en el remito</Pastilla>
+                    {l.motivo_diferencia && (
+                      <div className="text-[10px] text-[var(--sub)] mt-0.5">
+                        {l.motivo_diferencia}{l.nota_diferencia ? ` — ${l.nota_diferencia}` : ''}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3.5 py-1.5 text-[11px]">
+                    {pendiente ? (
+                      <>
+                        <span className="font-semibold text-amber-700">Pendiente: ¿lo aceptás?</span>
+                        {puedeResolver && <ResolverNoPrevisto linea={l} onResuelto={alResolver} />}
+                      </>
+                    ) : aceptado ? (
+                      <span className="text-green-700">
+                        Aceptado · suma {num(l.cantidad_recibida)}
+                        {l.nota_revision ? <span className="block text-[10px] text-[var(--sub)]">{l.nota_revision}</span> : null}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--red,#b91c1c)]">
+                        Rechazado — hay que devolverlo
+                        {l.nota_revision ? <span className="block text-[10px] text-[var(--sub)]">{l.nota_revision}</span> : null}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )
+            }
             return (
               <tr key={l.id} className="border-b border-gray-50 last:border-0">
                 <td className="px-3.5 py-1.5 text-sm font-semibold">
                   {l.sol.remito_numero || `#${l.sol.id}`}
                   <div className="text-[10px] font-normal text-[var(--sub)]">→ {nombreDeposito(l.sol.deposito_destino_id)}</div>
                 </td>
-                <td className="px-3.5 py-1.5 text-xs text-[var(--sub)]">{new Date(l.recibida_en).toLocaleString('es-AR')}</td>
+                <td className="px-3.5 py-1.5 text-xs text-[var(--sub)]">{new Date(l.recibida_en).toLocaleString('es-AR', { hourCycle: 'h23' })}</td>
                 <td className="px-3.5 py-1.5 text-sm"><span className="font-mono text-xs">{l.sku}</span> {l.mate_nombre}</td>
                 <td className="px-3.5 py-1.5 text-sm">{num(l.cantidad_enviada)}</td>
                 <td className="px-3.5 py-1.5 text-sm">{num(recibidaInicial)}</td>
@@ -225,7 +401,7 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
                   {pendiente ? (
                     <>
                       <span className="font-semibold text-amber-700">Pendiente de revisar</span>
-                      {(esAdmin || depositosOrigen.map(Number).includes(Number(l.sol.deposito_origen_id))) && (
+                      {puedeResolver && (
                         <CorregirEnvio linea={l} onCorregido={alCorregir} />
                       )}
                     </>
@@ -250,6 +426,7 @@ export default function DiferenciasRecepcion({ depositosOrigen = [], esAdmin = f
         soloDiferencias
         diasAtras={30}
         recarga={recarga}
+        solicitudIds={idsOrigen}
         plegable="Historial de diferencias (últimos 30 días)"
         className="border-t border-gray-100 px-3.5 py-2"
       />
