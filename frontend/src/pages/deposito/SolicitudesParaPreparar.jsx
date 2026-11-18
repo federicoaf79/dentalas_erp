@@ -161,6 +161,15 @@ function FilaLineaReservada({ linea, claseAbc, onDeclarar, guardando, stockAca }
   )
 }
 
+// 18/11/2026 — fecha y hora en formato 24 h.
+function fechaHoraH23(valor) {
+  try {
+    return new Date(valor).toLocaleString('es-AR', { hourCycle: 'h23' })
+  } catch {
+    return String(valor)
+  }
+}
+
 export default function SolicitudesParaPreparar() {
   const permisos = usePermisos()
   // 10/11/2026 — radiografía UX (ítem 18): null = no se sabe (no se muestra nada).
@@ -173,6 +182,9 @@ export default function SolicitudesParaPreparar() {
   const [generando, setGenerando] = useState(null)
   const [declarando, setDeclarando] = useState(null)
   const [empresa, setEmpresa] = useState(null)
+  // 18/11/2026 — pedido de Aris: tope de pedidos automáticos abiertos. null = no se sabe
+  // (migración 20261118170000 sin aplicar o error): no se muestra nada.
+  const [topeAuto, setTopeAuto] = useState(null)
   // SKU -> stock_yiqi.en_transito, para el chequeo de consistencia contra
   // lo que YiQi ya calcula por su cuenta (Aris, 10/9: formalizar "En
   // tránsito" cruzando contra ese dato).
@@ -212,6 +224,11 @@ export default function SolicitudesParaPreparar() {
     }
     setLoading(true)
     setError(null)
+    // 18/11/2026 — estado del tope de pedidos automáticos (silencioso si la RPC no existe todavía).
+    supabase
+      .rpc('estado_pedidos_automaticos_abiertos')
+      .then(({ data: t, error: e }) => setTopeAuto(!e && t && typeof t === 'object' ? t : null))
+      .catch(() => setTopeAuto(null))
     try {
       const { data, error: errSol } = await supabase
         .from('solicitudes_reposicion')
@@ -317,6 +334,32 @@ export default function SolicitudesParaPreparar() {
 
   const cargandoAlgo = loading || permisos.cargando
 
+  // 18/11/2026 — pedido automático que Central todavía no empezó a armar (todas las líneas reservadas).
+  function estaEnEspera(s) {
+    if (s.generada_por !== 'regla_automatica' || s.estado !== 'en_preparacion' || s.armado_iniciado_en) return false
+    const lin = lineasPorSolicitud[s.id]
+    return Array.isArray(lin) && lin.length > 0 && lin.every((l) => l.estado_linea === 'reservada')
+  }
+
+  // 18/11/2026 — al imprimir un pedido automático se marca el armado como iniciado: desde ahí el
+  // sistema deja de reformularlo. Fire-and-forget: nunca bloquea ni rompe la impresión.
+  function marcarArmadoIniciado(s) {
+    if (s.generada_por !== 'regla_automatica' || s.armado_iniciado_en) return
+    try {
+      supabase
+        .rpc('marcar_armado_iniciado', { p_solicitud_id: s.id })
+        .then(({ error: e }) => {
+          if (!e) {
+            const ahora = new Date().toISOString()
+            setSolicitudes((prev) => prev.map((x) => (x.id === s.id ? { ...x, armado_iniciado_en: ahora } : x)))
+          }
+        })
+        .catch(() => {})
+    } catch {
+      /* la impresión sigue igual */
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#f7f8fa]">
       <div className="px-6 py-4 border-b border-[var(--border)] bg-white">
@@ -325,6 +368,14 @@ export default function SolicitudesParaPreparar() {
           {cargandoAlgo ? 'Cargando…' : `${solicitudes.length} solicitud${solicitudes.length === 1 ? '' : 'es'}`}
         </div>
       </div>
+
+      {/* 18/11/2026 — pedido de Aris: con el tope de pedidos automáticos abiertos no se generan más. */}
+      {topeAuto?.activa && topeAuto?.frenado && (
+        <div className="mx-4 mt-4 bg-[var(--yel-bg,#fef3c7)] border border-amber-200 text-[#92400e] rounded-lg px-3.5 py-2.5 text-[13px]">
+          Hay {topeAuto.abiertos} pedidos automáticos abiertos (máximo {topeAuto.maximo}). Hasta que se preparen y se
+          entreguen, el sistema no genera pedidos nuevos.
+        </div>
+      )}
 
       <Aviso tipo="info" id="deposito-preparar-criterio" className="mx-4 mt-4">
         "Generar remito de mercadería" trae la necesidad actualizada al momento exacto del clic — si lo hacés dos
@@ -388,18 +439,26 @@ export default function SolicitudesParaPreparar() {
                       <RemitoFirmado solicitudId={s.id} compacto />
                     </div>
                   )}
+                  {/* 18/11/2026 — pedido automático en espera: se reformula solo con el stock. */}
+                  {estaEnEspera(s) && (
+                    <div className="text-[11px] text-[var(--sub)] mt-1">
+                      Pedido automático: se actualiza solo con el stock hasta que lo imprimas o declares el primer artículo.
+                      {s.recalculado_en ? ` Actualizado: ${fechaHoraH23(s.recalculado_en)}` : ''}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {s.estado === 'en_preparacion' && (
                     <button
-                      onClick={() =>
+                      onClick={() => {
                         generarRemitoImprimible({
                           solicitud: s,
                           lineas: lineasPorSolicitud[s.id] ?? [],
                           empresa,
                           claseAbcPorSku,
                         })
-                      }
+                        marcarArmadoIniciado(s)
+                      }}
                       title="Imprimir o guardar como PDF — el destino confirma la recepción contra este remito"
                       className="px-2.5 py-1.5 rounded-lg text-[12px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50"
                     >

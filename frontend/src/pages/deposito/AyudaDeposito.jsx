@@ -204,6 +204,12 @@ export default function AyudaDeposito() {
                   ningún recálculo: es exactamente lo que vos cargaste, ni más ni menos.
                 </li>
                 <li>
+                  {/* 18/11/2026 — pedidos automáticos */}
+                  Los pedidos automáticos de Central al Local se actualizan solos con el stock hasta que imprimís el
+                  remito o declarás el primer artículo: desde ahí ya no cambian. Hay como máximo 2 abiertos a la vez; hasta
+                  que se preparen y se entreguen, el sistema no genera más.
+                </li>
+                <li>
                   {/* 18/11/2026 — tope de stock */}
                   No podés pedir más de lo que el otro depósito tiene en stock según YiQi (menos lo que ya está
                   comprometido en otros pedidos abiertos): cada artículo muestra "Disponible en …" y, si te pasás, aparece

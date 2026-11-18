@@ -14,6 +14,10 @@ import Pastilla from './ui/Pastilla'
 // (migración sin correr) muestra un aviso discreto y no rompe nada.
 // El interruptor real es reglas_reposicion_central.activa: el cron
 // queda siempre activo y la función decide por esa columna.
+// 18/11/2026 — pedido de Aris (migración 20261118170000): tope de pedidos
+// abiertos a la vez, recálculo de los remitos en espera y lista de pedidos
+// automáticos abiertos. Los datos nuevos vienen del mismo
+// estado_reposicion_automatica(); si la migración no está, se ignoran.
 // ============================================================
 
 function fechaHora(valor) {
@@ -43,6 +47,9 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
   const [horas, setHoras] = useState('4')
   const [maximo, setMaximo] = useState('30')
   const [umbral, setUmbral] = useState('0')
+  // 18/11/2026 — tope de pedidos abiertos y recálculo de los que están en espera.
+  const [maxOrdenes, setMaxOrdenes] = useState('2')
+  const [recalcEspera, setRecalcEspera] = useState(true)
 
   const [confirmando, setConfirmando] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -55,6 +62,8 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
     setHoras(String(Math.round((Number(regla.frecuencia_minutos) / 60) * 100) / 100))
     setMaximo(String(regla.maximo_lineas ?? 30))
     setUmbral(String(regla.umbral_deficit ?? 0))
+    setMaxOrdenes(String(regla.maximo_ordenes_abiertas ?? 2))
+    setRecalcEspera(regla.recalcular_en_espera !== false)
   }, [])
 
   const cargar = useCallback(async () => {
@@ -100,7 +109,9 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
     if (!Number.isFinite(h) || h < 1 || h > 24) return { error: 'La frecuencia tiene que estar entre 1 y 24 horas.' }
     if (!Number.isInteger(m) || m < 1 || m > 100) return { error: 'El máximo de artículos por remito tiene que ser un entero entre 1 y 100.' }
     if (!Number.isFinite(u) || u < 0) return { error: 'El umbral no puede ser negativo.' }
-    return { minutos: Math.round(h * 60), maximo: m, umbral: u }
+    const mo = Number(maxOrdenes)
+    if (!Number.isInteger(mo) || mo < 1 || mo > 10) return { error: 'El máximo de pedidos abiertos a la vez tiene que ser un entero entre 1 y 10.' }
+    return { minutos: Math.round(h * 60), maximo: m, umbral: u, maxOrdenes: mo }
   }
 
   async function guardar(nuevaActiva) {
@@ -119,6 +130,8 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
         p_frecuencia_minutos: f.minutos,
         p_maximo_lineas: f.maximo,
         p_umbral_deficit: f.umbral,
+        p_maximo_ordenes_abiertas: f.maxOrdenes,
+        p_recalcular_en_espera: recalcEspera,
       })
       if (error) throw error
       setMensaje(
@@ -176,7 +189,15 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
     regla &&
     (Number(String(horas).replace(',', '.')) * 60 !== Number(regla.frecuencia_minutos) ||
       Number(maximo) !== Number(regla.maximo_lineas) ||
-      Number(String(umbral).replace(',', '.')) !== Number(regla.umbral_deficit))
+      Number(String(umbral).replace(',', '.')) !== Number(regla.umbral_deficit) ||
+      Number(maxOrdenes) !== Number(regla.maximo_ordenes_abiertas ?? 2) ||
+      recalcEspera !== (regla.recalcular_en_espera !== false))
+
+  // 18/11/2026 — pedidos automáticos abiertos y si el automático está frenado por el tope.
+  const abiertos = Array.isArray(estado?.pedidos_abiertos) ? estado.pedidos_abiertos : []
+  const cantAbiertos = Number(estado?.abiertos_ahora ?? abiertos.length)
+  const maxAbiertos = Number(estado?.maximo_ordenes_abiertas ?? regla?.maximo_ordenes_abiertas ?? 2)
+  const frenado = activa && cantAbiertos >= maxAbiertos
 
   return (
     <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
@@ -249,7 +270,7 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
       )}
 
       {/* Parámetros */}
-      <div className="px-4 pb-3 grid gap-3 sm:grid-cols-3">
+      <div className="px-4 pb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="text-[12px] text-[var(--sub)] flex flex-col gap-1">
           <span className="font-semibold text-[var(--tx,inherit)]">Frecuencia (en horas)</span>
           <input
@@ -277,6 +298,26 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
           />
           <span>Un artículo solo se pide si le faltan al menos estas unidades. 0 = cualquier faltante.</span>
         </label>
+        <label className="text-[12px] text-[var(--sub)] flex flex-col gap-1">
+          <span className="font-semibold text-[var(--tx,inherit)]">Máximo de pedidos abiertos a la vez</span>
+          <input
+            type="number" min="1" max="10" step="1" inputMode="numeric"
+            value={maxOrdenes} onChange={(e) => setMaxOrdenes(e.target.value)}
+            className="border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-sm w-full"
+          />
+          <span>Entre 1 y 10. Con ese tanto de pedidos sin entregar, el sistema no genera más.</span>
+        </label>
+        <label className="text-[12px] text-[var(--sub)] flex flex-col gap-1">
+          <span className="font-semibold text-[var(--tx,inherit)]">Actualizar los pedidos en espera con el stock nuevo</span>
+          <select
+            value={recalcEspera ? 'si' : 'no'} onChange={(e) => setRecalcEspera(e.target.value === 'si')}
+            className="border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-sm w-full bg-white"
+          >
+            <option value="si">Sí</option>
+            <option value="no">No</option>
+          </select>
+          <span>Un pedido en espera es uno que Central todavía no empezó a armar.</span>
+        </label>
       </div>
 
       <div className="px-4 pb-3 flex flex-wrap items-center gap-3">
@@ -286,6 +327,37 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
         {errorGuardar && <span className="text-[12px] text-[var(--red)]">{errorGuardar}</span>}
         {mensaje && <span className="text-[12px] text-green-700">{mensaje}</span>}
       </div>
+
+      {/* 18/11/2026 — pedidos automáticos abiertos y tope */}
+      {frenado && (
+        <div className="mx-4 mb-3 bg-[var(--yel-bg,#fef3c7)] border border-amber-200 text-[#92400e] rounded-lg px-3 py-2 text-[12px]">
+          Hay {cantAbiertos} pedido{cantAbiertos === 1 ? '' : 's'} automático{cantAbiertos === 1 ? '' : 's'} abierto
+          {cantAbiertos === 1 ? '' : 's'} (máximo {maxAbiertos}): el sistema no genera pedidos nuevos hasta que se
+          preparen y se entreguen.
+        </div>
+      )}
+      {estado && estado.abiertos_ahora !== undefined && (
+        <div className="px-4 pb-3 text-[12px] text-[var(--sub)]">
+          <div>
+            Pedidos automáticos abiertos:{' '}
+            <strong className="text-[var(--tx,inherit)]">{cantAbiertos} de {maxAbiertos}</strong>
+          </div>
+          {abiertos.length > 0 && (
+            <ul className="mt-1 flex flex-col gap-0.5">
+              {abiertos.map((p) => (
+                <li key={p.id}>
+                  <strong className="text-[var(--tx,inherit)]">{p.remito_numero || `#${p.id}`}</strong>
+                  {' · '}
+                  {formatoNumero(Number(p.lineas ?? 0), { decimales: 0 })} artículos
+                  {' · '}
+                  {p.en_espera ? 'en espera — se actualiza solo' : 'Central ya empezó a armarlo'}
+                  {p.recalculado_en ? ` · última actualización ${fechaHora(p.recalculado_en)}` : ''}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Estado: último pedido, cuántos entrarían hoy, quién lo configuró */}
       <div className="border-t border-gray-100 bg-gray-50 px-4 py-2.5 text-[12px] text-[var(--sub)] flex flex-wrap gap-x-6 gap-y-1">
@@ -341,7 +413,14 @@ export default function ConfigReposicionAutomatica({ onCambio }) {
             <li>Prioridad: clase A sin stock, después B, después C sin stock, después poca cobertura y por último el resto.</li>
             <li>
               Si hay más artículos que el máximo por remito, el resto va en el pedido siguiente (solo mientras la
-              reposición automática esté activada).
+              reposición automática esté activada), pero nunca hay más pedidos automáticos abiertos que el máximo
+              configurado: hasta que no se preparen y se entreguen, no se generan pedidos nuevos.
+            </li>
+            <li>
+              Un pedido en espera (Central todavía no lo imprimió ni declaró ningún artículo) se vuelve a armar con el
+              stock de ese momento, cada vez que corresponde según la frecuencia o cuando tocás «Recalcular remitos»:
+              si apareció un artículo A con necesidad, entra por prioridad. Deja de actualizarse cuando Central
+              imprime el remito o declara el primer artículo. Los pedidos manuales no se tocan.
             </li>
             <li>Central declara a mano lo que envía: eso alimenta el control de diferencias al recibir.</li>
           </ul>

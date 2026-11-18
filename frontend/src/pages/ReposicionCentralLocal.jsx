@@ -355,6 +355,9 @@ export default function ReposicionCentralLocal() {
   // 17/11/2026 — pedido de Aris: crear pedidos entre depósitos desde acá (solo admin).
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false)
   const [avisoCreado, setAvisoCreado] = useState(null)
+  // 18/11/2026 — pedido de Aris: botón "Recalcular remitos" (fuerza la actualización del armado).
+  const [recalculando, setRecalculando] = useState(false)
+  const [errorRecalculo, setErrorRecalculo] = useState(null)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -406,6 +409,46 @@ export default function ReposicionCentralLocal() {
       setLoading(false)
     }
   }, [])
+
+  // 18/11/2026 — llama a forzar_actualizacion_reposicion(): reformula los pedidos en espera con el
+  // stock de ahora y, si el automático está activo y hay lugar, crea los que falten.
+  async function recalcularRemitos() {
+    setRecalculando(true)
+    setErrorRecalculo(null)
+    setAvisoCreado(null)
+    try {
+      const { data, error: errRpc } = await supabase.rpc('forzar_actualizacion_reposicion')
+      if (errRpc) throw errRpc
+      const rec = Number(data?.recalculados ?? 0)
+      const anu = Number(data?.anulados ?? 0)
+      const cre = Number(data?.creados ?? 0)
+      const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
+      const partes = []
+      if (rec > 0) partes.push(`se actualizaron ${plural(rec, 'pedido en espera', 'pedidos en espera')}`)
+      if (anu > 0) partes.push(`${plural(anu, 'pedido en espera quedó anulado', 'pedidos en espera quedaron anulados')} porque ya no había nada para mandar`)
+      if (cre > 0) partes.push(`se creó ${cre === 1 ? '1 pedido nuevo' : `${cre} pedidos nuevos`}`)
+      let texto
+      if (data?.activa === false) {
+        texto = rec + anu > 0
+          ? 'El automático está pausado: solo se actualizaron los pedidos en espera.'
+          : 'El automático está pausado y no había pedidos en espera para actualizar.'
+      } else if (partes.length === 0) {
+        texto = Number(data?.abiertos ?? 0) >= Number(data?.maximo ?? 0)
+          ? `No hubo cambios. Hay ${data?.abiertos} pedidos automáticos abiertos (máximo ${data?.maximo}): hasta que no se preparen y se entreguen, no se generan pedidos nuevos.`
+          : 'No hubo cambios: no había pedidos en espera ni artículos para pedir.'
+      } else {
+        const t = partes.join(' y ')
+        texto = t.charAt(0).toUpperCase() + t.slice(1) + '.'
+      }
+      setAvisoCreado(texto)
+      setVersionAuto((v) => v + 1)
+      await cargar()
+    } catch (err) {
+      setErrorRecalculo(err?.message || 'No se pudo recalcular los remitos.')
+    } finally {
+      setRecalculando(false)
+    }
+  }
 
   useEffect(() => {
     if (permisos.cargando || !permisos.esAdmin) return
@@ -460,6 +503,17 @@ export default function ReposicionCentralLocal() {
         <button onClick={cargar} className="btn btn-sm">
           ↻ Actualizar
         </button>
+        {/* 18/11/2026 — pedido de Aris: forzar la actualización del armado de remitos (solo admin). */}
+        {!permisos.cargando && permisos.esAdmin && (
+          <button
+            onClick={recalcularRemitos}
+            disabled={recalculando}
+            className="btn btn-sm"
+            title="Vuelve a armar con el stock de ahora los pedidos automáticos que Central todavía no empezó a preparar (si apareció un artículo A con necesidad, entra por prioridad). Si el automático está activo y hay lugar, también crea los pedidos que falten, sin esperar la frecuencia. Los que Central ya empezó a armar no se tocan."
+          >
+            {recalculando ? 'Recalculando…' : '⟳ Recalcular remitos'}
+          </button>
+        )}
       </EncabezadoPagina>
 
       <div className="pagina flex flex-col gap-3.5">
@@ -476,6 +530,11 @@ export default function ReposicionCentralLocal() {
       {avisoCreado && (
         <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-2.5 text-[13px]">
           {avisoCreado}
+        </div>
+      )}
+      {errorRecalculo && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-2.5 text-[13px]">
+          {errorRecalculo}
         </div>
       )}
 
