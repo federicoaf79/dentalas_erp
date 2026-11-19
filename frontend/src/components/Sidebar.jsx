@@ -87,16 +87,17 @@ function NavItem({ item, active, onClick, badges }) {
   return (
     <div
       onClick={() => onClick(item.key)}
-      className={`flex items-center gap-[9px] px-2.5 py-[9px] rounded-lg cursor-pointer text-[13px] mb-0.5 select-none transition-colors
+      className={`flex items-start gap-[9px] px-2.5 py-[9px] rounded-lg cursor-pointer text-[13px] mb-0.5 select-none transition-colors
         ${active
           ? 'bg-[var(--ind-bg)] text-[var(--ind)] font-bold'
           : 'text-gray-700 hover:bg-[var(--ind-bg)]'
         }`}
     >
       {/* 5/10/2026: íconos de línea Tabler, iguales al prototipo v7 (antes emojis). */}
-      <i className={`ti ${item.icon} text-[16px] flex-shrink-0`} aria-hidden="true" />
-      <span className="flex-1 truncate">{item.label}</span>
-      {badges && <div className="flex gap-1 items-center">{badges}</div>}
+      <i className={`ti ${item.icon} text-[16px] flex-shrink-0 mt-px`} aria-hidden="true" />
+      {/* 19/11/2026 — radiografía visual: el texto puede ir en dos líneas (antes truncate cortaba con "…") */}
+      <span className="flex-1 min-w-0 break-words leading-snug">{item.label}</span>
+      {badges && <div className="flex gap-1 items-center flex-shrink-0">{badges}</div>}
     </div>
   )
 }

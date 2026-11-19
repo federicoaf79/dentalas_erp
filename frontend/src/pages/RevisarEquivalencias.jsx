@@ -1,4 +1,14 @@
 import { formatoMoneda } from '../lib/formato'
+
+// 19/11/2026 — radiografía visual: formatoMoneda redondea a 0 decimales (lib/formato.js, maximumFractionDigits: 0),
+// y los artículos de precio unitario bajo (barbijos, fresas) se veían como "$ 0" o "$ 2". Acá se muestran 2
+// decimales cuando el precio es menor a 100. El dato en sí (precios_proveedor_yiqi.precio_final) no se toca.
+function precioChico(valor) {
+  const num = Number(valor)
+  if (valor == null || valor === '' || !Number.isFinite(num)) return formatoMoneda(valor)
+  if (Math.abs(num) >= 100) return formatoMoneda(num)
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num)
+}
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -99,9 +109,11 @@ export default function RevisarEquivalencias() {
         <button
           onClick={cargarTanda}
           disabled={cargandoAlgo}
-          className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
+          className="btn btn-sm"
         >
-          {cargandoAlgo ? 'Cargando…' : '↻ Cargar tanda nueva'}
+          {/* 19/11/2026 — radiografía visual: ícono Tabler en vez del glifo ↻ */}
+          <i className="ti ti-refresh" aria-hidden="true" />
+          {cargandoAlgo ? 'Cargando…' : 'Cargar tanda nueva'}
         </button>
       </div>
 
@@ -173,13 +185,13 @@ export default function RevisarEquivalencias() {
                       <div className="text-[11px] text-[var(--sub)] mb-0.5">{par.proveedor_a}</div>
                       <div className="font-semibold text-sm">{par.mate_nombre_a}</div>
                       <div className="font-mono text-xs text-gray-400 mt-1">{par.sku_a}</div>
-                      <div className="font-bold mt-1">{formatoMoneda(par.precio_final_a)}</div>
+                      <div className="font-bold mt-1">{precioChico(par.precio_final_a)}</div>
                     </div>
                     <div className="p-3.5">
                       <div className="text-[11px] text-[var(--sub)] mb-0.5">{par.proveedor_b}</div>
                       <div className="font-semibold text-sm">{par.mate_nombre_b}</div>
                       <div className="font-mono text-xs text-gray-400 mt-1">{par.sku_b}</div>
-                      <div className="font-bold mt-1">{formatoMoneda(par.precio_final_b)}</div>
+                      <div className="font-bold mt-1">{precioChico(par.precio_final_b)}</div>
                     </div>
                   </div>
 

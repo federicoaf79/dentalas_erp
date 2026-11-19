@@ -712,7 +712,8 @@ export default function Ayuda() {
         bajada="Qué hace cada pantalla del menú, cómo se usa, y qué reglas conviene tener presentes"
       />
 
-      <div className="pagina flex flex-col gap-4 max-w-3xl">
+      {/* 19/11/2026 — radiografía visual: contenedor más ancho (antes max-w-3xl dejaba media pantalla vacía a 1536 px) */}
+      <div className="pagina flex flex-col gap-4 max-w-4xl xl:max-w-6xl">
         {/* Roles, en una tarjeta fija arriba de todo — es la base para entender
             por qué varias pantallas se ven distinto según quién entra. */}
         <div className="bg-white rounded-xl border border-[var(--border)] p-4">
@@ -797,9 +798,12 @@ export default function Ayuda() {
         {(hayFiltro ? modulosFiltrados : MODULOS).map((m) => (
           <div key={m.titulo} className="flex flex-col gap-2.5">
             <div className="text-[11px] text-gray-400 uppercase tracking-wider px-1 mt-1">{m.titulo}</div>
-            {m.tabs.map((t) => (
-              <TabCard key={t.key} tab={t} abierta={hayFiltro || abiertos.has(t.key)} onToggle={() => toggle(t.key)} />
-            ))}
+            {/* 19/11/2026 — radiografía visual: tarjetas en 2 columnas desde xl */}
+            <div className="flex flex-col gap-2.5 xl:grid xl:grid-cols-2 xl:items-start">
+              {m.tabs.map((t) => (
+                <TabCard key={t.key} tab={t} abierta={hayFiltro || abiertos.has(t.key)} onToggle={() => toggle(t.key)} />
+              ))}
+            </div>
           </div>
         ))}
 

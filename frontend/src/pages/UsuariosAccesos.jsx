@@ -120,6 +120,9 @@ function PanelDeposito({ usuario, asignados, errorCarga, onCambio }) {
 
   async function toggle(depId) {
     const yaEsta = asignados.includes(depId)
+    // 19/11/2026 — radiografía visual: confirmar al quitar el último depósito de la cuenta
+    if (yaEsta && asignados.length === 1 &&
+        !window.confirm('La cuenta va a quedar sin depósito y no va a poder operar. ¿Seguro?')) return
     setGuardando(depId)
     try {
       await cambiarDeposito(usuario.id, depId, yaEsta ? 'quitar' : 'agregar')
@@ -166,6 +169,8 @@ function PanelDeposito({ usuario, asignados, errorCarga, onCambio }) {
           )
         })}
       </div>
+      {/* 19/11/2026 — radiografía visual: aviso de guardado inmediato */}
+      <div className="mt-2 text-[11px] text-[var(--sub)]">Se guarda al tildar.</div>
       {asignados.length === 0 && !errorCarga && (
         <div className="mt-3 text-[12px] text-amber-700">
           Esta cuenta no tiene ningún depósito asignado: hoy no ve ninguna solicitud.
@@ -300,7 +305,7 @@ function ModalPassword({ usuario, onCerrar, onConfirmar, guardando }) {
           <button
             onClick={onCerrar}
             disabled={guardando}
-            className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
+            className="btn btn-sm"
           >
             Cancelar
           </button>
@@ -444,7 +449,8 @@ export default function UsuariosAccesos() {
           className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
         >
           {/* 10/11/2026 — radiografía UX (ítem 5): botón Actualizar unificado con ícono Tabler */}
-          <i className="ti ti-refresh" aria-hidden="true" />
+          {/* 19/11/2026 — radiografía visual: mismo botón que Monitor/Alertas (btn btn-sm separa ícono y texto) */}
+            <i className="ti ti-refresh" aria-hidden="true" />
           {loading ? 'Actualizando…' : 'Actualizar'}
         </button>
         )}

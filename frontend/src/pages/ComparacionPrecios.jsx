@@ -308,9 +308,10 @@ export default function ComparacionPrecios({ onIrARevisar }) {
           <button
             onClick={cargarDatos}
             disabled={cargandoAlgo}
-            className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-[var(--border)] bg-white hover:bg-gray-50 disabled:opacity-50"
+            className="btn btn-sm"
           >
             {/* 10/11/2026 — radiografía UX (ítem 5): botón Actualizar unificado con ícono Tabler */}
+            {/* 19/11/2026 — radiografía visual: mismo botón que Monitor/Alertas (btn btn-sm separa ícono y texto) */}
             <i className="ti ti-refresh" aria-hidden="true" />
             {cargandoAlgo ? 'Actualizando…' : 'Actualizar'}
           </button>

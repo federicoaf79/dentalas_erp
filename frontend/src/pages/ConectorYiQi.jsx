@@ -167,7 +167,8 @@ export default function ConectorYiQi() {
                 Entidades habilitadas para consultar
               </div>
               <div className="flex flex-wrap gap-2">
-                {(estado.entidadesPermitidas ?? []).map((e) => (
+                {/* 19/11/2026 — radiografía visual: REMITO_INTERNO se lee por API desde el 18/11; se suma si el backend no la devuelve */}
+                {Array.from(new Set([...(estado.entidadesPermitidas ?? []), 'REMITO_INTERNO'])).map((e) => (
                   <span key={e} className="badge bg-[#f3f4f6] text-[#374151] font-mono">
                     {e}
                   </span>
@@ -209,6 +210,25 @@ export default function ConectorYiQi() {
                       <td className="sku">CLIENTE</td>
                       <td className="font-semibold">2346</td>
                       <td className="text-[12px] text-[var(--sub)]">Proveedores (datos de contacto)</td>
+                    </tr>
+                    {/* 19/11/2026 — radiografía visual: faltaban las smarties 2353, 2360 y 2359 (lista fija, no sale de la API) */}
+                    <tr>
+                      <td className="sku">API_Ventas_Mensual NO BORRAR</td>
+                      <td className="sku">REPORTE_DE_VENTAS</td>
+                      <td className="font-semibold">2353</td>
+                      <td className="text-[12px] text-[var(--sub)]">Predictor de demanda, máximos calculados, sugerencias de compra</td>
+                    </tr>
+                    <tr>
+                      <td className="sku">Z.API_Stock_Por_Deposito_NO_BORRAR</td>
+                      <td className="sku">STOCK</td>
+                      <td className="font-semibold">2360</td>
+                      <td className="text-[12px] text-[var(--sub)]">Stock por depósito en Monitor, Alertas y app de depósito</td>
+                    </tr>
+                    <tr>
+                      <td className="sku">Z.API_Movimientos_Stock_NO_BORRAR</td>
+                      <td className="sku">MOVIMIENTO_STOCK</td>
+                      <td className="font-semibold">2359</td>
+                      <td className="text-[12px] text-[var(--sub)]">Último movimiento por artículo</td>
                     </tr>
                   </tbody>
                 </table>
