@@ -190,7 +190,10 @@ export default function PedirAlOtroDeposito() {
         </div>
       )}
 
-      <div className="px-4 pt-4 flex gap-2 max-w-xl">
+      {/* 19/11/2026 — radiografía visual (depósito): desde lg, resultados (izquierda) y pedido (derecha, sticky) en dos columnas; en pantallas chicas sigue apilado. */}
+      <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+      <div className="min-w-0">
+      <div className="px-4 pt-4 flex gap-2 max-w-xl lg:max-w-none">
         <input
           type="text"
           value={busqueda}
@@ -208,7 +211,7 @@ export default function PedirAlOtroDeposito() {
         </button>
       </div>
 
-      <div className="px-4 mt-1.5 max-w-xl text-[11px] text-[var(--sub)] flex gap-1.5 items-start">
+      <div className="px-4 mt-1.5 max-w-xl lg:max-w-none text-[11px] text-[var(--sub)] flex gap-1.5 items-start">
         <i className="ti ti-bulb mt-px" />
         <span>
           Buscá por palabras sueltas: «acrilico auto» encuentra todo lo que tenga las dos palabras, en cualquier
@@ -218,23 +221,23 @@ export default function PedirAlOtroDeposito() {
       </div>
 
       {buscado && !buscando && resultados.length === 0 && !error && (
-        <div className="mx-4 mt-2 max-w-xl text-[13px] text-[var(--sub)]">
+        <div className="mx-4 mt-2 max-w-xl lg:max-w-none text-[13px] text-[var(--sub)]">
           No encontramos artículos con «{buscado}». Probá con menos palabras, otra forma de escribirla o el código.
         </div>
       )}
 
       {total !== null && total > resultados.length && (
-        <div className="px-4 mt-2 max-w-xl text-[12px] text-[var(--sub)]">
+        <div className="px-4 mt-2 max-w-xl lg:max-w-none text-[12px] text-[var(--sub)]">
           Mostrando {resultados.length} de {total} — sumá otra palabra (marca, color, tamaño) para afinar
         </div>
       )}
 
       {dispFalla && (
-        <div className="mx-4 mt-2 max-w-xl text-[12px] text-amber-700">No se pudo leer el stock: el pedido se envía sin tope de cantidad.</div>
+        <div className="mx-4 mt-2 max-w-xl lg:max-w-none text-[12px] text-amber-700">No se pudo leer el stock: el pedido se envía sin tope de cantidad.</div>
       )}
 
       {resultados.length > 0 && (
-        <div className="mx-4 mt-2 max-w-xl bg-white rounded-xl border border-[var(--border)] overflow-hidden max-h-64 overflow-y-auto">
+        <div className="mx-4 mt-2 max-w-xl lg:max-w-none bg-white rounded-xl border border-[var(--border)] overflow-hidden max-h-64 lg:max-h-[60vh] overflow-y-auto">
           {resultados.map((r) => (
             <div
               key={r.mate_codigo}
@@ -261,8 +264,9 @@ export default function PedirAlOtroDeposito() {
           ))}
         </div>
       )}
+      </div>
 
-      <div className="px-4 py-4 max-w-xl">
+<div className="px-4 py-4 max-w-xl lg:max-w-none lg:sticky lg:top-4">
         <div className="text-[13px] font-semibold mb-2">Pedido ({carrito.length})</div>
         {carrito.length === 0 ? (
           <div className="bg-white rounded-xl border border-[var(--border)] p-6 text-center text-[var(--sub)] text-sm">
@@ -324,6 +328,7 @@ export default function PedirAlOtroDeposito() {
         >
           {enviando ? 'Enviando…' : `📤 Enviar pedido ${otroDeposito ? aDeposito(otroDeposito) : ''}`}
         </button>
+      </div>
       </div>
     </div>
   )

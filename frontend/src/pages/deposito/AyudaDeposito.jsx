@@ -2,6 +2,9 @@ import { useState } from 'react'
 import Aviso from '../../components/Aviso'
 import { DEPOSITO_OTRO, nombreDeposito } from '../../lib/depositos'
 import { usePermisos } from '../../hooks/usePermisos'
+// 19/11/2026 — radiografía visual (depósito): avisos de estado leídos en vivo en vez de texto fijo.
+import { useEstadoAutomatismos } from '../../hooks/useEstadoAutomatismos'
+import { useModoPruebaYiqi } from '../../hooks/useModoPruebaYiqi'
 
 // ============================================================
 // pages/deposito/AyudaDeposito.jsx — 14/9/2026
@@ -34,6 +37,20 @@ export default function AyudaDeposito() {
   const miDeposito = permisos.misDepositos?.[0] ?? null
   const otroDeposito = miDeposito ? DEPOSITO_OTRO[miDeposito] : null
   const [abierto, setAbierto] = useState('circuito')
+  // 19/11/2026 — radiografía visual (depósito): estado real de la reposición automática y del modo prueba.
+  const automatismos = useEstadoAutomatismos()
+  const { modoPrueba, cargando: cargandoModoPrueba } = useModoPruebaYiqi()
+  const textoAutomatica =
+    automatismos?.reposicion_central_activa === false
+      ? 'Por ahora la reposición automática Central→Local está pausada: solo llegan pedidos manuales ("Pedir al otro depósito").'
+      : automatismos?.reposicion_central_activa === true
+        ? 'La reposición automática Central→Local está activada: el sistema crea pedidos de Central al Local solo. Además podés pedir cosas puntuales con "Pedir al otro depósito".'
+        : 'La reposición automática Central→Local puede estar activada o pausada según lo decida Aris; no pudimos leer el estado ahora.'
+  const textoModoPrueba = cargandoModoPrueba
+    ? ''
+    : modoPrueba
+      ? ' Además, mientras dure el modo prueba, confirmar una recepción no mueve stock en YiQi: queda registrada solo en la app.'
+      : ' Confirmar una recepción mueve el stock real en YiQi.'
 
   function toggle(key) {
     setAbierto((prev) => (prev === key ? null : key))
@@ -49,7 +66,8 @@ export default function AyudaDeposito() {
         </div>
       </div>
 
-      <div className="p-4 flex flex-col gap-3 max-w-2xl">
+      {/* 19/11/2026 — radiografía visual (depósito): contenedor más ancho (antes max-w-2xl dejaba media pantalla vacía a 1536 px) y 2 columnas desde xl, como Ayuda.jsx. */}
+      <div className="p-4 flex flex-col gap-3 max-w-4xl xl:max-w-6xl xl:grid xl:grid-cols-2 xl:items-start">
         <Tarjeta icon="🔄" titulo="El circuito, en resumen">
           <p>
             Vos tenés 3 pantallas en el menú de la izquierda. Las mismas 3 sirven tanto para Depósito Central como
@@ -73,9 +91,8 @@ export default function AyudaDeposito() {
           </ul>
           {/* 10/11/2026 — radiografía UX (ítem 16): estado actual del circuito. */}
           <Aviso tipo="filtro" className="mt-1">
-            Por ahora la reposición automática Central→Local está pausada: solo llegan pedidos manuales ("Pedir al
-            otro depósito"). Además, mientras dure el modo prueba, confirmar una recepción no mueve stock en YiQi:
-            queda registrada solo en la app.
+            {textoAutomatica}
+            {textoModoPrueba}
           </Aviso>
           <Aviso tipo="info" id="deposito-ayuda-sin-aprobacion" className="mt-1">
             Este circuito no tiene un paso de "aprobación" como sí tienen las órdenes de compra — no hay nadie que

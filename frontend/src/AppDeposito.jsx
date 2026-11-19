@@ -79,7 +79,8 @@ export default function AppDeposito({ nombreUsuario, onLogout }) {
             {nombreUsuario.slice(0, 2)}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold truncate capitalize">{nombreUsuario}</div>
+            {/* 19/11/2026 — radiografía visual (depósito): title con el nombre completo y hasta 2 líneas en vez de cortar con "…". */}
+            <div className="text-[13px] font-semibold capitalize line-clamp-2 break-words leading-tight" title={nombreUsuario}>{nombreUsuario}</div>
             <CambiarMiPassword />
           </div>
           {onLogout && (
