@@ -263,7 +263,10 @@ export default function PredictorDemanda() {
               No hay artículos con ventas que coincidan con la búsqueda.
             </div>
           ) : (
-            <table className="tabla">
+            <>
+            {/* 19/11/2026 — radiografía visual: a < 1536 px (pantalla de 1280) se compacta la tabla para que entre sin scroll lateral; a 1536 px o más queda igual. */}
+            <style>{`@media (max-width: 1535px) { .tabla.tabla-predictor th { padding: 8px 5px; font-size: 9.5px; } .tabla.tabla-predictor td { padding: 8px 5px; font-size: 12px; } .tabla.tabla-predictor th:last-child, .tabla.tabla-predictor td:last-child { position: sticky; right: 0; z-index: 1; background: #fff; box-shadow: -8px 0 8px -8px rgba(0,0,0,.25); } .tabla.tabla-predictor th:last-child { background: #fafafa; } .tabla.tabla-predictor td.mes, .tabla.tabla-predictor th.mes { padding-left: 3px; padding-right: 3px; font-size: 11px; } }`}</style>
+            <table className="tabla tabla-predictor">
               <thead>
                 <tr>
                   <th className="sticky left-0 z-[1]">SKU</th>
@@ -275,7 +278,7 @@ export default function PredictorDemanda() {
                   <th className="text-right!">Prom./mes</th>
                   <th>Cobertura</th>
                   {meses.map((m) => (
-                    <th key={m.clave} className="text-right! px-1.5! text-gray-400!">
+                    <th key={m.clave} className="mes text-right! px-1.5! text-gray-400!">
                       {m.label}
                     </th>
                   ))}
@@ -288,10 +291,10 @@ export default function PredictorDemanda() {
                   return (
                     <tr key={f.mate_codigo}>
                       <td className="sku sticky left-0 bg-white">{f.mate_codigo}</td>
-                      <td className="font-semibold max-w-[200px] truncate" title={f.mate_nombre ?? ''}>
+                      <td className="font-semibold max-w-[150px] 2xl:max-w-[200px] whitespace-normal 2xl:truncate" title={f.mate_nombre ?? ''}>
                         {f.mate_nombre ?? '—'}
                       </td>
-                      <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap max-w-[120px] truncate" title={f.proveedor ?? ''}>{f.proveedor ?? '—'}</td>
+                      <td className="text-[var(--sub)] text-[12px]! max-w-[100px] 2xl:max-w-[120px] whitespace-normal 2xl:whitespace-nowrap 2xl:truncate" title={f.proveedor ?? ''}>{f.proveedor ?? '—'}</td>
                       <td className="text-right tabular-nums font-semibold">{formatoNumero(f.stock_actual)}</td>
                       <td className="text-right font-semibold tabular-nums text-[var(--ind,#4338ca)]">
                         {formatoEntero(f.promedio)}
@@ -302,7 +305,7 @@ export default function PredictorDemanda() {
                         return (
                           <td
                             key={m.clave}
-                            className={`px-1.5! text-right text-[12px]! tabular-nums ${
+                            className={`mes px-1.5! text-right text-[12px]! tabular-nums ${
                               valor == null ? 'text-gray-200' : Number(valor) < 0 ? 'text-[var(--red)]' : 'text-gray-600'
                             }`}
                           >
@@ -310,12 +313,13 @@ export default function PredictorDemanda() {
                           </td>
                         )
                       })}
-                      <td className="text-right font-bold tabular-nums">{formatoNumero(f.total)}</td>
+                      <td className="text-right font-bold tabular-nums">{formatoNumero(f.total)}</td>{/* 19/11/2026 — radiografía visual: Total queda fijo a la derecha si hay scroll lateral */}
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+            </>
           )}
         </div>
 

@@ -383,11 +383,17 @@ export default function Proveedores({ onIrACondiciones }) {
               No hay proveedores que coincidan con la búsqueda.
             </div>
           ) : (
-            <table className="tabla">
+            <>
+            {/* 19/11/2026 — radiografía visual: a < 1536 px (pantalla de 1280) se compacta la tabla para que entre sin scroll lateral; a 1536 px o más queda igual. */}
+            <style>{`@media (max-width: 1535px) { .tabla.tabla-proveedores th { padding: 8px 5px; font-size: 9.5px; } .tabla.tabla-proveedores td { padding: 8px 5px; font-size: 12px; } }`}</style>
+            {/* 19/11/2026 — radiografía visual: la columna del botón Condiciones queda fija a la derecha con scroll lateral; selectores directos para no afectar la tabla anidada del detalle ni la fila expandida (colspan). */}
+            <style>{`.tabla.tabla-proveedores > thead > tr > th:last-child, .tabla.tabla-proveedores > tbody > tr > td:last-child:not([colspan]) { position: sticky; right: 0; z-index: 1; background: #fff; box-shadow: -8px 0 8px -8px rgba(0,0,0,.18); } .tabla.tabla-proveedores > thead > tr > th:last-child { background: #fafafa; z-index: 10; }`}</style>
+            <table className="tabla tabla-proveedores">
               <thead>
                 <tr>
+                  {/* 19/11/2026 — radiografía visual: Condición IVA se oculta debajo de 1536 px para que entren Mínimo compra y Condiciones */}
                   {['Código', 'Proveedor', 'CUIT', 'Condición IVA', 'Teléfono', 'Artículos', 'Alertas', 'WhatsApp pedidos', 'Límite aprob.', 'Mínimo compra', ''].map((h) => (
-                    <th key={h}>{h}</th>
+                    <th key={h} className={h === 'Condición IVA' ? 'hidden 2xl:table-cell' : undefined}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -399,10 +405,10 @@ export default function Proveedores({ onIrACondiciones }) {
                       className={`cursor-pointer ${proveedorExpandido === p.clave ? 'bg-indigo-50/50' : ''}`}
                     >
                       <td className="sku">{p.codigo ?? '—'}</td>
-                      <td className="font-semibold text-[var(--text)]">{p.nombre}</td>
+                      <td className="font-semibold text-[var(--text)]" title={p.nombre ?? ''}>{p.nombre}</td>
                       <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap">{p.cuit ?? '—'}</td>
-                      <td className="text-[var(--sub)] text-[12px]!">{p.condicionIva ?? '—'}</td>
-                      <td className="text-[var(--sub)] text-[12px]! whitespace-nowrap">{p.telefono ?? '—'}</td>
+                      <td className="text-[var(--sub)] text-[12px]! hidden 2xl:table-cell">{p.condicionIva ?? '—'}</td>
+                      <td className="text-[var(--sub)] text-[12px]! 2xl:whitespace-nowrap">{p.telefono ?? '—'}</td>
                       <td className="font-bold">{formatoNumero(p.totalArticulos)}</td>
                       <td>
                         {p.criticas === 0 && p.preventivas === 0 ? (
@@ -465,6 +471,7 @@ export default function Proveedores({ onIrACondiciones }) {
                 ))}
               </tbody>
             </table>
+            </>
           )}
         </div>
 

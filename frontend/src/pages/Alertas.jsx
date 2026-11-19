@@ -658,15 +658,16 @@ export default function Alertas({ onArmarOC }) {
           excluidos (este último solo admin, igual que su pestaña). */}
       {!permisos.error && (
         <div className="metricas mb-5">
-          <div className="metrica">
-            <div className="metrica-rot">Preventivas</div>
-            <div className="metrica-val text-[#b8860b]">{cargandoAlgo ? '—' : formatoNumero(preventivasFiltradas)}</div>
-            <div className="metrica-sub">tiempo para actuar</div>
-          </div>
+          {/* 19/11/2026 — radiografía visual: Críticas primero, igual que los chips de abajo */}
           <div className="metrica">
             <div className="metrica-rot">Críticas</div>
             <div className="metrica-val text-[var(--red)]">{cargandoAlgo ? '—' : formatoNumero(criticasFiltradas)}</div>
             <div className="metrica-sub">acción inmediata</div>
+          </div>
+          <div className="metrica">
+            <div className="metrica-rot">Preventivas</div>
+            <div className="metrica-val text-[#b8860b]">{cargandoAlgo ? '—' : formatoNumero(preventivasFiltradas)}</div>
+            <div className="metrica-sub">tiempo para actuar</div>
           </div>
           <div className="metrica">
             <div className="metrica-rot">Pausadas</div>
@@ -841,7 +842,9 @@ export default function Alertas({ onArmarOC }) {
               /* 10/11/2026 — radiografía UX (ítem 2): el wrapper pasa a scroll en ambos ejes con alto
                  acotado; con solo overflow-x un th sticky no se pega al scroll vertical de la página. */
               <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 140px)' }}>
-              <table className="tabla tabla-acciones">
+              {/* 19/11/2026 — radiografía visual: a < 1536 px (pantalla de 1280) se compacta la tabla para que entre sin scroll lateral; a 1536 px o más queda igual. */}
+<style>{`@media (max-width: 1535px) { .tabla.tabla-alertas th { padding: 8px 5px; font-size: 9.5px; } .tabla.tabla-alertas td { padding: 8px 5px; font-size: 12px; } .tabla.tabla-alertas td:last-child, .tabla.tabla-alertas th:last-child { box-shadow: -8px 0 8px -8px rgba(0,0,0,.25); } }`}</style>
+              <table className="tabla tabla-acciones tabla-alertas">
                 <thead>
                   <tr>
                     {[
@@ -877,8 +880,8 @@ export default function Alertas({ onArmarOC }) {
                   {filasPaginadas.map((a) => (
                     <tr key={a.yiqi_id} className={a._alerta.nivel === 'critica' ? 'bg-[#fdf2f2]' : undefined}>
                       <td className="sku whitespace-nowrap">{a.mate_codigo}</td>
-                      <td className="font-semibold"><div className="min-w-[145px]">{a.mate_nombre}</div></td>{/* 10/11/2026 — 180→145 px: con el scroll propio de la tabla, a 1536 px la columna Causa quedaba tapada por la de acciones */}
-                      <td className="text-[var(--sub)] text-[12px]">{a.clie_nombre ?? '—'}</td>
+                      <td className="font-semibold"><div className="min-w-[105px] 2xl:min-w-[145px]" title={a.mate_nombre ?? ''}>{a.mate_nombre}</div></td>{/* 10/11/2026 — 180→145 px: con el scroll propio de la tabla, a 1536 px la columna Causa quedaba tapada por la de acciones */}
+                      <td className="text-[var(--sub)] text-[12px] max-w-[110px] 2xl:max-w-none" title={a.clie_nombre ?? ''}>{a.clie_nombre ?? '—'}</td>{/* 19/11/2026 — radiografía visual: Proveedor hace salto de línea en pantallas chicas */}
                       {/* Punto 3 (28/9/2026): gráfico en vez de 3 columnas numéricas
                           sueltas (Stock/Mín./Máx.) -- ver components/BarraMinStockMax.jsx.
                           El umbral que se grafica como "Mín." es el mismo que decide la
@@ -934,7 +937,7 @@ export default function Alertas({ onArmarOC }) {
                         )}
                       </td>
                       <td
-                        className="text-gray-400 text-[12px] max-w-[110px] truncate"
+                        className="text-gray-400 text-[12px] max-w-[70px] 2xl:max-w-[110px] truncate"
                         title={textoNota(a.mate_notas_sobre_punto_de) ?? ''}
                       >
                         {textoNota(a.mate_notas_sobre_punto_de) ?? '—'}
@@ -957,7 +960,7 @@ export default function Alertas({ onArmarOC }) {
                               })
                             }
                             title={causasPorSku[a.mate_codigo]?.nota ?? 'Ver o cambiar la causa declarada'}
-                            className="pill pill-amarillo max-w-[160px] truncate"
+                            className="pill pill-amarillo max-w-[100px] 2xl:max-w-[160px] truncate"
                           >
                             <i className="ti ti-message" />
                             {causasPorSku[a.mate_codigo].causa_rotulo}

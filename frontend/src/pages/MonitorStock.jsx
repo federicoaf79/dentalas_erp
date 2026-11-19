@@ -604,7 +604,12 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                 : 'No hay artículos con alerta en este momento (o no coinciden con la búsqueda).'}
             </div>
           ) : (
-            <table className="tabla tabla-acciones">
+            <>
+            {/* 19/11/2026 — radiografía visual: a < 1536 px (pantalla de 1280) se compacta la tabla para que entre sin scroll lateral; a 1536 px o más queda igual. */}
+            <style>{`@media (max-width: 1535px) { .tabla.tabla-monitor th { padding: 8px 5px; font-size: 9.5px; } .tabla.tabla-monitor td { padding: 8px 5px; font-size: 12px; } }`}</style>
+            {/* 19/11/2026 — radiografía visual: Estado y "+ OC" quedan fijos a la derecha cuando hay scroll lateral */}
+            <style>{`.tabla.tabla-monitor.con-oc th:nth-last-child(2), .tabla.tabla-monitor.con-oc td:nth-last-child(2) { position: sticky; right: 64px; z-index: 1; background: #fff; box-shadow: -8px 0 8px -8px rgba(0,0,0,.25); } .tabla.tabla-monitor.con-oc th:nth-last-child(2) { background: #fafafa; z-index: 10; } .tabla.tabla-monitor.con-oc th:last-child, .tabla.tabla-monitor.con-oc td:last-child { width: 64px; min-width: 64px; }`}</style>
+            <table className={`tabla tabla-acciones tabla-monitor${onArmarOC ? ' con-oc' : ''}`}>
               <thead>
                 <tr>
                   {[
@@ -642,8 +647,8 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                   return (
                     <tr key={a.yiqi_id}>
                       <td className="sku whitespace-nowrap">{a.mate_codigo}</td>
-                      <td className="font-semibold"><div className="min-w-[180px]">{a.mate_nombre}</div></td>
-                      <td><span className="text-[12px] text-[var(--sub)]">{a.clie_nombre ?? '—'}</span></td>
+                      <td className="font-semibold"><div className="min-w-[110px] 2xl:min-w-[180px]" title={a.mate_nombre ?? ''}>{a.mate_nombre}</div></td>
+                      <td className="max-w-[110px] 2xl:max-w-none" title={a.clie_nombre ?? ''}><span className="text-[12px] text-[var(--sub)]">{a.clie_nombre ?? '—'}</span></td>
                       <td>
                         {/* 2/10/2026 (feedback Ivana 17/20): barra Stock vs Mín./Máx., igual que Alertas */}
                         <BarraMinStockMax
@@ -732,7 +737,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                         )}
                       </td>
                       <td
-                        className="text-gray-400 max-w-[110px] truncate"
+                        className="text-gray-400 max-w-[70px] 2xl:max-w-[110px] truncate"
                         title={textoNota(a.mate_notas_sobre_punto_de) ?? ''}
                       >
                         {textoNota(a.mate_notas_sobre_punto_de) ?? '—'}
@@ -759,6 +764,7 @@ export default function MonitorStock({ contadores = {}, onArmarOC, onIrA }) {
                 })}
               </tbody>
             </table>
+            </>
           )}
         </div>
 
