@@ -203,8 +203,9 @@ export default function NuevoPedidoEntreDepositos({ onCerrar, onCreado }) {
           disabled={enviando}
           className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-[13px] mb-1"
         >
-          <option value={DEPOSITO_CENTRAL}>Central → Local</option>
-          <option value={DEPOSITO_LOCAL}>Local → Central</option>
+          {/* 19/11/2026 — radiografía visual: mismo nombre que en el resto de la app (Depósito Central → Depósito Local). */}
+          <option value={DEPOSITO_CENTRAL}>{nombreDeposito(DEPOSITO_CENTRAL)} → {nombreDeposito(DEPOSITO_LOCAL)}</option>
+          <option value={DEPOSITO_LOCAL}>{nombreDeposito(DEPOSITO_LOCAL)} → {nombreDeposito(DEPOSITO_CENTRAL)}</option>
         </select>
         <div className="text-[12px] text-[var(--sub)] mb-3">
           El origen ({nombreDeposito(origen)}) prepara y envía; el destino ({nombreDeposito(destino)}) recibe y

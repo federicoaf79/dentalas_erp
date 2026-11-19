@@ -307,8 +307,9 @@ function TarjetaOrden({ o, abierta, onToggle, causa, onCausa, compacta = false }
           <span className="text-[11px] text-[var(--sub)]">{formatoFecha(o.fecha)}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-semibold text-[var(--text)] truncate">{o.proveedor || '—'}</div>
-          <div className="text-[12px] text-[var(--sub)] mt-0.5 truncate">
+          {/* 19/11/2026 — radiografía visual: title con el texto completo (se corta con "…"). */}
+          <div className="text-[14px] font-semibold text-[var(--text)] truncate" title={o.proveedor || ''}>{o.proveedor || '—'}</div>
+          <div className="text-[12px] text-[var(--sub)] mt-0.5 truncate" title={`${articulos} ${articulos === 1 ? 'artículo' : 'artículos'}${o.asunto ? ` · Asunto: ${o.asunto}` : ''}`}>
             {articulos} {articulos === 1 ? 'artículo' : 'artículos'}
             {/* El asunto es la nota manual de Ivana en YiQi (U-2, 7/9/2026). */}
             {o.asunto && <> · <span className="text-gray-400">Asunto:</span> {o.asunto}</>}
@@ -408,7 +409,7 @@ function TarjetaOrdenPropia({ o, modoPrueba }) {
           <span className="text-[11px] text-[var(--sub)]">{o.creada_en ? formatoFecha(String(o.creada_en).slice(0, 10)) : '—'}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-semibold text-[var(--text)] truncate">{o.proveedor_nombre || '—'}</div>
+          <div className="text-[14px] font-semibold text-[var(--text)] truncate" title={o.proveedor_nombre || ''}>{o.proveedor_nombre || '—'}</div>
           <div className="text-[12px] text-[var(--sub)] mt-0.5 truncate">
             {o.cant_items} {o.cant_items === 1 ? 'artículo' : 'artículos'}
             {quien && <> · {quien}</>}
@@ -444,6 +445,18 @@ export default function SeguimientoOC() {
   const [propias, setPropias] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // 19/11/2026 — radiografía visual: avisos de ingreso con exceso/parcial que se pueden ocultar por número de OC (localStorage).
+  const [ocultosIngreso, setOcultosIngreso] = useState(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('seguimiento_ingreso_ocultos') || '[]')
+      return Array.isArray(v) ? v.map(String) : []
+    } catch { return [] }
+  })
+  const [verOcultosIngreso, setVerOcultosIngreso] = useState(false)
+  const guardarOcultosIngreso = (lista) => {
+    setOcultosIngreso(lista)
+    try { localStorage.setItem('seguimiento_ingreso_ocultos', JSON.stringify(lista)) } catch { /* sin storage: queda solo en memoria */ }
+  }
   const [filtroEstado, setFiltroEstado] = useState('todas')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
@@ -636,7 +649,10 @@ export default function SeguimientoOC() {
     )
   }
 
-  const parciales = noCompletadas.filter((o) => o._estado.key === 'parcial')
+  const parcialesTodas = noCompletadas.filter((o) => o._estado.key === 'parcial')
+  // 19/11/2026 — radiografía visual: los ocultados no se cuentan en el aviso salvo que se pida verlos.
+  const parciales = verOcultosIngreso ? parcialesTodas : parcialesTodas.filter((o) => !ocultosIngreso.includes(String(o.nroOC)))
+  const cantOcultosIngreso = parcialesTodas.length - parcialesTodas.filter((o) => !ocultosIngreso.includes(String(o.nroOC))).length
   const abrirCausa = (o) =>
     setModalCausa({ referenciaId: o.nroOC, referenciaTexto: `OC #${o.nroOC} — ${o.proveedor}` })
   const toggle = (nro) => setFilaExpandida(filaExpandida === nro ? null : nro)
@@ -673,7 +689,19 @@ export default function SeguimientoOC() {
                   : `Ingreso parcial en ${parciales.length} OC`
             }
             acciones={
-              <button className="btn btn-sm" onClick={() => setFiltroEstado('parcial')}><i className="ti ti-eye" /> Ver</button>
+              <>
+                <button className="btn btn-sm" onClick={() => setFiltroEstado('parcial')}><i className="ti ti-eye" /> Ver</button>
+                {/* 19/11/2026 — radiografía visual: ocultar el aviso (se recuerda por nro de OC). */}
+                {!verOcultosIngreso && (
+                  <button
+                    className="btn btn-sm"
+                    title="Ocultar este aviso (se recuerda en este navegador)"
+                    onClick={() => guardarOcultosIngreso([...new Set([...ocultosIngreso, ...parciales.map((o) => String(o.nroOC))])])}
+                  >
+                    Ocultar
+                  </button>
+                )}
+              </>
             }
           >
             {parciales.length === 1
@@ -684,6 +712,34 @@ export default function SeguimientoOC() {
                 }`
               : 'Llegó parte de la mercadería y todavía faltan unidades por recibir.'}
           </BloqueAccion>
+        )}
+
+        {/* 19/11/2026 — radiografía visual: volver a ver / volver a ocultar los avisos ocultos */}
+        {cantOcultosIngreso > 0 && filtroEstado !== 'parcial' && (
+          <div className="mb-3 text-[12px]">
+            <button
+              type="button"
+              className="text-[var(--ind)] underline"
+              onClick={() => {
+                if (verOcultosIngreso) {
+                  setVerOcultosIngreso(false)
+                } else {
+                  setVerOcultosIngreso(true)
+                }
+              }}
+            >
+              {verOcultosIngreso ? 'Volver a ocultar' : `Mostrar ocultos (${cantOcultosIngreso})`}
+            </button>
+            {verOcultosIngreso && (
+              <button
+                type="button"
+                className="text-[var(--sub)] underline ml-3"
+                onClick={() => { guardarOcultosIngreso([]); setVerOcultosIngreso(false) }}
+              >
+                Dejar de ocultar
+              </button>
+            )}
+          </div>
         )}
 
         {/* Filtros por estado + fechas */}

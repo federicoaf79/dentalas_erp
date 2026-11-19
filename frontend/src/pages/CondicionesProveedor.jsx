@@ -385,7 +385,8 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
                               <input
                                 type="number" step="1000"
                                 value={form.limite_aprobacion}
-                                placeholder={limiteGlobal ? `General: ${limiteGlobal}` : 'Usa el general'}
+                                // 19/11/2026 — radiografía visual: el límite general se muestra formateado ($ 1.000.000).
+                                placeholder={limiteGlobal ? `General: ${moneda(limiteGlobal)}` : 'Usa el general'}
                                 onChange={(e) => setForm((f) => ({ ...f, limite_aprobacion: e.target.value }))}
                                 className="border border-[var(--border)] rounded-lg px-3 py-2 text-sm w-full"
                               />
@@ -398,7 +399,8 @@ export default function CondicionesProveedor({ preseleccion, onConsumirPreselecc
                                   checked={form.siempre_requiere_aprobacion}
                                   onChange={(e) => setForm((f) => ({ ...f, siempre_requiere_aprobacion: e.target.checked }))}
                                 />
-                                Siempre requiere mi aprobación
+                                {/* 19/11/2026 — radiografía visual: la ven también Federico e Ivana, no es "mi" aprobación. */}
+                                Siempre requiere aprobación de Aris
                               </span>
                             </label>
 

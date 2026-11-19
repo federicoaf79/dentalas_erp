@@ -36,6 +36,28 @@ function rpcNoExiste(error) {
   return m.includes('pgrst202') || m.includes('42883') || m.includes('could not find the function') || m.includes('does not exist')
 }
 
+// 19/11/2026 — radiografía visual: un solo estilo de interruptor (el grande con texto de estado) para los dos de la tarjeta.
+function Interruptor({ activo, onClick, disabled, ariaLabel, textoOn = 'Activada', textoOff = 'Pausada' }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={activo}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      className={`relative inline-flex items-center h-10 w-[148px] rounded-full border transition-colors shrink-0 ${
+        activo ? 'bg-[var(--grn,#059669)] border-[var(--grn,#059669)]' : 'bg-gray-200 border-gray-300'
+      } ${disabled ? 'opacity-60' : ''}`}
+    >
+      <span className={`absolute top-1 h-8 w-8 rounded-full bg-white shadow transition-all ${activo ? 'left-[108px]' : 'left-1'}`} />
+      <span className={`w-full text-[13px] font-bold ${activo ? 'text-white pr-10 text-left pl-4' : 'text-gray-600 pl-10 text-right pr-4'}`}>
+        {activo ? textoOn : textoOff}
+      </span>
+    </button>
+  )
+}
+
 // 18/11/2026 — camino B (decisión de Federico): sección "Remito interno en YiQi" con su propio interruptor
 // (RPC configurar_remito_yiqi). `onEstado` le avisa a la pantalla si el módulo está prendido.
 export default function ConfigReposicionAutomatica({ onCambio, onEstado }) {
@@ -58,6 +80,13 @@ export default function ConfigReposicionAutomatica({ onCambio, onEstado }) {
   const [errorGuardar, setErrorGuardar] = useState(null)
   const [mensaje, setMensaje] = useState(null)
   const [detalleAbierto, setDetalleAbierto] = useState(false)
+  // 19/11/2026 — radiografía visual: la tarjeta es plegable. null = el usuario nunca eligió (manda el estado: Activada → desplegada, Pausada → plegada).
+  const [eleccionDespliegue, setEleccionDespliegue] = useState(() => {
+    try {
+      const v = localStorage.getItem('config_reposicion_auto_desplegada')
+      return v === '1' ? true : v === '0' ? false : null
+    } catch { return null }
+  })
   // 18/11/2026 — interruptor "Crear el remito interno en YiQi".
   const [confirmandoYiqi, setConfirmandoYiqi] = useState(false)
   const [guardandoYiqi, setGuardandoYiqi] = useState(false)
@@ -243,13 +272,46 @@ export default function ConfigReposicionAutomatica({ onCambio, onEstado }) {
   const maxAbiertos = Number(estado?.maximo_ordenes_abiertas ?? regla?.maximo_ordenes_abiertas ?? 2)
   const frenado = activa && cantAbiertos >= maxAbiertos
 
+  // 19/11/2026 — radiografía visual: pausada → plegada por defecto; activada → desplegada. La elección del usuario manda.
+  const desplegada = eleccionDespliegue ?? activa
+  const alternarDespliegue = () => {
+    const nuevo = !desplegada
+    setEleccionDespliegue(nuevo)
+    try { localStorage.setItem('config_reposicion_auto_desplegada', nuevo ? '1' : '0') } catch { /* sin storage */ }
+  }
+  const resumen = [
+    activa ? 'Activada' : 'Pausada',
+    `cada ${horasTexto} h`,
+    `hasta ${formatoNumero(Number(regla?.maximo_lineas ?? 30), { decimales: 0 })} artículos por remito`,
+    `máx. ${maxAbiertos} pedidos abiertos`,
+    `Remito interno en YiQi: ${yiqiPrendido ? 'activado' : 'desactivado'}`,
+    candidatos ? `Hoy entrarían ${formatoNumero(candidatos.total, { decimales: 0 })} artículos` : 'Hoy entrarían: calculando…',
+  ].join(' · ')
+
   return (
     <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden">
+      {/* 19/11/2026 — radiografía visual: línea de resumen + botón Configurar (plegable) */}
+      {!desplegada && (
+        <div className="px-4 py-3 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[240px] text-[13px] text-[var(--sub)]">
+            <strong className="text-[var(--tx,inherit)]">Reposición automática Central → Local</strong>
+            {' · '}
+            {resumen}
+          </div>
+          <button type="button" className="btn btn-sm" aria-expanded={false} onClick={alternarDespliegue}>
+            Configurar ▾
+          </button>
+        </div>
+      )}
+      {desplegada && (<>
       <div className="px-4 py-3.5 flex flex-wrap items-center gap-4">
         <div className="flex-1 min-w-[240px]">
           <div className="flex items-center gap-2">
             <h2 className="text-[15px] font-bold">Reposición automática Central → Local</h2>
             <Pastilla tono={activa ? 'verde' : 'gris'}>{activa ? 'Activada' : 'Pausada'}</Pastilla>
+            <button type="button" className="btn btn-sm ml-1" aria-expanded={true} onClick={alternarDespliegue}>
+              Ocultar ▴
+            </button>
           </div>
           <p className="text-[12px] text-[var(--sub)] mt-1">
             {activa
@@ -259,26 +321,12 @@ export default function ConfigReposicionAutomatica({ onCambio, onEstado }) {
         </div>
 
         {/* Interruptor grande */}
-        <button
-          type="button"
-          role="switch"
-          aria-checked={activa}
-          aria-label="Reposición automática Central a Local"
+        <Interruptor
+          activo={activa}
           disabled={guardando || !regla}
           onClick={clicInterruptor}
-          className={`relative inline-flex items-center h-10 w-[148px] rounded-full border transition-colors shrink-0 ${
-            activa ? 'bg-[var(--grn,#059669)] border-[var(--grn,#059669)]' : 'bg-gray-200 border-gray-300'
-          } ${guardando ? 'opacity-60' : ''}`}
-        >
-          <span
-            className={`absolute top-1 h-8 w-8 rounded-full bg-white shadow transition-all ${activa ? 'left-[108px]' : 'left-1'}`}
-          />
-          <span
-            className={`w-full text-[13px] font-bold ${activa ? 'text-white pr-10 text-left pl-4' : 'text-gray-600 pl-10 text-right pr-4'}`}
-          >
-            {activa ? 'Activada' : 'Pausada'}
-          </span>
-        </button>
+          ariaLabel="Reposición automática Central a Local"
+        />
       </div>
 
       {!regla && (
@@ -422,19 +470,14 @@ export default function ConfigReposicionAutomatica({ onCambio, onEstado }) {
               Pendiente, y los depósitos lo ejecutan desde YiQi.
             </p>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={yiqiPrendido}
-            aria-label="Crear el remito interno en YiQi"
+          <Interruptor
+            activo={yiqiPrendido}
             disabled={guardandoYiqi || !estado}
             onClick={clicInterruptorYiqi}
-            className={`relative inline-flex items-center h-8 w-[60px] rounded-full border transition-colors shrink-0 ${
-              yiqiPrendido ? 'bg-[var(--grn,#059669)] border-[var(--grn,#059669)]' : 'bg-gray-200 border-gray-300'
-            } ${guardandoYiqi ? 'opacity-60' : ''}`}
-          >
-            <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${yiqiPrendido ? 'left-[32px]' : 'left-1'}`} />
-          </button>
+            ariaLabel="Crear el remito interno en YiQi"
+            textoOn="Activado"
+            textoOff="Desactivado"
+          />
         </div>
         {yiqiPrendido && !escrituraHabilitada && (
           <div className="mt-2 bg-[var(--yel-bg,#fef3c7)] border border-amber-200 text-[#92400e] rounded-lg px-3 py-2 text-[12px]">
@@ -539,6 +582,7 @@ export default function ConfigReposicionAutomatica({ onCambio, onEstado }) {
           Del Local hacia Central no hay reposición automática: a Central la repone Compras.
         </p>
       </div>
+      </>)}
     </div>
   )
 }
