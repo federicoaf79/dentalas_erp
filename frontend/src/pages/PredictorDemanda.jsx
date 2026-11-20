@@ -83,6 +83,8 @@ function esExcluidoDelPredictor(fila) {
   const nombreMin = String(fila.mate_nombre ?? '').toLowerCase()
   // 20/11/2026 — 887/888: genéricos de compras puntuales para un cliente o vendedor (Ivana).
   if (['887', '888', '889', '890', '99999'].includes(sku)) return true
+  // 20/11/2026 — "Prioritario a domicilio": concepto de facturación, no se repone.
+  if (String(sku).trim().toLowerCase() === 'prioritario a domicilio') return true
   return nombreMin.includes('acritone') || nombreMin.includes('newcryl')
 }
 
