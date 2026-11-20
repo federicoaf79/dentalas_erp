@@ -84,7 +84,7 @@ function esExcluidoDelPredictor(fila) {
   // 20/11/2026 — 887/888: genéricos de compras puntuales para un cliente o vendedor (Ivana).
   if (['887', '888', '889', '890', '99999'].includes(sku)) return true
   // 20/11/2026 — conceptos de envío del reporte de ventas (Prioritario…): no se reponen.
-  if (['prioritario', 'prioritario a domicilio', 'prioritario a sucursal de correo', 'retiro en sucursal oca prioritario'].includes(String(sku).trim().toLowerCase())) return true
+  if (['prioritario', 'prioritario a domicilio', 'prioritario a sucursal de correo', 'retiro en sucursal oca prioritario', 'estándar a domicilio', 'estándar a sucursal de correo', 'express a domicilio', 'express a sucursal de correo', 'retiro en una sucursal'].includes(String(sku).trim().toLowerCase())) return true
   return nombreMin.includes('acritone') || nombreMin.includes('newcryl')
 }
 
